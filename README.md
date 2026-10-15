@@ -38,6 +38,10 @@ never a code change (FR2).
 | `npm run test` | Vitest (unit, jsdom + Testing Library) |
 | `npm run test:e2e` | Playwright, against a built-and-previewed app |
 
+`.github/workflows/ci.yml` (KAN-157) runs typecheck, lint, the unit suite
+and the Playwright suite on every push/PR to `main`; both suites are
+treated as a Done gate for this epic's stories.
+
 ## Reusable patterns (read before adding a new feature epic's screens)
 
 - **`src/api/client.ts`** — the only place that calls `fetch` against
