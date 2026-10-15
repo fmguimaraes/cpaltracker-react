@@ -163,4 +163,74 @@ describe('HelloWorld', () => {
     expect(auth!.status).toBe('anonymous')
     expect(auth!.account).toBeNull()
   })
+
+  /**
+   * KAN-156 (FR10) — the explicit in-app logout action this story adds.
+   */
+  it('renders a "Sign out" button only once authenticated, and it issues an explicit POST on click', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/auth/logout.php')) {
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      void init
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            account: {
+              userId: 1,
+              clientId: null,
+              mail: 'demo@cpal.test',
+              nom: 'Demo',
+              prenom: 'User',
+              role: 'client',
+              telephone: null,
+              lastLoginAt: null,
+              mustChangePassword: false,
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+
+    renderHelloWorld()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('connected')).toHaveTextContent('demo@cpal.test'),
+    )
+
+    const logoutButton = screen.getByTestId('logout-button')
+    await user.click(logoutButton)
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([input]) => {
+          const url = typeof input === 'string' ? input : input.toString()
+          return url.includes('/auth/logout.php')
+        }),
+      ).toBe(true),
+    )
+    const logoutCall = fetchMock.mock.calls.find(([input]) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      return url.includes('/auth/logout.php')
+    }) as [RequestInfo | URL, RequestInit]
+    expect(logoutCall[1].method).toBe('POST')
+  })
+
+  it('does not render a "Sign out" button while anonymous (no authenticated session to end)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 401 })),
+    )
+
+    renderHelloWorld()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('connected')).toHaveTextContent('not signed in'),
+    )
+    expect(screen.queryByTestId('logout-button')).not.toBeInTheDocument()
+  })
 })

@@ -32,7 +32,7 @@ export function RequireAuth({
   children,
   allowMustChangePassword = false,
 }: RequireAuthProps) {
-  const { status, account } = useAuth()
+  const { status, account, notice } = useAuth()
   const location = useLocation()
 
   if (status === 'loading') {
@@ -49,7 +49,10 @@ export function RequireAuth({
   }
 
   if (status === 'anonymous') {
-    return <Navigate to={buildLoginRedirectPath(location)} replace />
+    // KAN-156 (FR10/FR11/FR12): this single branch — already FR13's
+    // anonymous-redirect — also carries the logout/session-loss indicator;
+    // see AuthContext's `notice` and `buildLoginRedirectPath`'s doc comment.
+    return <Navigate to={buildLoginRedirectPath(location, notice)} replace />
   }
 
   if (account?.mustChangePassword && !allowMustChangePassword) {

@@ -2,9 +2,26 @@ import { useAuth } from '../auth/AuthContext'
 import { useThemeStore } from '../store/themeStore'
 
 export function HelloWorld() {
-  const { status, account, error } = useAuth()
+  const { status, account, error, logout } = useAuth()
   const { theme, toggleTheme } = useThemeStore()
   const baseUrl = import.meta.env.VITE_API_BASE_URL
+
+  /**
+   * KAN-156 (FR10) — the explicit, authenticated action that triggers
+   * logout. `logout()` itself already always clears local auth state (its
+   * own `finally`, see AuthContext) even if the server call fails, so there
+   * is nothing further to do on a thrown `ApiError` here — it's swallowed
+   * rather than surfaced, since by the time it could throw the user is
+   * already signed out locally and `RequireAuth` is about to redirect them
+   * to `/login?notice=logged-out`.
+   */
+  async function handleLogout() {
+    try {
+      await logout()
+    } catch {
+      // See doc comment above — intentionally ignored.
+    }
+  }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-8">
@@ -12,19 +29,36 @@ export function HelloWorld() {
         <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
           cpaltracker-react
         </h1>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          data-testid="theme-toggle"
-          className="rounded-md border px-3 py-1.5 text-sm"
-          style={{
-            borderColor: 'var(--color-border)',
-            backgroundColor: 'var(--color-surface)',
-            color: 'var(--color-text)',
-          }}
-        >
-          {theme === 'light' ? 'Switch to dark' : 'Switch to light'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            data-testid="theme-toggle"
+            className="rounded-md border px-3 py-1.5 text-sm"
+            style={{
+              borderColor: 'var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text)',
+            }}
+          >
+            {theme === 'light' ? 'Switch to dark' : 'Switch to light'}
+          </button>
+          {status === 'authenticated' && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              data-testid="logout-button"
+              className="rounded-md border px-3 py-1.5 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text)',
+              }}
+            >
+              Sign out
+            </button>
+          )}
+        </div>
       </header>
 
       <section

@@ -1,6 +1,6 @@
 import { act, render, waitFor } from '@testing-library/react'
 import { inspect } from 'node:util'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, setAuthToken } from '../api/client'
 import { AuthProvider, useAuth } from './AuthContext'
 
@@ -344,5 +344,188 @@ describe('AuthContext token handling (NFR3)', () => {
     const [, init] = vi.mocked(fetch).mock.calls.at(-1) as [RequestInfo | URL, RequestInit]
     const headers = new Headers(init.headers)
     expect(headers.has('Authorization')).toBe(false)
+  })
+})
+
+/**
+ * KAN-156 — FR10 (explicit POST-only logout, clears AuthContext, sets the
+ * 'logged-out' notice) and FR11/FR12 (shared session-loss interceptor drops
+ * an authenticated session and sets the 'session-expired' notice).
+ */
+describe('AuthContext logout (FR10)', () => {
+  beforeEach(() => {
+    setAuthToken(null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    setAuthToken(null)
+  })
+
+  it('issues a POST to /auth/logout.php — never GET — and the only call site in the app is this one', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/auth/login.php')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: 'a-token',
+              expiresAt: '2026-10-16T00:00:00Z',
+              account: accountSummary,
+            }),
+            { status: 200 },
+          ),
+        )
+      }
+      if (url.includes('/auth/logout.php')) {
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      return Promise.resolve(new Response(null, { status: 401 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    await act(async () => {
+      await probe.auth.login('demo@cpal.test', 'password')
+    })
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+
+    await act(async () => {
+      await probe.auth.logout()
+    })
+
+    const logoutCall = fetchMock.mock.calls.find(([input]) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      return url.includes('/auth/logout.php')
+    })
+    expect(logoutCall).toBeDefined()
+    const [, init] = logoutCall as unknown as [RequestInfo | URL, RequestInit]
+    expect(init.method).toBe('POST')
+  })
+
+  it('clears AuthContext (status, account, token) and sets the logged-out notice once the POST completes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/auth/login.php')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                token: 'a-token',
+                expiresAt: '2026-10-16T00:00:00Z',
+                account: accountSummary,
+              }),
+              { status: 200 },
+            ),
+          )
+        }
+        if (url.includes('/auth/logout.php')) {
+          return Promise.resolve(new Response(null, { status: 204 }))
+        }
+        return Promise.resolve(new Response(null, { status: 401 }))
+      }),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    await act(async () => {
+      await probe.auth.login('demo@cpal.test', 'password')
+    })
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+    expect(probe.auth.notice).toBeNull()
+
+    await act(async () => {
+      await probe.auth.logout()
+    })
+
+    expect(probe.auth.status).toBe('anonymous')
+    expect(probe.auth.account).toBeNull()
+    expect(probe.auth.notice).toBe('logged-out')
+  })
+})
+
+describe('AuthContext session-loss interceptor (FR11, FR12)', () => {
+  beforeEach(() => {
+    setAuthToken(null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    setAuthToken(null)
+  })
+
+  it('drops an authenticated session to anonymous with the session-expired notice when any later /api/v1 call comes back 401 unauthorized', async () => {
+    // Review gate self-check: this test would fail to prove anything if the
+    // interceptor were a no-op, since nothing else in this flow sets
+    // `notice` to 'session-expired' — only `handleSessionLoss` does.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/auth/login.php')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                token: 'a-token',
+                expiresAt: '2026-10-16T00:00:00Z',
+                account: accountSummary,
+              }),
+              { status: 200 },
+            ),
+          )
+        }
+        return Promise.resolve(new Response(null, { status: 401 }))
+      }),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    await act(async () => {
+      await probe.auth.login('demo@cpal.test', 'password')
+    })
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+
+    // Reconfigure the mock: the next authenticated-only account.php response
+    // signals token invalidation server-side (idle timeout, absolute
+    // timeout, account disabled, or epoch mismatch — all the same single
+    // `401 unauthorized` wire signal per stack-decision.md §8).
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+        { status: 401 },
+      ),
+    )
+
+    await act(async () => {
+      await apiClient.get('/account.php').catch(() => undefined)
+    })
+
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+    expect(probe.auth.account).toBeNull()
+    expect(probe.auth.notice).toBe('session-expired')
+  })
+
+  it('never fires for the initial anonymous bootstrap (no prior session to lose)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+          { status: 401 },
+        ),
+      ),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    expect(probe.auth.notice).toBeNull()
   })
 })

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apiClient, setAuthToken } from './client'
+import { apiClient, setAuthToken, setSessionLossHandler } from './client'
 
 /**
  * KAN-151 — CSRF Token Lifecycle & Client-Side Security Constraints.
@@ -107,5 +107,121 @@ describe('apiClient request security constraints (FR9, NFR3)', () => {
     // real guard (review gate B1): assert nothing was written at all.
     expect(window.localStorage.length).toBe(0)
     expect(window.sessionStorage.length).toBe(0)
+  })
+})
+
+/**
+ * KAN-156 — FR11/FR12 shared session-loss interceptor. See
+ * `react-frontend-stack-decision.md` §8 for why `hadToken` + code
+ * `'unauthorized'` (not just any 401) is the real, narrowest-correct
+ * trigger condition against the actual `/api/v1` contract.
+ */
+describe('apiClient session-loss interceptor (FR11, FR12)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    setAuthToken(null)
+    setSessionLossHandler(null)
+  })
+
+  it('fires the registered handler on a 401 "unauthorized" response to a request that carried a bearer token', async () => {
+    const handler = vi.fn()
+    setSessionLossHandler(handler)
+    setAuthToken('a-previously-valid-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+          { status: 401 },
+        ),
+      ),
+    )
+
+    await expect(apiClient.get('/account.php')).rejects.toThrow()
+
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT fire for a 401 "unauthorized" response to a request that carried no token (a never-signed-in visitor\'s first bootstrap call)', async () => {
+    // This is the regression this test guards against: without the
+    // `hadToken` gate, every anonymous visitor's very first page load would
+    // be mislabeled "your session expired" even though nothing was ever
+    // authenticated.
+    const handler = vi.fn()
+    setSessionLossHandler(handler)
+    setAuthToken(null)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+          { status: 401 },
+        ),
+      ),
+    )
+
+    await expect(apiClient.get('/account.php')).rejects.toThrow()
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('does NOT fire for a 401 "invalid_credentials" response (a rejected login attempt, not a session loss)', async () => {
+    const handler = vi.fn()
+    setSessionLossHandler(handler)
+    // A rejected login never carries a token in the first place, but assert
+    // the code check too: even if a stale token happened to be set, a
+    // login-rejection code must never be treated as session loss.
+    setAuthToken('irrelevant-stale-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { code: 'invalid_credentials', message: 'Invalid email or password.' },
+          }),
+          { status: 401 },
+        ),
+      ),
+    )
+
+    await expect(
+      apiClient.post('/auth/login.php', { email: 'a@b.test', password: 'wrong' }),
+    ).rejects.toThrow()
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('does NOT fire for a non-401 error (e.g. 503 service_unavailable) even with a token set', async () => {
+    const handler = vi.fn()
+    setSessionLossHandler(handler)
+    setAuthToken('a-previously-valid-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'service_unavailable', message: 'Unavailable' } }),
+          { status: 503 },
+        ),
+      ),
+    )
+
+    await expect(apiClient.get('/account.php')).rejects.toThrow()
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('never fires on a successful response', async () => {
+    const handler = vi.fn()
+    setSessionLossHandler(handler)
+    setAuthToken('a-valid-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ account: {} }), { status: 200 })),
+    )
+
+    await apiClient.get('/account.php')
+
+    expect(handler).not.toHaveBeenCalled()
   })
 })

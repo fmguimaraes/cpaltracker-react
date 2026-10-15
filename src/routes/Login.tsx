@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { getAuthOutcomeMessage } from '../auth/authOutcome'
+import { LOGIN_NOTICE_MESSAGES, parseLoginNotice } from '../auth/loginNotice'
 import { CHANGE_PASSWORD_PATH, HOME_PATH } from '../auth/paths'
 import { sanitizeSuite } from '../auth/suite'
 
@@ -29,6 +30,12 @@ import { sanitizeSuite } from '../auth/suite'
  * `{error:{code,message}}` body — it maps the thrown `ApiError` through
  * `mapAuthOutcome`/`getAuthOutcomeMessage` (`src/auth/authOutcome.ts`) to one
  * of a fixed set of non-revealing, French, anti-enumeration-safe messages.
+ *
+ * KAN-156 adds FR10/FR11: a one-time `?notice=` indicator — `'logged-out'`
+ * right after an explicit logout, `'session-expired'` after the shared
+ * session-loss interceptor dropped an authenticated session — rendered from
+ * `src/auth/loginNotice.ts`'s validated `LoginNotice` union, same
+ * query-param-driven style as `suite` above.
  */
 
 interface LoginFormValues {
@@ -41,6 +48,7 @@ export function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const notice = parseLoginNotice(searchParams.get('notice'))
   const {
     register,
     handleSubmit,
@@ -80,6 +88,18 @@ export function Login() {
       >
         Sign in
       </h1>
+
+      {notice && (
+        <p
+          role="status"
+          aria-live="polite"
+          data-testid="login-notice"
+          className="text-sm"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          {LOGIN_NOTICE_MESSAGES[notice]}
+        </p>
+      )}
 
       <form
         className="flex flex-col gap-4"

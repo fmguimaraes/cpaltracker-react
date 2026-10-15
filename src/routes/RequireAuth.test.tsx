@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setAuthToken } from '../api/client'
+import { apiClient, setAuthToken } from '../api/client'
 import { AuthProvider } from '../auth/AuthContext'
 import { RequireAuth } from './RequireAuth'
 
@@ -129,6 +129,91 @@ describe('RequireAuth', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('protected-content')).toBeInTheDocument(),
+    )
+  })
+})
+
+/**
+ * KAN-156 (FR11/FR12) — the shared session-loss interceptor drops to
+ * anonymous, and this guard's already-existing FR13 redirect (reused
+ * unmodified) is what carries the user to /login with both `suite` and the
+ * new `notice=session-expired` indicator.
+ */
+describe('RequireAuth session-loss redirect (FR11, FR12)', () => {
+  beforeEach(() => {
+    setAuthToken(null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function LoginLocationProbe() {
+    const location = useLocation()
+    return <div data-testid="login-screen">{location.pathname + location.search}</div>
+  }
+
+  it('redirects to /login with suite preserved and notice=session-expired once an authenticated 401 unauthorized response arrives', async () => {
+    const authenticatedAccount = {
+      userId: 1,
+      clientId: null,
+      mail: 'demo@cpal.test',
+      nom: 'Demo',
+      prenom: 'User',
+      role: 'client' as const,
+      telephone: null,
+      lastLoginAt: null,
+      mustChangePassword: false,
+    }
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ account: authenticatedAccount }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <MemoryRouter initialEntries={['/protected?foo=bar']}>
+        <AuthProvider>
+          <Routes>
+            <Route
+              path="/protected"
+              element={
+                <RequireAuth>
+                  <div data-testid="protected-content">secret</div>
+                </RequireAuth>
+              }
+            />
+            <Route path="/login" element={<LoginLocationProbe />} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId('protected-content')).toBeInTheDocument(),
+    )
+
+    // The interceptor only fires for a request that was itself carrying a
+    // bearer token (see client.test.ts) — set one here to stand in for the
+    // token a real `login()` call would have issued.
+    setAuthToken('a-previously-valid-token')
+
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+        { status: 401 },
+      ),
+    )
+
+    await act(async () => {
+      await apiClient.get('/account.php').catch(() => undefined)
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('login-screen')).toBeInTheDocument(),
+    )
+    expect(screen.getByTestId('login-screen').textContent).toBe(
+      '/login?suite=%2Fprotected%3Ffoo%3Dbar&notice=session-expired',
     )
   })
 })

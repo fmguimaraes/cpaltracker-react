@@ -586,3 +586,57 @@ describe('Login redirect targeting (FR2, FR3, FR14)', () => {
     )
   })
 })
+
+/**
+ * KAN-156 — FR10 ("logged out" indicator) and FR11 (session-expired copy,
+ * reused from authOutcome.ts's sessionExpired message).
+ */
+describe('Login notice indicator (FR10, FR11)', () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute('data-theme')
+    window.localStorage.clear()
+    setAuthToken(null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('shows the logged-out indicator when redirected with ?notice=logged-out (FR10)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLogin({ initialEntry: '/login?notice=logged-out' })
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(await screen.findByTestId('login-notice')).toHaveTextContent(
+      'You have been signed out.',
+    )
+  })
+
+  it('shows the authOutcome.ts sessionExpired copy when redirected with ?notice=session-expired (FR11)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLogin({ initialEntry: '/login?suite=%2Fcontracts%2F42&notice=session-expired' })
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(await screen.findByTestId('login-notice')).toHaveTextContent(
+      'Votre session a expiré. Rechargez la page et réessayez.',
+    )
+  })
+
+  it('renders no notice banner for an unrecognized or absent ?notice= value', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderLogin({ initialEntry: '/login?notice=not-a-real-value' })
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId('login-notice')).not.toBeInTheDocument()
+
+    renderLogin({ initialEntry: '/login' })
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    expect(screen.queryAllByTestId('login-notice')).toHaveLength(0)
+  })
+})

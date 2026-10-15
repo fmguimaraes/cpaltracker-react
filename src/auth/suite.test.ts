@@ -100,4 +100,26 @@ describe('buildLoginRedirectPath (FR13)', () => {
     // pathname always starts with / in practice, but guard the fallback anyway
     expect(buildLoginRedirectPath({ pathname: '', search: '' })).toBe('/login')
   })
+
+  // KAN-156 (FR11/FR12): the optional notice param, appended alongside suite.
+  it('appends a notice param alongside suite when both are present', () => {
+    expect(
+      buildLoginRedirectPath({ pathname: '/contracts/42', search: '' }, 'session-expired'),
+    ).toBe('/login?suite=%2Fcontracts%2F42&notice=session-expired')
+  })
+
+  it('renders a bare /login?notice=... when there is no suite to preserve', () => {
+    expect(buildLoginRedirectPath({ pathname: '', search: '' }, 'logged-out')).toBe(
+      '/login?notice=logged-out',
+    )
+  })
+
+  it('omits notice entirely when not provided or null, unchanged from the FR13-only shape', () => {
+    expect(buildLoginRedirectPath({ pathname: '/contracts/42', search: '' })).toBe(
+      '/login?suite=%2Fcontracts%2F42',
+    )
+    expect(
+      buildLoginRedirectPath({ pathname: '/contracts/42', search: '' }, null),
+    ).toBe('/login?suite=%2Fcontracts%2F42')
+  })
 })

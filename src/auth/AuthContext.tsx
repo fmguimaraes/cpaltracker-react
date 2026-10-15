@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { apiClient, ApiError, setAuthToken } from '../api/client'
+import { apiClient, ApiError, setAuthToken, setSessionLossHandler } from '../api/client'
+import type { LoginNotice } from './loginNotice'
 
 /**
  * Account shape as returned by GET /api/v1/account.php (api/openapi.yaml
@@ -52,6 +53,15 @@ interface AuthState {
    * `false` whenever there is no account (loading/anonymous).
    */
   isAdmin: boolean
+  /**
+   * KAN-156 (FR10/FR11) — why the user is currently anonymous, for the
+   * login screen to show a one-time indicator: `'logged-out'` right after
+   * an explicit logout action, `'session-expired'` after the shared
+   * session-loss interceptor (FR11/FR12) dropped an authenticated session.
+   * `null` for every other anonymous case (e.g. a visitor who was never
+   * signed in) — that case must never be mislabeled "session expired".
+   */
+  notice: LoginNotice | null
   refresh: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -63,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<Account | null>(null)
   const [status, setStatus] = useState<AuthState['status']>('loading')
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<LoginNotice | null>(null)
   const requestId = useRef(0)
 
   const refresh = useCallback(async () => {
@@ -75,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccount(account)
       setStatus('authenticated')
       setError(null)
+      setNotice(null)
     } catch (err) {
       if (id !== requestId.current) return
       // KAN-151 review round 3 (A1): a stale token must never survive a
@@ -121,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccount({ ...summary, telephone: null, lastLoginAt: null })
       setStatus('authenticated')
       setError(null)
+      setNotice(null)
     } catch (err) {
       if (id === requestId.current) {
         setStatus('anonymous')
@@ -129,6 +142,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /**
+   * KAN-156 (FR10) — logout is an explicit, authenticated POST only (never a
+   * GET or third-party-triggerable link — `POST /api/v1/auth/logout.php`
+   * rejects anything but POST with a 405, and this is the only call site in
+   * the app). Mirrors CB21/CB35's "always ends the session client-side"
+   * intent: `setAuthToken(null)` runs unconditionally in `finally`
+   * regardless of whether the server call itself succeeded, same as
+   * `cpal_logout()` never refuses to end the local session. The caller
+   * (the logout button) is expected to swallow a thrown `ApiError` here —
+   * the point of logging out is to stop being authenticated locally, which
+   * has already happened by the time this throws.
+   *
+   * `notice` is set to `'logged-out'` here specifically so `RequireAuth`'s
+   * existing anonymous-redirect (FR13, reused as-is) also carries FR10's
+   * "logged out" indicator with no second redirect path. Edge case, not
+   * further engineered around: if the session-loss interceptor fires for
+   * this very request (the token was already server-invalidated the moment
+   * the user clicked logout), its `requestId` bump makes this block's own
+   * `id === requestId.current` check fail, so `notice` is left as
+   * `'session-expired'` (set by the interceptor) rather than
+   * `'logged-out'` — both are truthful, and a stricter tie-break isn't
+   * worth the added complexity for a race this narrow.
+   */
   const logout = useCallback(async () => {
     const id = ++requestId.current
     try {
@@ -138,9 +174,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (id === requestId.current) {
         setAccount(null)
         setStatus('anonymous')
+        setNotice('logged-out')
       }
     }
   }, [])
+
+  /**
+   * KAN-156 (FR11/FR12) — registered with `client.ts` (`setSessionLossHandler`)
+   * so a plain `fetch` wrapper that can't reach into React state has a way to
+   * tell this context "whatever request you had in flight, the server no
+   * longer considers it authenticated". Bumps `requestId` first so any
+   * already-in-flight `refresh()`/`login()`/`logout()` call's own `finally`/
+   * `catch` treats itself as superseded instead of double-applying (or
+   * racily overwriting) the state this sets — the same guard those three
+   * already use against each other.
+   */
+  const handleSessionLoss = useCallback(() => {
+    requestId.current += 1
+    setAuthToken(null)
+    setAccount(null)
+    setStatus('anonymous')
+    setError(null)
+    setNotice('session-expired')
+  }, [])
+
+  useEffect(() => {
+    setSessionLossHandler(handleSessionLoss)
+    return () => setSessionLossHandler(null)
+  }, [handleSessionLoss])
 
   useEffect(() => {
     void refresh()
@@ -149,8 +210,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = account?.role === 'admin'
 
   const value = useMemo(
-    () => ({ account, status, error, isAdmin, refresh, login, logout }),
-    [account, status, error, isAdmin, refresh, login, logout],
+    () => ({ account, status, error, isAdmin, notice, refresh, login, logout }),
+    [account, status, error, isAdmin, notice, refresh, login, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
