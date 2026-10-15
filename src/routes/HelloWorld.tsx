@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { useThemeStore } from '../store/themeStore'
 
@@ -5,6 +6,7 @@ export function HelloWorld() {
   const { status, account, error, logout } = useAuth()
   const { theme, toggleTheme } = useThemeStore()
   const baseUrl = import.meta.env.VITE_API_BASE_URL
+  const [loggingOut, setLoggingOut] = useState(false)
 
   /**
    * KAN-156 (FR10) — the explicit, authenticated action that triggers
@@ -14,12 +16,21 @@ export function HelloWorld() {
    * rather than surfaced, since by the time it could throw the user is
    * already signed out locally and `RequireAuth` is about to redirect them
    * to `/login?notice=logged-out`.
+   *
+   * Review gate round 1: disabling the button while a logout is in flight
+   * avoids sending a second POST with an already-consumed token in the
+   * first place — `AuthContext`'s own token-identity guard (B1) already
+   * makes a duplicate call harmless, but there is no reason to rely on that
+   * guard when the UI can simply not offer the duplicate click.
    */
   async function handleLogout() {
+    setLoggingOut(true)
     try {
       await logout()
     } catch {
       // See doc comment above — intentionally ignored.
+    } finally {
+      setLoggingOut(false)
     }
   }
 
@@ -47,8 +58,9 @@ export function HelloWorld() {
             <button
               type="button"
               onClick={handleLogout}
+              disabled={loggingOut}
               data-testid="logout-button"
-              className="rounded-md border px-3 py-1.5 text-sm"
+              className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
               style={{
                 borderColor: 'var(--color-border)',
                 backgroundColor: 'var(--color-surface)',

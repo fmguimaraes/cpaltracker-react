@@ -30,6 +30,10 @@ export function parseLoginNotice(value: string | null): LoginNotice | null {
  * already defines.
  */
 export const LOGIN_NOTICE_MESSAGES: Record<LoginNotice, string> = {
-  'logged-out': 'You have been signed out.',
+  // Review gate round 1: was English, while every other auth-flow message in
+  // this app (login errors, session-expired below) is French — kept
+  // consistent with NFR9's existing French copy even though the legacy
+  // `login.php` page has no literal "logged out" string to replicate here.
+  'logged-out': 'Vous avez été déconnecté(e).',
   'session-expired': AUTH_OUTCOME_MESSAGES.sessionExpired,
 }

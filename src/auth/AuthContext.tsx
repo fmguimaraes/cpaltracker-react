@@ -8,7 +8,13 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { apiClient, ApiError, setAuthToken, setSessionLossHandler } from '../api/client'
+import {
+  apiClient,
+  ApiError,
+  getAuthToken,
+  setAuthToken,
+  setSessionLossHandler,
+} from '../api/client'
 import type { LoginNotice } from './loginNotice'
 
 /**
@@ -164,13 +170,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * `'session-expired'` (set by the interceptor) rather than
    * `'logged-out'` — both are truthful, and a stricter tie-break isn't
    * worth the added complexity for a race this narrow.
+   *
+   * Review gate round 1 (B1): `setAuthToken(null)` must NOT run
+   * unconditionally — a slow logout POST (or a double-click sending a
+   * second one, see `e2e/logout-session.spec.ts`) that settles after a
+   * session-loss → re-login cycle would otherwise wipe out the newer token
+   * a later successful login already installed. Capturing the token this
+   * call actually sent and only clearing it if it's still the current one
+   * (the same guard `client.ts`'s `request()` applies to firing session
+   * loss) makes ending *this* call's own session never clobber a different,
+   * newer one.
    */
   const logout = useCallback(async () => {
     const id = ++requestId.current
+    const sentToken = getAuthToken()
     try {
       await apiClient.post('/auth/logout.php')
     } finally {
-      setAuthToken(null)
+      if (getAuthToken() === sentToken) {
+        setAuthToken(null)
+      }
       if (id === requestId.current) {
         setAccount(null)
         setStatus('anonymous')

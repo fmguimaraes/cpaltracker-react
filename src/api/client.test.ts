@@ -112,9 +112,10 @@ describe('apiClient request security constraints (FR9, NFR3)', () => {
 
 /**
  * KAN-156 — FR11/FR12 shared session-loss interceptor. See
- * `react-frontend-stack-decision.md` §8 for why `hadToken` + code
- * `'unauthorized'` (not just any 401) is the real, narrowest-correct
- * trigger condition against the actual `/api/v1` contract.
+ * `react-frontend-stack-decision.md` §8 for why requiring a token that's
+ * STILL the current one (not just "a token was sent", review gate round 1's
+ * B1) plus code `'unauthorized'` (not just any 401) is the real,
+ * narrowest-correct trigger condition against the actual `/api/v1` contract.
  */
 describe('apiClient session-loss interceptor (FR11, FR12)', () => {
   afterEach(() => {
@@ -144,10 +145,10 @@ describe('apiClient session-loss interceptor (FR11, FR12)', () => {
   })
 
   it('does NOT fire for a 401 "unauthorized" response to a request that carried no token (a never-signed-in visitor\'s first bootstrap call)', async () => {
-    // This is the regression this test guards against: without the
-    // `hadToken` gate, every anonymous visitor's very first page load would
-    // be mislabeled "your session expired" even though nothing was ever
-    // authenticated.
+    // This is the regression this test guards against: without requiring a
+    // token to have been sent, every anonymous visitor's very first page
+    // load would be mislabeled "your session expired" even though nothing
+    // was ever authenticated.
     const handler = vi.fn()
     setSessionLossHandler(handler)
     setAuthToken(null)
@@ -221,6 +222,64 @@ describe('apiClient session-loss interceptor (FR11, FR12)', () => {
     )
 
     await apiClient.get('/account.php')
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('does NOT fire for a stale 401 whose token has since been replaced by a newer login (review gate round 1, B1)', async () => {
+    // A slow request sent with T1 must not be allowed to declare session
+    // loss once T1 is no longer the current token — whether because a
+    // newer login already installed T2, or because an explicit logout
+    // already cleared it. Without comparing the token at response time
+    // against the token the request actually sent, a stale 401 would wipe
+    // out whatever session is current now.
+    const handler = vi.fn()
+    setSessionLossHandler(handler)
+    setAuthToken('T1-now-stale')
+
+    let resolveFetch!: (response: Response) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockReturnValue(new Promise<Response>((resolve) => (resolveFetch = resolve))),
+    )
+
+    const pending = apiClient.get('/account.php')
+
+    // A newer login replaces the token while T1's request is still in flight.
+    setAuthToken('T2-current')
+
+    resolveFetch(
+      new Response(
+        JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+        { status: 401 },
+      ),
+    )
+    await expect(pending).rejects.toThrow()
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('does NOT fire for a stale 401 whose token has since been cleared by an explicit logout (review gate round 1, B1)', async () => {
+    const handler = vi.fn()
+    setSessionLossHandler(handler)
+    setAuthToken('T1-now-stale')
+
+    let resolveFetch!: (response: Response) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockReturnValue(new Promise<Response>((resolve) => (resolveFetch = resolve))),
+    )
+
+    const pending = apiClient.get('/account.php')
+    setAuthToken(null) // an explicit logout completes while T1's request is still in flight
+
+    resolveFetch(
+      new Response(
+        JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+        { status: 401 },
+      ),
+    )
+    await expect(pending).rejects.toThrow()
 
     expect(handler).not.toHaveBeenCalled()
   })

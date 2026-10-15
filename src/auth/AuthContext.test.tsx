@@ -447,6 +447,63 @@ describe('AuthContext logout (FR10)', () => {
     expect(probe.auth.account).toBeNull()
     expect(probe.auth.notice).toBe('logged-out')
   })
+
+  it('a slow logout settling after a newer login must not wipe out the newer token (review gate round 1, B1)', async () => {
+    // Reproduces the generic shape of manifestation 1/3: logout()'s own
+    // `finally` used to call setAuthToken(null) unconditionally, so a slow
+    // logout call that settles after the user has already logged back in
+    // (got a new token) would erase that newer token out from under them.
+    let resolveLogout!: (response: Response) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/auth/login.php')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                token: 'T2',
+                expiresAt: '2026-10-16T00:00:00Z',
+                account: accountSummary,
+              }),
+              { status: 200 },
+            ),
+          )
+        }
+        if (url.includes('/auth/logout.php')) {
+          return new Promise<Response>((resolve) => (resolveLogout = resolve))
+        }
+        return Promise.resolve(new Response(null, { status: 401 }))
+      }),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    setAuthToken('T1-about-to-be-superseded')
+    const logoutPending = probe.auth.logout()
+
+    // While that logout POST is still in flight, the user logs back in and
+    // is issued a new token, T2.
+    await act(async () => {
+      await probe.auth.login('demo@cpal.test', 'password')
+    })
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+
+    // The original, now-superseded logout call finally settles.
+    resolveLogout(new Response(null, { status: 204 }))
+    await act(async () => {
+      await logoutPending
+    })
+
+    // T2 must still be the live token — assert indirectly via a fresh
+    // authenticated call actually carrying an Authorization header, since
+    // client.ts exposes no token getter to the UI layer.
+    vi.mocked(fetch).mockClear()
+    await apiClient.get('/account.php').catch(() => undefined)
+    const [, init] = vi.mocked(fetch).mock.calls.at(-1) as [RequestInfo | URL, RequestInit]
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer T2')
+  })
 })
 
 describe('AuthContext session-loss interceptor (FR11, FR12)', () => {
@@ -526,6 +583,73 @@ describe('AuthContext session-loss interceptor (FR11, FR12)', () => {
     const probe = renderProbe()
     await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
 
+    expect(probe.auth.notice).toBeNull()
+  })
+
+  it('a stale request for a since-replaced token does not wipe out a newer, already-successful login (review gate round 1, B1)', async () => {
+    // Reproduces the review gate's manifestation 1/2: a slow authenticated
+    // call sent with T1 must not retroactively declare session loss once
+    // the user has already logged back in and is authenticated with T2.
+    let resolveStaleCall!: (response: Response) => void
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/auth/login.php')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              token: init?.headers ? 'T2' : 'T2',
+              expiresAt: '2026-10-16T00:00:00Z',
+              account: accountSummary,
+            }),
+            { status: 200 },
+          ),
+        )
+      }
+      if (url.includes('/account.php')) {
+        // The very first bootstrap call (no token yet) settles immediately
+        // as anonymous; a later, authenticated call is held open until the
+        // test resolves it explicitly, simulating a slow in-flight request.
+        const headers = new Headers(init?.headers)
+        if (!headers.has('Authorization')) {
+          return Promise.resolve(new Response(null, { status: 401 }))
+        }
+        return new Promise<Response>((resolve) => (resolveStaleCall = resolve))
+      }
+      return Promise.resolve(new Response(null, { status: 401 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    // Simulate an already-authenticated session with T1 by logging in once...
+    setAuthToken('T1-stale')
+    // ...then fire off a slow authenticated call that won't resolve until
+    // later (captured in resolveStaleCall), while T1 is still current.
+    const stalePending = apiClient.get('/account.php').catch(() => undefined)
+
+    // The user logs in again (e.g. after an unrelated, already-handled
+    // session loss) and gets a new token, T2.
+    await act(async () => {
+      await probe.auth.login('demo@cpal.test', 'password')
+    })
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+    expect(probe.auth.notice).toBeNull()
+
+    // T1's slow request finally settles — as a 401 unauthorized, since T1 is
+    // no longer valid server-side. It must be treated as stale, not as a
+    // session loss for the CURRENT (T2) session.
+    resolveStaleCall(
+      new Response(
+        JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+        { status: 401 },
+      ),
+    )
+    await act(async () => {
+      await stalePending
+    })
+
+    expect(probe.auth.status).toBe('authenticated')
     expect(probe.auth.notice).toBeNull()
   })
 })

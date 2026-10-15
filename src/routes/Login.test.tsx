@@ -610,7 +610,7 @@ describe('Login notice indicator (FR10, FR11)', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     expect(await screen.findByTestId('login-notice')).toHaveTextContent(
-      'You have been signed out.',
+      'Vous avez été déconnecté(e).',
     )
   })
 

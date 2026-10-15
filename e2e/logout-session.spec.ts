@@ -58,7 +58,7 @@ test('logout is an explicit POST action that clears AuthContext and redirects to
 
   await expect(page).toHaveURL(/\/login\?suite=%2F&notice=logged-out$/)
   await expect(page.getByTestId('login-notice')).toHaveText(
-    'You have been signed out.',
+    'Vous avez été déconnecté(e).',
   )
 
   // FR10 — the only request this app ever issues against the logout

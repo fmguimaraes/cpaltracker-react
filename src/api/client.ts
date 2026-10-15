@@ -26,6 +26,16 @@ export function setAuthToken(token: string | null): void {
 }
 
 /**
+ * Review gate round 1 (B1): `logout()`'s own `finally` needs to know the
+ * token *it* sent before unconditionally clearing it — a slow logout call
+ * that completes after a session-loss → re-login cycle must not wipe out
+ * the newer token a later login already installed.
+ */
+export function getAuthToken(): string | null {
+  return authToken
+}
+
+/**
  * KAN-156 (FR11/FR12) — shared session-loss notification.
  *
  * A plain `fetch`-wrapping module like this one can't call back into a React
@@ -70,9 +80,15 @@ async function parseErrorBody(response: Response): Promise<ApiError> {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Captured before the request is sent: the session-loss check below needs
-  // to know whether *this* call believed it was authenticated, not whatever
-  // `authToken` happens to hold by the time the response comes back.
-  const hadToken = authToken !== null
+  // to know which token *this* call believed it was authenticated with, not
+  // whatever `authToken` happens to hold by the time the response comes
+  // back. Review gate round 1 (B1): a *later* request can set a newer token
+  // (a fresh login after this one was sent) or clear it (an explicit
+  // logout) before this one's response arrives — a stale 401 must never be
+  // allowed to act on a session that already moved on. Comparing
+  // `sentToken` against the *current* `authToken` at response time (not
+  // just truthiness) is what makes that distinction.
+  const sentToken = authToken
   const url = `${resolveBaseUrl()}${path}`
   const response = await fetch(url, {
     ...init,
@@ -80,7 +96,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       Accept: 'application/json',
       ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : {}),
       ...init?.headers,
     },
   })
@@ -93,15 +109,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     // epoch-mismatch session-loss cases: `401 unauthorized`
     // ("Missing, invalid or expired token."). The same code/status is also
     // what a bearer-less request gets (e.g. the very first anonymous
-    // bootstrap call, which never had a session to lose) — `hadToken` is
-    // what tells those two apart: only a request that *was* carrying a
-    // token and still got rejected as unauthorized counts as a session
-    // dropping out from under an already-authenticated caller. A failed
-    // `POST /auth/login.php` never qualifies either way: that endpoint
-    // requires no bearer token at all (`security: []`) and always replies
-    // with code `invalid_credentials`, never `unauthorized` — see
+    // bootstrap call, which never had a session to lose) — requiring
+    // `sentToken` is what tells those two apart: only a request that *was*
+    // carrying a token and still got rejected as unauthorized counts as a
+    // session dropping out from under an already-authenticated caller. A
+    // failed `POST /auth/login.php` never qualifies either way: that
+    // endpoint requires no bearer token at all (`security: []`) and always
+    // replies with code `invalid_credentials`, never `unauthorized` — see
     // react-frontend-stack-decision.md §8 for the full reconciliation.
-    if (hadToken && apiError.status === 401 && apiError.code === 'unauthorized') {
+    //
+    // `sentToken === authToken` (review gate round 1, B1): only fire for a
+    // token that is STILL the current one. A response for a token that's
+    // since been replaced (a newer login) or cleared (a logout) is stale and
+    // must not clobber whatever session is current now.
+    if (
+      sentToken &&
+      sentToken === authToken &&
+      apiError.status === 401 &&
+      apiError.code === 'unauthorized'
+    ) {
       sessionLossHandler?.()
     }
     throw apiError
