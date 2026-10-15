@@ -46,6 +46,12 @@ interface AuthState {
   account: Account | null
   status: 'loading' | 'authenticated' | 'anonymous'
   error: string | null
+  /**
+   * FR15 — the account's role, re-exposed as a dedicated boolean so in-app
+   * RBAC gating never has to re-derive it from the `role` enum itself.
+   * `false` whenever there is no account (loading/anonymous).
+   */
+  isAdmin: boolean
   refresh: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -134,9 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh()
   }, [refresh])
 
+  const isAdmin = account?.role === 'admin'
+
   const value = useMemo(
-    () => ({ account, status, error, refresh, login, logout }),
-    [account, status, error, refresh, login, logout],
+    () => ({ account, status, error, isAdmin, refresh, login, logout }),
+    [account, status, error, isAdmin, refresh, login, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

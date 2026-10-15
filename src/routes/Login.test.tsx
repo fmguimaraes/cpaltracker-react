@@ -11,14 +11,25 @@ function StatusProbe() {
   return <div data-testid="auth-status">{status}</div>
 }
 
-function renderLogin({ withStatusProbe = false } = {}) {
+function renderLogin({
+  withStatusProbe = false,
+  initialEntry = '/login',
+} = {}) {
   return render(
-    <MemoryRouter initialEntries={['/login']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <AuthProvider>
         {withStatusProbe && <StatusProbe />}
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<div data-testid="home-screen" />} />
+          <Route
+            path="/contracts/42"
+            element={<div data-testid="suite-target-screen" />}
+          />
+          <Route
+            path="/change-password"
+            element={<div data-testid="change-password-screen" />}
+          />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -307,6 +318,141 @@ describe('Login', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('home-screen')).toBeInTheDocument(),
+    )
+  })
+})
+
+describe('Login redirect targeting (FR2, FR3, FR14)', () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute('data-theme')
+    window.localStorage.clear()
+    setAuthToken(null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('skips the form and redirects home when the bootstrap already reports an authenticated session (FR2)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            account: {
+              userId: 1,
+              clientId: null,
+              mail: 'demo@cpal.test',
+              nom: 'Demo',
+              prenom: 'User',
+              role: 'client',
+              telephone: null,
+              lastLoginAt: null,
+              mustChangePassword: false,
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+
+    renderLogin()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-screen')).toBeInTheDocument(),
+    )
+  })
+
+  it('redirects to the validated suite target instead of home when one is present (FR2, FR3)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            account: {
+              userId: 1,
+              clientId: null,
+              mail: 'demo@cpal.test',
+              nom: 'Demo',
+              prenom: 'User',
+              role: 'client',
+              telephone: null,
+              lastLoginAt: null,
+              mustChangePassword: false,
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+
+    renderLogin({ initialEntry: '/login?suite=%2Fcontracts%2F42' })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('suite-target-screen')).toBeInTheDocument(),
+    )
+  })
+
+  it('ignores an open-redirect suite value and falls back to home (FR3)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            account: {
+              userId: 1,
+              clientId: null,
+              mail: 'demo@cpal.test',
+              nom: 'Demo',
+              prenom: 'User',
+              role: 'client',
+              telephone: null,
+              lastLoginAt: null,
+              mustChangePassword: false,
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+
+    renderLogin({
+      initialEntry:
+        '/login?suite=' + encodeURIComponent('https://evil.example.com'),
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-screen')).toBeInTheDocument(),
+    )
+  })
+
+  it('redirects a mustChangePassword account to the password-change route instead of home/suite (FR14)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            account: {
+              userId: 1,
+              clientId: null,
+              mail: 'demo@cpal.test',
+              nom: 'Demo',
+              prenom: 'User',
+              role: 'client',
+              telephone: null,
+              lastLoginAt: null,
+              mustChangePassword: true,
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+
+    renderLogin({ initialEntry: '/login?suite=%2Fcontracts%2F42' })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('change-password-screen')).toBeInTheDocument(),
     )
   })
 })

@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { CHANGE_PASSWORD_PATH, HOME_PATH } from '../auth/paths'
+import { sanitizeSuite } from '../auth/suite'
 
 /**
  * KAN-145 — Login Screen & Credential Submission.
@@ -13,13 +15,19 @@ import { useAuth } from '../auth/AuthContext'
  * `aria-live`) and NFR6 (styling from design tokens only — see
  * `src/theme/tokens.css`).
  *
- * Out of scope here (owned by sibling stories): outcome→copy mapping and
- * lockout UX (FR7/FR8 — KAN-155), CSRF (FR9 — KAN-151),
- * `suite`/`MustChangePassword` redirect targeting (FR3/FR6/FR14 —
- * KAN-149/KAN-155). On success this screen redirects to `/` unconditionally;
- * on failure it surfaces the API's own `{error:{code,message}}` text
- * verbatim, never inventing extra detail the backend's anti-enumeration
- * behavior withholds.
+ * KAN-149 adds FR2 (an already-authenticated bootstrap — or a login that
+ * just succeeded — skips this form and redirects to the validated `suite`
+ * target, else home) and the FR3/FR14 redirect-targeting it depends on
+ * (`sanitizeSuite`, the `MustChangePassword` redirect to
+ * `CHANGE_PASSWORD_PATH`). Single effect below, reacting to `status`/
+ * `account`, so there is exactly one place that decides "where does an
+ * authenticated visitor on this screen go" — no separate manual navigate on
+ * submit success racing it.
+ *
+ * Out of scope here (owned by a sibling story): outcome→copy mapping and
+ * lockout UX (FR7/FR8 — KAN-155). On failure this screen surfaces the API's
+ * own `{error:{code,message}}` text verbatim, never inventing extra detail
+ * the backend's anti-enumeration behavior withholds.
  */
 
 interface LoginFormValues {
@@ -28,8 +36,9 @@ interface LoginFormValues {
 }
 
 export function Login() {
-  const { login } = useAuth()
+  const { login, status, account } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const {
     register,
@@ -37,11 +46,24 @@ export function Login() {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({ mode: 'onSubmit' })
 
+  // FR2/FR3/FR14 — once a session is authenticated (bootstrap found one, or
+  // a submit just succeeded), skip the form: send a MustChangePassword
+  // account to the password-change route, otherwise to the validated
+  // `suite` target, else home (replicates CB1).
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    if (account?.mustChangePassword) {
+      navigate(CHANGE_PASSWORD_PATH, { replace: true })
+      return
+    }
+    const suite = sanitizeSuite(searchParams.get('suite'))
+    navigate(suite || HOME_PATH, { replace: true })
+  }, [status, account, searchParams, navigate])
+
   const onSubmit = handleSubmit(async ({ email, password }) => {
     setSubmitError(null)
     try {
       await login(email, password)
-      navigate('/', { replace: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : ''
       setSubmitError(message || 'Something went wrong. Please try again.')

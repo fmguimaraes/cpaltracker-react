@@ -139,3 +139,63 @@ describe('AuthContext login()', () => {
     expect(probe.auth.status).toBe('anonymous')
   })
 })
+
+describe('AuthContext isAdmin (FR15)', () => {
+  beforeEach(() => {
+    setAuthToken(null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('is false while there is no account (loading/anonymous)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 401 })),
+    )
+    const probe = renderProbe()
+    expect(probe.auth.isAdmin).toBe(false)
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+    expect(probe.auth.isAdmin).toBe(false)
+  })
+
+  it('is true only when the bootstrapped account has role "admin"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            account: {
+              ...accountSummary,
+              role: 'admin',
+              telephone: null,
+              lastLoginAt: null,
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+    expect(probe.auth.isAdmin).toBe(true)
+  })
+
+  it('is false for a non-admin role', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            account: { ...accountSummary, telephone: null, lastLoginAt: null },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+    expect(probe.auth.isAdmin).toBe(false)
+  })
+})
