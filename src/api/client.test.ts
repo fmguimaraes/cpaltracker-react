@@ -55,9 +55,10 @@ describe('apiClient request security constraints (FR9, NFR3)', () => {
     await apiClient.post('/auth/logout.php')
 
     // Allowlist, not a denylist of known CSRF header names (review gate A4):
-    // this is exactly the set `api/v1/_lib.php`'s CORS allowlist admits, so
-    // the test fails on *any* unexpected header, not just ones we thought to
-    // name.
+    // Content-Type/Authorization per `api/v1/_lib.php`'s Allow-Headers, plus
+    // Accept (CORS-safelisted, not backend-granted) — the only three headers
+    // this client ever sends — so the test fails on *any* unexpected header,
+    // not just ones we thought to name.
     const allowedHeaders = new Set(['accept', 'content-type', 'authorization'])
     for (const call of fetchMock.mock.calls) {
       const init = call[1] as RequestInit

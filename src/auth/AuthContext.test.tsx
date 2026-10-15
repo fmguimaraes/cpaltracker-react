@@ -1,4 +1,5 @@
 import { act, render, waitFor } from '@testing-library/react'
+import { inspect } from 'node:util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setAuthToken } from '../api/client'
 import { AuthProvider, useAuth } from './AuthContext'
@@ -273,6 +274,7 @@ describe('AuthContext token handling (NFR3)', () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {}),
       vi.spyOn(console, 'log').mockImplementation(() => {}),
       vi.spyOn(console, 'info').mockImplementation(() => {}),
+      vi.spyOn(console, 'debug').mockImplementation(() => {}),
     ]
     vi.stubGlobal(
       'fetch',
@@ -310,11 +312,14 @@ describe('AuthContext token handling (NFR3)', () => {
     })
     await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
 
+    // Review gate round 2 (B1): `call.join(' ')` coerces an object argument
+    // to "[object Object]", so `console.log('login', { token })` — the most
+    // realistic way a token leaks — would have passed undetected.
+    // `util.inspect(..., { depth: null })` expands nested values instead.
     for (const spy of consoleSpies) {
       for (const call of spy.mock.calls) {
-        expect(call.join(' ')).not.toContain('never-logged-token')
+        expect(inspect(call, { depth: null })).not.toContain('never-logged-token')
       }
-      spy.mockRestore()
     }
   })
 })
