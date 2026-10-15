@@ -32,6 +32,7 @@ export function PhoneForm({ account }: { account: Account }) {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<PhoneFormValues>({
     mode: 'onSubmit',
@@ -44,6 +45,7 @@ export function PhoneForm({ account }: { account: Account }) {
     try {
       await updateAccount({ currentPassword, phone: phone.trim() })
       setSuccess(phone.trim() === '' ? 'Numéro supprimé.' : 'Numéro enregistré.')
+      reset({ currentPassword: '', phone: phone.trim() })
     } catch (err) {
       setFormError(mapAccountActionOutcome(err).message)
     }
