@@ -10,6 +10,9 @@ export const LOGIN_PATH = '/login'
 /** KAN-146 — the forgot-password request page (FR1-FR3). */
 export const FORGOT_PASSWORD_PATH = '/forgot-password'
 
+/** KAN-148 — the reset-password redeem-token page (FR4-FR8). */
+export const RESET_PASSWORD_PATH = '/reset-password'
+
 /**
  * FR14 — `RequireAuth`'s `MustChangePassword` gate needs a concrete route to
  * redirect to today. This repo has no password-change screen yet (its
