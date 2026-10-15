@@ -77,6 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null)
     } catch (err) {
       if (id !== requestId.current) return
+      // KAN-151 review round 3 (A1): a stale token must never survive a
+      // failed refresh — otherwise it keeps being sent as `Authorization:
+      // Bearer` on later requests (including the next login attempt) after
+      // the account it belonged to is no longer considered authenticated.
+      setAuthToken(null)
       setAccount(null)
       if (err instanceof ApiError && err.status === 401) {
         setStatus('anonymous')

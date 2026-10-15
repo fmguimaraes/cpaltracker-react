@@ -1,7 +1,7 @@
 import { act, render, waitFor } from '@testing-library/react'
 import { inspect } from 'node:util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { setAuthToken } from '../api/client'
+import { apiClient, setAuthToken } from '../api/client'
 import { AuthProvider, useAuth } from './AuthContext'
 
 const accountSummary = {
@@ -321,5 +321,28 @@ describe('AuthContext token handling (NFR3)', () => {
         expect(inspect(call, { depth: null })).not.toContain('never-logged-token')
       }
     }
+  })
+
+  it('clears a stale token on a failed refresh, so it is never sent on a later request (review gate round 3, A1)', async () => {
+    setAuthToken('stale-token-from-a-previous-session')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'unauthorized', message: 'Token expired' } }),
+          { status: 401 },
+        ),
+      ),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    vi.mocked(fetch).mockClear()
+    await apiClient.get('/account.php').catch(() => undefined)
+
+    const [, init] = vi.mocked(fetch).mock.calls.at(-1) as [RequestInfo | URL, RequestInit]
+    const headers = new Headers(init.headers)
+    expect(headers.has('Authorization')).toBe(false)
   })
 })

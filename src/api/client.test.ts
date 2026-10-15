@@ -52,6 +52,11 @@ describe('apiClient request security constraints (FR9, NFR3)', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await apiClient.post('/auth/login.php', { email: 'a@b.test', password: 'x' })
+    // Review gate round 3 (A3): set a token before logout so the
+    // `authorization` branch of the allowlist below is actually exercised —
+    // without this, both calls ran unauthenticated and that entry was never
+    // tested.
+    setAuthToken('demo-token')
     await apiClient.post('/auth/logout.php')
 
     // Allowlist, not a denylist of known CSRF header names (review gate A4):
