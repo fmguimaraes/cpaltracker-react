@@ -1,7 +1,7 @@
 import { act, render, waitFor } from '@testing-library/react'
 import { inspect } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiClient, setAuthToken } from '../api/client'
+import { apiClient, getAuthToken, setAuthToken } from '../api/client'
 import { AuthProvider, useAuth } from './AuthContext'
 
 const accountSummary = {
@@ -738,5 +738,187 @@ describe('AuthContext session-loss interceptor (FR11, FR12)', () => {
 
     expect(probe.auth.status).toBe('authenticated')
     expect(probe.auth.notice).toBeNull()
+  })
+})
+
+describe('AuthContext updateAccount (KAN-152, FR11-FR14, GAP5)', () => {
+  const fullAccount = {
+    userId: 1,
+    clientId: null,
+    mail: 'demo@cpal.test',
+    nom: 'Demo',
+    prenom: 'User',
+    role: 'client' as const,
+    telephone: null,
+    lastLoginAt: null,
+    mustChangePassword: false,
+  }
+
+  beforeEach(() => {
+    setAuthToken(null)
+  })
+
+  it('applies the PATCH response\'s full Account object and transparently re-authenticates after a password change', async () => {
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/account.php') && init?.method === 'PATCH') {
+          calls.push('patch')
+          expect(JSON.parse(init.body as string)).toEqual({
+            currentPassword: 'old-pw',
+            password: 'new-pw',
+            passwordConfirmation: 'new-pw',
+          })
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ account: { ...fullAccount, lastLoginAt: '2026-10-16 09:00:00' } }),
+              { status: 200 },
+            ),
+          )
+        }
+        if (url.includes('/auth/login.php')) {
+          calls.push('login')
+          expect(JSON.parse(init!.body as string)).toEqual({
+            email: 'demo@cpal.test',
+            password: 'new-pw',
+          })
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ token: 'FRESH-TOKEN', expiresAt: '2026-10-16T10:00:00Z', account: fullAccount }),
+              { status: 200 },
+            ),
+          )
+        }
+        if (url.includes('/account.php')) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ account: fullAccount }), { status: 200 }),
+          )
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
+      }),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+
+    await act(async () => {
+      await probe.auth.updateAccount({
+        currentPassword: 'old-pw',
+        password: 'new-pw',
+        passwordConfirmation: 'new-pw',
+      })
+    })
+
+    expect(calls).toEqual(['patch', 'login'])
+    expect(probe.auth.account?.lastLoginAt).toBe('2026-10-16 09:00:00')
+    expect(getAuthToken()).toBe('FRESH-TOKEN')
+  })
+
+  it('does not call login.php again for a phone or e-mail change', async () => {
+    const loginCalls: unknown[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/auth/login.php')) {
+          loginCalls.push(url)
+          return Promise.reject(new Error('should not be called'))
+        }
+        if (url.includes('/account.php') && init?.method === 'PATCH') {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ account: { ...fullAccount, telephone: '+33612345678' } }),
+              { status: 200 },
+            ),
+          )
+        }
+        return Promise.resolve(new Response(JSON.stringify({ account: fullAccount }), { status: 200 }))
+      }),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+
+    await act(async () => {
+      await probe.auth.updateAccount({ currentPassword: 'old-pw', phone: '+33612345678' })
+    })
+
+    expect(loginCalls).toEqual([])
+    expect(probe.auth.account?.telephone).toBe('+33612345678')
+  })
+
+  it('still resolves successfully, and leaves the stale token in place, when the post-password-change re-authentication itself fails (best-effort only)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/account.php') && init?.method === 'PATCH') {
+          return Promise.resolve(
+            new Response(JSON.stringify({ account: fullAccount }), { status: 200 }),
+          )
+        }
+        if (url.includes('/auth/login.php')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ error: { code: 'service_unavailable', message: 'Down' } }),
+              { status: 503 },
+            ),
+          )
+        }
+        return Promise.resolve(new Response(JSON.stringify({ account: fullAccount }), { status: 200 }))
+      }),
+    )
+    setAuthToken('STALE-TOKEN')
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+
+    await act(async () => {
+      await expect(
+        probe.auth.updateAccount({
+          currentPassword: 'old-pw',
+          password: 'new-pw',
+          passwordConfirmation: 'new-pw',
+        }),
+      ).resolves.toBeUndefined()
+    })
+
+    expect(getAuthToken()).toBe('STALE-TOKEN')
+  })
+
+  it('rethrows the PATCH failure as-is and never calls login.php when the account action itself is rejected', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/auth/login.php')) {
+          return Promise.reject(new Error('should not be called'))
+        }
+        if (url.includes('/account.php') && init?.method === 'PATCH') {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ error: { code: 'invalid_credentials', message: 'Mot de passe actuel incorrect.' } }),
+              { status: 401 },
+            ),
+          )
+        }
+        return Promise.resolve(new Response(JSON.stringify({ account: fullAccount }), { status: 200 }))
+      }),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+
+    await act(async () => {
+      await expect(
+        probe.auth.updateAccount({
+          currentPassword: 'wrong',
+          password: 'new-pw',
+          passwordConfirmation: 'new-pw',
+        }),
+      ).rejects.toThrow()
+    })
   })
 })

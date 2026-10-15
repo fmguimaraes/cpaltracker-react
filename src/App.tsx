@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { CHANGE_PASSWORD_PATH, FORGOT_PASSWORD_PATH, RESET_PASSWORD_PATH } from './auth/paths'
 import { useThemeStore } from './store/themeStore'
-import { ChangePassword } from './routes/ChangePassword'
+import { Account } from './routes/Account'
 import { ForgotPassword } from './routes/ForgotPassword'
 import { HelloWorld } from './routes/HelloWorld'
 import { Login } from './routes/Login'
@@ -37,7 +37,7 @@ export function App() {
             path={CHANGE_PASSWORD_PATH}
             element={
               <RequireAuth allowMustChangePassword>
-                <ChangePassword />
+                <Account />
               </RequireAuth>
             }
           />

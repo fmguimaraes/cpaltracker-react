@@ -71,7 +71,19 @@ interface AuthState {
   refresh: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  updateAccount: (body: AccountPatchBody) => Promise<void>
 }
+
+/**
+ * KAN-152 (FR12-FR14) — `PATCH /api/v1/account.php`'s body shape: always
+ * `currentPassword` plus exactly one of the three target fields (the API's
+ * own discriminant — `api/v1/account.php`'s PATCH handler rejects a body
+ * with zero or more than one of `password`/`phone`/`email`).
+ */
+export type AccountPatchBody =
+  | { currentPassword: string; password: string; passwordConfirmation: string }
+  | { currentPassword: string; phone: string }
+  | { currentPassword: string; email: string }
 
 const AuthContext = createContext<AuthState | null>(null)
 
@@ -201,6 +213,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   /**
+   * KAN-152 (FR11-FR14) — submits one account self-service action and
+   * applies the API's own, already-updated `Account` object on success
+   * (the PATCH response re-reads the full record server-side — same shape
+   * as `refresh()`'s GET, richer than `login()`'s `AccountSummary`). Errors
+   * are rethrown as-is for the caller to map via `accountActionOutcome.ts`,
+   * same convention as `login()`.
+   *
+   * GAP5 (stack-decision.md §11): a successful password change revokes
+   * every live token for the account server-side, including the one that
+   * just authenticated this very request — there is no exemption for it.
+   * FR12(b) requires the acting session to stay logged in, so a password
+   * change immediately re-authenticates transparently with the password
+   * just set, installing a fresh token before the now-dead one could ever
+   * be used again. That re-authentication is best-effort: if it fails, this
+   * call still resolves successfully (the account WAS changed), and the
+   * next real request simply falls through to the ordinary session-loss
+   * flow rather than this function pretending the session survived.
+   */
+  const updateAccount = useCallback(async (body: AccountPatchBody) => {
+    const id = ++requestId.current
+    const { account: updated } = await apiClient.patch<{ account: Account }>(
+      '/account.php',
+      body,
+    )
+    if (id !== requestId.current) return
+    setAccount(updated)
+    setError(null)
+
+    if ('password' in body) {
+      try {
+        const { token } = await apiClient.post<{ token: string }>('/auth/login.php', {
+          email: updated.mail,
+          password: body.password,
+        })
+        if (id === requestId.current) {
+          setAuthToken(token)
+        }
+      } catch {
+        // Best-effort only — see docblock above.
+      }
+    }
+  }, [])
+
+  /**
    * KAN-156 (FR11/FR12) — registered with `client.ts` (`setSessionLossHandler`)
    * so a plain `fetch` wrapper that can't reach into React state has a way to
    * tell this context "whatever request you had in flight, the server no
@@ -231,8 +287,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = account?.role === 'admin'
 
   const value = useMemo(
-    () => ({ account, status, error, isAdmin, notice, refresh, login, logout }),
-    [account, status, error, isAdmin, notice, refresh, login, logout],
+    () => ({ account, status, error, isAdmin, notice, refresh, login, logout, updateAccount }),
+    [account, status, error, isAdmin, notice, refresh, login, logout, updateAccount],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

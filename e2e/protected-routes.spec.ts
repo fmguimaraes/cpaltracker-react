@@ -76,7 +76,7 @@ test('ignores a dot-segment open-redirect suite value and lands on home with no 
   expect(pageErrors).toHaveLength(0)
 })
 
-test('redirects a mustChangePassword account away from the protected home route (FR14)', async ({
+test('redirects a mustChangePassword account away from the protected home route, into first-connection mode (FR14, KAN-152 FR9/FR10)', async ({
   page,
 }) => {
   await page.route('**/account.php', (route) =>
@@ -92,5 +92,9 @@ test('redirects a mustChangePassword account away from the protected home route 
   await page.goto('/')
 
   await expect(page).toHaveURL(/\/change-password$/)
-  await expect(page.getByTestId('change-password-placeholder')).toBeVisible()
+  await expect(page.getByTestId('account-first-connection-notice')).toBeVisible()
+  await expect(page.getByTestId('account-password-form')).toBeVisible()
+  await expect(page.getByTestId('account-phone-section')).toHaveCount(0)
+  await expect(page.getByTestId('account-email-section')).toHaveCount(0)
+  await expect(page.getByTestId('account-logout')).toHaveCount(0)
 })

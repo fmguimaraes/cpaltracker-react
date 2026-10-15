@@ -14,9 +14,10 @@ export const FORGOT_PASSWORD_PATH = '/forgot-password'
 export const RESET_PASSWORD_PATH = '/reset-password'
 
 /**
- * FR14 — `RequireAuth`'s `MustChangePassword` gate needs a concrete route to
- * redirect to today. This repo has no password-change screen yet (its
- * actual form/UX is KAN-155's job, FR6-8/NFR9); `ChangePassword` is a thin
- * placeholder that reserves this path so the gate is fully wired end to end.
+ * `RequireAuth`'s `MustChangePassword` gate (KAN-149 FR14) redirects here.
+ * KAN-152 (FR9-FR15) builds the real page at this path — the account
+ * self-service screen (`Account.tsx`), which also serves as this redirect's
+ * first-connection mode (the KAN-149-era `ChangePassword` placeholder, and
+ * its stale "KAN-155" attribution, are gone).
  */
 export const CHANGE_PASSWORD_PATH = '/change-password'
