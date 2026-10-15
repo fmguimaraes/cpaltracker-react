@@ -141,7 +141,7 @@ describe('Login', () => {
     )
   })
 
-  it('surfaces the real {error:{code,message}} body on invalid credentials without extra client-side detail (FR4, anti-enumeration)', async () => {
+  it('shows the mapped generic rejection copy on invalid credentials, never the raw {error:{code,message}} body (FR7, anti-enumeration)', async () => {
     const fetchMock = mockFetchSequence(
       new Response(
         JSON.stringify({
@@ -160,11 +160,101 @@ describe('Login', () => {
     await user.type(screen.getByLabelText('Password'), 'wrong-password')
     await user.click(screen.getByTestId('login-submit'))
 
+    // KAN-155: the mapped French copy, not the raw backend message — this
+    // would still pass if Login.tsx rendered `err.message` verbatim unless
+    // we also assert the raw text is absent.
     expect(await screen.findByTestId('login-error')).toHaveTextContent(
-      'Invalid email or password.',
+      'Adresse ou mot de passe incorrect.',
     )
+    expect(screen.queryByText('Invalid email or password.')).not.toBeInTheDocument()
     // the form stays put — no navigation on failure
     expect(screen.getByTestId('login-form')).toBeInTheDocument()
+  })
+
+  it('shows the identical generic rejection copy for a locked-account 401, with no countdown and no distinguishing branch (FR8)', async () => {
+    // GAP4 is already closed at the /api/v1 layer: a locked account comes
+    // back as the exact same 401 invalid_credentials body as wrong-password
+    // (see authOutcome.ts). This test would fail if a future regression
+    // reintroduced a distinct lockout code path/copy (e.g. a minutes
+    // countdown, or a different testid/string) for this same response.
+    const fetchMock = mockFetchSequence(
+      new Response(
+        JSON.stringify({
+          error: { code: 'invalid_credentials', message: 'Adresse ou mot de passe incorrect.' },
+        }),
+        { status: 401 },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderLogin()
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await user.type(screen.getByLabelText('Email'), 'demo@cpal.test')
+    await user.type(screen.getByLabelText('Password'), 'wrong-password')
+    await user.click(screen.getByTestId('login-submit'))
+
+    const errorNode = await screen.findByTestId('login-error')
+    expect(errorNode).toHaveTextContent('Adresse ou mot de passe incorrect.')
+    // no remaining-minutes countdown ever appears
+    expect(errorNode.textContent).not.toMatch(/\d/)
+  })
+
+  it('shows the per-IP throttle copy, with no borrowed minutes countdown, on a 429 rate_limited response (FR7)', async () => {
+    const fetchMock = mockFetchSequence(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 'rate_limited',
+            message: 'Too many attempts from this connection. Try again later.',
+          },
+        }),
+        { status: 429 },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderLogin()
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await user.type(screen.getByLabelText('Email'), 'demo@cpal.test')
+    await user.type(screen.getByLabelText('Password'), 'anything')
+    await user.click(screen.getByTestId('login-submit'))
+
+    const errorNode = await screen.findByTestId('login-error')
+    expect(errorNode).toHaveTextContent(
+      'Trop de tentatives depuis cette connexion. Réessayez plus tard.',
+    )
+    expect(errorNode.textContent).not.toMatch(/\d/)
+  })
+
+  it('shows the service-unavailable copy on a 503 (DB outage) response (FR7)', async () => {
+    const fetchMock = mockFetchSequence(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 'service_unavailable',
+            message: 'Le service est momentanément indisponible. Réessayez dans un instant.',
+          },
+        }),
+        { status: 503 },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderLogin()
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await user.type(screen.getByLabelText('Email'), 'demo@cpal.test')
+    await user.type(screen.getByLabelText('Password'), 'anything')
+    await user.click(screen.getByTestId('login-submit'))
+
+    expect(await screen.findByTestId('login-error')).toHaveTextContent(
+      'Le service est momentanément indisponible. Réessayez dans un instant.',
+    )
   })
 
   it('announces errors via aria-live for keyboard/screen-reader users (NFR5)', async () => {
@@ -251,7 +341,7 @@ describe('Login', () => {
     await user.click(screen.getByTestId('login-submit'))
 
     expect(await screen.findByTestId('login-error')).toHaveTextContent(
-      'Invalid email or password.',
+      'Adresse ou mot de passe incorrect.',
     )
     // the failed login must settle status itself — not leave it on
     // 'loading' waiting for the (now-stale) bootstrap call to resolve

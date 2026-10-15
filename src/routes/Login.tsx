@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { getAuthOutcomeMessage } from '../auth/authOutcome'
 import { CHANGE_PASSWORD_PATH, HOME_PATH } from '../auth/paths'
 import { sanitizeSuite } from '../auth/suite'
 
@@ -24,10 +25,10 @@ import { sanitizeSuite } from '../auth/suite'
  * authenticated visitor on this screen go" — no separate manual navigate on
  * submit success racing it.
  *
- * Out of scope here (owned by a sibling story): outcome→copy mapping and
- * lockout UX (FR7/FR8 — KAN-155). On failure this screen surfaces the API's
- * own `{error:{code,message}}` text verbatim, never inventing extra detail
- * the backend's anti-enumeration behavior withholds.
+ * KAN-155 adds FR7/FR8/NFR9: on failure this screen never shows the raw
+ * `{error:{code,message}}` body — it maps the thrown `ApiError` through
+ * `mapAuthOutcome`/`getAuthOutcomeMessage` (`src/auth/authOutcome.ts`) to one
+ * of a fixed set of non-revealing, French, anti-enumeration-safe messages.
  */
 
 interface LoginFormValues {
@@ -65,8 +66,9 @@ export function Login() {
     try {
       await login(email, password)
     } catch (err) {
-      const message = err instanceof Error ? err.message : ''
-      setSubmitError(message || 'Something went wrong. Please try again.')
+      // FR7/FR8/NFR9 — mapped, non-revealing copy only; never the raw
+      // backend message (see authOutcome.ts for why).
+      setSubmitError(getAuthOutcomeMessage(err))
     }
   })
 
