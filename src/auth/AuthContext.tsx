@@ -28,11 +28,26 @@ export interface Account {
   mustChangePassword: boolean
 }
 
+/**
+ * The subset of Account returned alongside a freshly issued token by
+ * POST /auth/login.php (api/openapi.yaml `AccountSummary` schema) — no
+ * `telephone`/`lastLoginAt`. KAN-145 fills those two with `null` until a
+ * later `refresh()` (GET /account.php) backfills the full record.
+ */
+type AccountSummary = Omit<Account, 'telephone' | 'lastLoginAt'>
+
+interface LoginResponse {
+  token: string
+  expiresAt: string
+  account: AccountSummary
+}
+
 interface AuthState {
   account: Account | null
   status: 'loading' | 'authenticated' | 'anonymous'
   error: string | null
   refresh: () => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -67,6 +82,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /**
+   * KAN-145 (FR4): submits credentials to POST /auth/login.php via the
+   * bearer-token `apiClient` (never cookies — stack decision §3) and, on
+   * success, stores the issued token + account summary. Race-guarded with
+   * the same `requestId` pattern as `refresh`/`logout` so a stale in-flight
+   * submission can't clobber a newer one. Errors are rethrown as-is (the
+   * real `{error:{code,message}}` body from the API) for the caller to
+   * display — this never adds client-side detail the backend's
+   * anti-enumeration behavior deliberately withholds.
+   */
+  const login = useCallback(async (email: string, password: string) => {
+    const id = ++requestId.current
+    try {
+      const { token, account: summary } = await apiClient.post<LoginResponse>(
+        '/auth/login.php',
+        { email, password },
+      )
+      if (id !== requestId.current) return
+      setAuthToken(token)
+      setAccount({ ...summary, telephone: null, lastLoginAt: null })
+      setStatus('authenticated')
+      setError(null)
+    } catch (err) {
+      if (id !== requestId.current) return
+      throw err
+    }
+  }, [])
+
   const logout = useCallback(async () => {
     const id = ++requestId.current
     try {
@@ -85,8 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const value = useMemo(
-    () => ({ account, status, error, refresh, logout }),
-    [account, status, error, refresh, logout],
+    () => ({ account, status, error, refresh, login, logout }),
+    [account, status, error, refresh, login, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

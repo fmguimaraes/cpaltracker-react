@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { useThemeStore } from './store/themeStore'
 import { HelloWorld } from './routes/HelloWorld'
+import { Login } from './routes/Login'
 import { NotFound } from './routes/NotFound'
 
 export function App() {
@@ -17,6 +18,7 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HelloWorld />} />
+          <Route path="/login" element={<Login />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
