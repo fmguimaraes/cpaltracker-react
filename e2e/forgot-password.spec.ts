@@ -2,8 +2,11 @@ import { test, expect } from '@playwright/test'
 
 /**
  * KAN-146 smoke coverage for the forgot-password screen's own UI contract
- * (FR1, FR2, FR3, NFR3). See `src/auth/forgotPasswordOutcome.test.ts` for
- * the structural "every non-5xx outcome maps to the identical confirmation"
+ * (FR1, FR2, FR3, NFR3). See `src/auth/forgotPasswordOutcome.ts` for the
+ * full outcome mapping (only account-existence-related outcomes share the
+ * identical confirmation; a per-IP 429 and a malformed 400 are their own
+ * distinct, still non-leaking messages) and
+ * `src/auth/forgotPasswordOutcome.test.ts` for the structural regression
  * guard; these are end-to-end smoke checks on top of it, same mocked-
  * `/api/v1` pattern as `login.spec.ts`.
  */
@@ -34,9 +37,34 @@ test('keeps submit disabled until a validly formatted e-mail is entered (FR1)', 
   await expect(page.getByTestId('forgot-password-submit')).toBeEnabled()
 })
 
-test('shows the identical confirmation regardless of outcome — success, per-IP throttle, or unknown-account-shaped 200 (FR2, FR3, NFR3, anti-enumeration)', async ({
+test('shows the identical confirmation for an unknown-account-shaped 200 (FR2, FR3, NFR3, anti-enumeration)', async ({
   page,
 }) => {
+  await page.route('**/auth/forgot-password.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'ok', expiresInMinutes: 60 }),
+    }),
+  )
+
+  await page.goto('/forgot-password')
+  await page.getByLabel('Adresse e-mail').fill('demo@cpal.test')
+  await page.getByTestId('forgot-password-submit').click()
+
+  await expect(page.getByTestId('forgot-password-confirmation')).toHaveText(
+    'Si un compte existe pour cette adresse, un e-mail de réinitialisation vient de lui être envoyé.',
+  )
+})
+
+test('shows a distinct per-IP-throttle message on a 429 (CB3), never the success confirmation', async ({
+  page,
+}) => {
+  // Review gate round 1 (B1): the legacy page (forgot_password.php) and
+  // /api/v1 both give an IP-blocked request its own message, never the
+  // "check your mailbox" confirmation — collapsing it would be a false
+  // success, not an anti-enumeration improvement (it's per-IP, not
+  // account-related, so showing it distinctly reveals nothing either way).
   await page.route('**/auth/forgot-password.php', (route) =>
     route.fulfill({
       status: 429,
@@ -52,7 +80,7 @@ test('shows the identical confirmation regardless of outcome — success, per-IP
   await page.getByTestId('forgot-password-submit').click()
 
   await expect(page.getByTestId('forgot-password-confirmation')).toHaveText(
-    'Si un compte existe pour cette adresse, un e-mail de réinitialisation vient de lui être envoyé.',
+    'Trop de tentatives depuis cette connexion. Réessayez plus tard.',
   )
 })
 

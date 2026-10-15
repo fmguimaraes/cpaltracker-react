@@ -68,15 +68,14 @@ describe('ForgotPassword', () => {
     expect(JSON.parse(init.body as string)).toEqual({ email: 'demo@cpal.test' })
   })
 
-  // FR2/NFR3 — the same confirmation state (identical text, identical
-  // data-testid, identical DOM structure) must render for every one of
-  // these outcomes. No test here ever asserts a *different* screen for any
-  // of them — that absence is the regression guard this story's Technical
-  // Requirements ask for.
+  // FR2/NFR3 — only the account-existence-related outcomes share the
+  // identical confirmation (identical text, identical data-testid,
+  // identical DOM structure). A per-IP 429 and a malformed 400 are
+  // deliberately NOT part of this set (review gate round 1, B1) — see
+  // forgotPasswordOutcome.ts's docblock for why.
   it.each([
     ['an unknown-account-shaped 200', new Response(JSON.stringify({ message: 'ok' }), { status: 200 })],
-    ['a malformed-body 400', new Response(JSON.stringify({ error: { code: 'invalid_body', message: 'Bad request' } }), { status: 400 })],
-    ['a per-IP-throttle 429 (CB3)', new Response(JSON.stringify({ error: { code: 'rate_limited', message: 'Too many requests' } }), { status: 429 })],
+    ['an unexpected 404', new Response(JSON.stringify({ error: { code: 'not_found', message: 'nope' } }), { status: 404 })],
   ])('renders the identical confirmation for %s', async (_label, response) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
     const user = userEvent.setup()
@@ -89,6 +88,48 @@ describe('ForgotPassword', () => {
     expect(confirmation).toHaveTextContent(
       'Si un compte existe pour cette adresse, un e-mail de réinitialisation vient de lui être envoyé.',
     )
+  })
+
+  it('renders a distinct per-IP-throttle message on a 429 (CB3), never the success confirmation', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'rate_limited', message: 'Too many requests' } }),
+          { status: 429 },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    renderForgotPassword()
+
+    await user.type(screen.getByTestId('forgot-password-email'), 'demo@cpal.test')
+    await user.click(screen.getByTestId('forgot-password-submit'))
+
+    const confirmation = await screen.findByTestId('forgot-password-confirmation')
+    expect(confirmation).toHaveTextContent(
+      'Trop de tentatives depuis cette connexion. Réessayez plus tard.',
+    )
+  })
+
+  it('renders a distinct invalid-request message on a malformed-body 400, never the success confirmation', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'invalid_body', message: 'Bad request' } }),
+          { status: 400 },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    renderForgotPassword()
+
+    await user.type(screen.getByTestId('forgot-password-email'), 'demo@cpal.test')
+    await user.click(screen.getByTestId('forgot-password-submit'))
+
+    const confirmation = await screen.findByTestId('forgot-password-confirmation')
+    expect(confirmation).toHaveTextContent('Adresse e-mail invalide.')
   })
 
   it('renders a distinct service-unavailable message on a genuine 5xx, never the confirmation (not an account-existence leak)', async () => {

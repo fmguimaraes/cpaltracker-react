@@ -21,12 +21,16 @@ import { LOGIN_PATH } from '../auth/paths'
  * bearer-token `/api/v1` client — see react-frontend-stack-decision.md §3;
  * this screen is unauthenticated, so no token is ever attached) — no direct
  * `fetch`, no client-side token minting.
- * FR2/NFR3: regardless of the response (success, 429 throttle, or any other
- * non-5xx status — see `forgotPasswordOutcome.ts` for the full mapping),
- * exactly one "check your mailbox" state renders. There is deliberately no
- * `if (outcome === ...)` branch anywhere below the single `onSubmit` —
- * `outcome` only ever decides which of two *fixed* strings is shown, never
- * which DOM structure renders.
+ * FR2/NFR3: only the account-existence-related outcomes (success, unknown/
+ * inactive/soft-deleted account, per-account rate limit, mail-send
+ * failure) render the identical "check your mailbox" confirmation — see
+ * `forgotPasswordOutcome.ts` for exactly which wire responses that covers
+ * and why a per-IP `429` throttle and a malformed-body `400` are
+ * deliberately NOT part of that collapsed set (review gate round 1, B1).
+ * There is deliberately no `if (outcome === ...)` branch anywhere below the
+ * single `onSubmit` — `outcome` only ever decides which of a fixed set of
+ * strings is shown, never which DOM structure renders; this page still has
+ * exactly one post-submit screen layout, just with per-outcome copy.
  */
 
 interface ForgotPasswordFormValues {
