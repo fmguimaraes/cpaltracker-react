@@ -426,6 +426,38 @@ describe('Login redirect targeting (FR2, FR3, FR14)', () => {
     )
   })
 
+  it('ignores a protocol-relative open-redirect suite value and falls back to home (FR3, review gate KAN-149 round 1)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            account: {
+              userId: 1,
+              clientId: null,
+              mail: 'demo@cpal.test',
+              nom: 'Demo',
+              prenom: 'User',
+              role: 'client',
+              telephone: null,
+              lastLoginAt: null,
+              mustChangePassword: false,
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+
+    renderLogin({
+      initialEntry: '/login?suite=' + encodeURIComponent('//evil.example.com/phish'),
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-screen')).toBeInTheDocument(),
+    )
+  })
+
   it('redirects a mustChangePassword account to the password-change route instead of home/suite (FR14)', async () => {
     vi.stubGlobal(
       'fetch',

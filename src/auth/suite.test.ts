@@ -23,6 +23,26 @@ describe('sanitizeSuite (FR3)', () => {
     expect(sanitizeSuite(undefined)).toBe('')
     expect(sanitizeSuite('')).toBe('')
   })
+
+  it('drops a protocol-relative value that the browser would resolve off-origin', () => {
+    expect(sanitizeSuite('//evil.example.com/phish')).toBe('')
+  })
+
+  it('drops a backslash value the browser treats as protocol-relative', () => {
+    expect(sanitizeSuite('/\\evil.example.com/phish')).toBe('')
+    expect(sanitizeSuite('\\/evil.example.com/phish')).toBe('')
+  })
+
+  it('drops a value whose stripped control characters reveal a protocol-relative host', () => {
+    expect(sanitizeSuite('/\t/evil.example.com/phish')).toBe('')
+    expect(sanitizeSuite('/\n/evil.example.com/phish')).toBe('')
+  })
+
+  it('still accepts a same-origin path containing query and hash', () => {
+    expect(sanitizeSuite('/contracts/42?tab=history#top')).toBe(
+      '/contracts/42?tab=history#top',
+    )
+  })
 })
 
 describe('buildLoginRedirectPath (FR13)', () => {

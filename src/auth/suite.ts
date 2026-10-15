@@ -1,17 +1,29 @@
 import { LOGIN_PATH } from './paths'
 
 /**
- * FR3 — the `suite` return-target is accepted only when it is a same-origin
- * relative path: it must start with `/` and contain no `://`. Anything else
- * (an absolute URL, a bare host, empty/missing) is dropped to `''`, exactly
- * replicating `login.php`'s own CB2 check (`react-auth-and-session.md` FR3;
- * `Auth-and-Session.md` CB2, `login.php` lines 36-40) — this neutralizes an
- * open redirect to a third-party host via the `suite` param.
+ * FR3 — the `suite` return-target is accepted only when it resolves to a
+ * same-origin path. `login.php`'s own CB2 check (`startsWith('/') &&
+ * !includes('://')`) is not sufficient on its own: the browser still
+ * resolves protocol-relative values (`//evil.com`), backslash tricks
+ * (`/\evil.com` — a browser treats `\` as `/`), and values containing
+ * stripped control characters (`/\t/evil.com`) to a different origin, which
+ * is a real open redirect (review gate, KAN-149 round 1). Resolve against
+ * the current origin with the URL parser itself and require the result to
+ * still be same-origin, rather than pattern-matching the raw string.
  */
 export function sanitizeSuite(suite: string | null | undefined): string {
   if (!suite) return ''
   if (!suite.startsWith('/') || suite.includes('://')) return ''
-  return suite
+
+  let resolved: URL
+  try {
+    resolved = new URL(suite, window.location.origin)
+  } catch {
+    return ''
+  }
+  if (resolved.origin !== window.location.origin) return ''
+
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`
 }
 
 /**
