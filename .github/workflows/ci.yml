@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -51,8 +51,11 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e -- --project=chromium
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
-          name: playwright-report
+          # playwright.config.ts's `reporter` is `list` only (no HTML
+          # report) and `trace` is `on-first-retry` — this is traces for
+          # any retried test, not a full report; named accordingly.
+          name: playwright-test-results
           path: test-results/
           retention-days: 7

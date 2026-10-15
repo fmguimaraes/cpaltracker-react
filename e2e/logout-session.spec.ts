@@ -7,8 +7,7 @@ import { test, expect } from '@playwright/test'
  * /login with a logged-out indicator), FR11 (the shared session-loss
  * interceptor's session-expired copy) and FR12 (routes to /login with
  * `suite` set to the current location) — mocked-`/api/v1` smoke/regression
- * checks on this story's own UI contract, same scope line
- * `protected-routes.spec.ts` and `login.spec.ts` draw. See
+ * checks on this story's own UI contract. See
  * react-frontend-stack-decision.md §9.1 for why this built-and-previewed
  * app with `/api/v1` mocked satisfies NFR2 rather than a live backend.
  */
