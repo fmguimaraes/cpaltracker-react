@@ -2,14 +2,20 @@ import { test, expect } from '@playwright/test'
 
 /**
  * KAN-145 smoke coverage for the login screen's own UI contract (FR1, FR5,
- * NFR5). Full login/lockout/logout/session-expiry flows against a live
- * `/api/v1` backend are NFR2's job (KAN-157, "Unit + E2E Test Coverage") —
- * not duplicated here.
+ * NFR5).
  *
  * KAN-155 adds smoke coverage for the FR7/FR8 outcome→copy mapping itself
  * (mocked `/auth/login.php` responses, same `page.route` pattern as
- * `protected-routes.spec.ts`/`csrf-security.spec.ts`) — not the full
- * lockout/session-expiry *flow*, which remains KAN-157's job.
+ * `protected-routes.spec.ts`/`csrf-security.spec.ts`), including the
+ * wrong-password/locked-account case (both get the same `401
+ * invalid_credentials` response — anti-enumeration — mapped to the same
+ * genericRejection copy here) and the separate per-IP 429 throttle case.
+ * Full login/logout/session-expiry flows live in `logout-session.spec.ts`
+ * and `csrf-security.spec.ts`. KAN-157 (NFR2, "Unit + E2E Test Coverage")
+ * audited this coverage and wired it into CI rather than adding new flows
+ * — see react-frontend-stack-decision.md §9/§9.1 for why NFR2's "running
+ * local/staging build" is satisfied by this built-and-previewed app with
+ * `/api/v1` mocked, not a live backend.
  */
 
 test('renders a labeled, keyboard-accessible login form at /login (FR1, NFR5)', async ({

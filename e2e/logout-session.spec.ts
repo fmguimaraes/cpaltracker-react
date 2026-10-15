@@ -6,10 +6,11 @@ import { test, expect } from '@playwright/test'
  * Covers FR10 (explicit POST-only logout, clears AuthContext, redirects to
  * /login with a logged-out indicator), FR11 (the shared session-loss
  * interceptor's session-expired copy) and FR12 (routes to /login with
- * `suite` set to the current location). Full live-backend flows remain
- * NFR2's job (KAN-157) — same scope line `protected-routes.spec.ts` and
- * `login.spec.ts` already draw; these are mocked-`/api/v1` smoke/regression
- * checks on this story's own UI contract.
+ * `suite` set to the current location) — mocked-`/api/v1` smoke/regression
+ * checks on this story's own UI contract, same scope line
+ * `protected-routes.spec.ts` and `login.spec.ts` draw. See
+ * react-frontend-stack-decision.md §9.1 for why this built-and-previewed
+ * app with `/api/v1` mocked satisfies NFR2 rather than a live backend.
  */
 
 const authenticatedAccount = {

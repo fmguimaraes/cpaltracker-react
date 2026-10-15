@@ -3,8 +3,10 @@ import { test, expect } from '@playwright/test'
 /**
  * KAN-149 smoke coverage for the protected-route guard (FR13), the
  * already-authenticated login redirect (FR2) and the MustChangePassword
- * guard (FR14). Full login/lockout/logout/session-expiry E2E flows against a
- * live `/api/v1` backend are NFR2's job (KAN-157) — not duplicated here.
+ * guard (FR14). Full login/logout/session-expiry flows live in
+ * `logout-session.spec.ts` and `csrf-security.spec.ts` — see
+ * react-frontend-stack-decision.md §9.1 for why this built-and-previewed
+ * app with `/api/v1` mocked satisfies NFR2 rather than a live backend.
  */
 
 const authenticatedAccount = {
