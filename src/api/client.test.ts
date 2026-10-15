@@ -11,7 +11,7 @@ import { apiClient, setAuthToken } from './client'
  * never relies on cookies (`api/v1/_lib.php`: no
  * `Access-Control-Allow-Credentials`; `openapi.yaml`: `bearerAuth` only, no
  * CSRF field anywhere in the login/logout schemas) — see
- * `react-frontend-stack-decision.md` §7 for the full reconciliation. There is
+ * `react-frontend-stack-decision.md` §6 for the full reconciliation. There is
  * no cookie-borne ambient credential for a forged cross-site request to
  * piggyback on, so there is nothing for a conventional CSRF token to defend;
  * implementing a double-submit-cookie scheme here would be dead code
@@ -33,10 +33,11 @@ function lastRequestInit(fetchMock: ReturnType<typeof vi.fn>): RequestInit {
 describe('apiClient request security constraints (FR9, NFR3)', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
     setAuthToken(null)
   })
 
-  it('always sends credentials: "omit", even if a caller-supplied init tried to override it', async () => {
+  it('always sends credentials: "omit" on every request', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -53,11 +54,17 @@ describe('apiClient request security constraints (FR9, NFR3)', () => {
     await apiClient.post('/auth/login.php', { email: 'a@b.test', password: 'x' })
     await apiClient.post('/auth/logout.php')
 
+    // Allowlist, not a denylist of known CSRF header names (review gate A4):
+    // this is exactly the set `api/v1/_lib.php`'s CORS allowlist admits, so
+    // the test fails on *any* unexpected header, not just ones we thought to
+    // name.
+    const allowedHeaders = new Set(['accept', 'content-type', 'authorization'])
     for (const call of fetchMock.mock.calls) {
       const init = call[1] as RequestInit
       const headers = new Headers(init.headers)
-      expect(headers.has('X-CSRF-Token')).toBe(false)
-      expect(headers.has('X-XSRF-Token')).toBe(false)
+      for (const name of headers.keys()) {
+        expect(allowedHeaders.has(name)).toBe(true)
+      }
       if (typeof init.body === 'string') {
         expect(init.body).not.toMatch(/csrf/i)
       }
@@ -90,9 +97,9 @@ describe('apiClient request security constraints (FR9, NFR3)', () => {
     for (const call of localSetSpy.mock.calls) {
       expect(call.join(' ')).not.toContain('super-secret-token')
     }
-    expect(window.localStorage.getItem('authToken')).toBeNull()
-    expect(window.sessionStorage.getItem('authToken')).toBeNull()
-
-    localSetSpy.mockRestore()
+    // Asserting against a single invented key name ("authToken") is not a
+    // real guard (review gate B1): assert nothing was written at all.
+    expect(window.localStorage.length).toBe(0)
+    expect(window.sessionStorage.length).toBe(0)
   })
 })

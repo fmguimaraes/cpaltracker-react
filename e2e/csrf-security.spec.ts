@@ -24,8 +24,23 @@ const accountSummary = {
 
 test('the login request carries no Cookie header and the issued token is never written to localStorage/sessionStorage (FR9, NFR3)', async ({
   page,
+  context,
 }) => {
   const loginRequests: Array<Record<string, string>> = []
+
+  // Review gate round 1: localhost:4173 never holds a cookie for this origin
+  // regardless of `credentials` mode, so without seeding one first this
+  // assertion would pass even against a `credentials:'include'` regression.
+  // Seeding one makes the no-Cookie-header assertion below mean something —
+  // it only holds because `credentials:'omit'` tells the browser to withhold
+  // a cookie it would otherwise send.
+  await context.addCookies([
+    {
+      name: 'CPALSESSID',
+      value: 'legacy-session-cookie-should-never-be-sent',
+      url: 'http://localhost:4173',
+    },
+  ])
 
   await page.route('**/account.php', (route) =>
     route.fulfill({

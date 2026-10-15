@@ -203,13 +203,13 @@ describe('AuthContext isAdmin (FR15)', () => {
 /**
  * KAN-151 — NFR3 / client-side security constraints regression guard.
  *
- * `/api/v1` is bearer-token, not cookie-session (stack decision §3, §7).
+ * `/api/v1` is bearer-token, not cookie-session (stack decision §3, §6).
  * NFR3's literal ask ("never store credentials or session secrets in
  * localStorage/sessionStorage or app logs") still applies to this model: the
  * token must stay in `client.ts`'s in-memory module variable and never leak
  * to persistent storage, the DOM, or a logged error message. FR9's "CSRF
  * token" ask does not translate to this architecture (no cookie session to
- * protect) — see §7 of the stack decision for the full reconciliation.
+ * protect) — see §6 of the stack decision for the full reconciliation.
  */
 describe('AuthContext token handling (NFR3)', () => {
   beforeEach(() => {
@@ -218,6 +218,7 @@ describe('AuthContext token handling (NFR3)', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
     setAuthToken(null)
   })
 
@@ -264,34 +265,56 @@ describe('AuthContext token handling (NFR3)', () => {
     }
     expect(window.localStorage.length).toBe(0)
     expect(window.sessionStorage.length).toBe(0)
-
-    localSetSpy.mockRestore()
   })
 
-  it('never logs the token via console.error when a login request fails', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  it('never logs the issued token via console across a full login→logout cycle (review gate round 1: a failed-login-only test cannot catch a logging regression, since no token is ever issued on that path)', async () => {
+    const consoleSpies = [
+      vi.spyOn(console, 'error').mockImplementation(() => {}),
+      vi.spyOn(console, 'warn').mockImplementation(() => {}),
+      vi.spyOn(console, 'log').mockImplementation(() => {}),
+      vi.spyOn(console, 'info').mockImplementation(() => {}),
+    ]
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            error: { code: 'invalid_credentials', message: 'Invalid email or password.' },
-          }),
-          { status: 401 },
-        ),
-      ),
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/auth/login.php')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                token: 'never-logged-token',
+                expiresAt: '2026-10-16T00:00:00Z',
+                account: accountSummary,
+              }),
+              { status: 200 },
+            ),
+          )
+        }
+        if (url.includes('/auth/logout.php')) {
+          return Promise.resolve(new Response(null, { status: 204 }))
+        }
+        return Promise.resolve(new Response(null, { status: 401 }))
+      }),
     )
 
     const probe = renderProbe()
     await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
 
     await act(async () => {
-      await expect(
-        probe.auth.login('demo@cpal.test', 'wrong-password'),
-      ).rejects.toThrow()
+      await probe.auth.login('demo@cpal.test', 'password')
     })
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
 
-    expect(consoleErrorSpy).not.toHaveBeenCalled()
-    consoleErrorSpy.mockRestore()
+    await act(async () => {
+      await probe.auth.logout()
+    })
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    for (const spy of consoleSpies) {
+      for (const call of spy.mock.calls) {
+        expect(call.join(' ')).not.toContain('never-logged-token')
+      }
+      spy.mockRestore()
+    }
   })
 })
