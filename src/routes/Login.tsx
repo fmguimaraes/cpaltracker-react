@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { getAuthOutcomeMessage } from '../auth/authOutcome'
 import { LOGIN_NOTICE_MESSAGES, parseLoginNotice } from '../auth/loginNotice'
-import { CHANGE_PASSWORD_PATH, HOME_PATH } from '../auth/paths'
+import { CHANGE_PASSWORD_PATH, FORGOT_PASSWORD_PATH, HOME_PATH } from '../auth/paths'
 import { sanitizeSuite } from '../auth/suite'
 
 /**
@@ -36,6 +36,9 @@ import { sanitizeSuite } from '../auth/suite'
  * session-loss interceptor dropped an authenticated session — rendered from
  * `src/auth/loginNotice.ts`'s validated `LoginNotice` union, same
  * query-param-driven style as `suite` above.
+ *
+ * KAN-146 adds a link to `FORGOT_PASSWORD_PATH` — otherwise that new screen
+ * would be unreachable from normal navigation.
  */
 
 interface LoginFormValues {
@@ -210,6 +213,15 @@ export function Login() {
         >
           {isSubmitting ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <Link
+          to={FORGOT_PASSWORD_PATH}
+          data-testid="login-forgot-password-link"
+          className="text-sm underline"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          Forgot password?
+        </Link>
       </form>
     </main>
   )

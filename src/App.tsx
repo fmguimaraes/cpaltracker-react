@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
-import { CHANGE_PASSWORD_PATH } from './auth/paths'
+import { CHANGE_PASSWORD_PATH, FORGOT_PASSWORD_PATH } from './auth/paths'
 import { useThemeStore } from './store/themeStore'
 import { ChangePassword } from './routes/ChangePassword'
+import { ForgotPassword } from './routes/ForgotPassword'
 import { HelloWorld } from './routes/HelloWorld'
 import { Login } from './routes/Login'
 import { NotFound } from './routes/NotFound'
@@ -29,6 +30,7 @@ export function App() {
             }
           />
           <Route path="/login" element={<Login />} />
+          <Route path={FORGOT_PASSWORD_PATH} element={<ForgotPassword />} />
           <Route
             path={CHANGE_PASSWORD_PATH}
             element={
