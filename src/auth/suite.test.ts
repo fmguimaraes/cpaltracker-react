@@ -57,21 +57,34 @@ describe('sanitizeSuite (FR3)', () => {
     expect(sanitizeSuite('/\t.//evil.example.com/phish')).toBe('')
   })
 
-  it('is idempotent and never returns a value starting with // for any accepted or rejected input', () => {
+  it('never returns a value that is anything other than a same-origin, path-absolute reference', () => {
+    // The real security property (review gate, round 3): the output must
+    // stay same-origin no matter what it is re-parsed against, and must
+    // never start with "//" or "/\" (both of which the WHATWG parser would
+    // treat as protocol-relative). This is deliberately not an idempotence
+    // check (sanitizeSuite(sanitizeSuite(x)) === sanitizeSuite(x) does not
+    // hold in general — e.g. backslash normalization can produce a "://" in
+    // the output that the raw-string pre-check then rejects on a second
+    // pass, always in the safe direction) — assert the actual invariant
+    // instead of a proxy for it.
     const candidates = [
       '/contracts/42',
       '/contracts/42?tab=history#top',
       '//evil.example.com/phish',
       '/.//evil.example.com/phish',
       '/%2e//evil.example.com/phish',
+      '/./\\evil.example.com/phish',
       'https://evil.example.com/phish',
       '',
       'contracts/42',
     ]
     for (const candidate of candidates) {
       const sanitized = sanitizeSuite(candidate)
+      if (sanitized === '') continue
+      expect(sanitized.startsWith('/')).toBe(true)
       expect(sanitized.startsWith('//')).toBe(false)
-      expect(sanitizeSuite(sanitized)).toBe(sanitized)
+      expect(sanitized.startsWith('/\\')).toBe(false)
+      expect(new URL(sanitized, 'http://other.test').host).toBe('other.test')
     }
   })
 })
