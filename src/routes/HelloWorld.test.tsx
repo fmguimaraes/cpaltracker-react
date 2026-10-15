@@ -220,6 +220,61 @@ describe('HelloWorld', () => {
     expect(logoutCall[1].method).toBe('POST')
   })
 
+  it('a double-click on "Sign out" sends exactly one logout POST (review gate round 2: race 3, double logout)', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/auth/logout.php')) {
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            account: {
+              userId: 1,
+              clientId: null,
+              mail: 'demo@cpal.test',
+              nom: 'Demo',
+              prenom: 'User',
+              role: 'client',
+              telephone: null,
+              lastLoginAt: null,
+              mustChangePassword: false,
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+
+    renderHelloWorld()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('connected')).toHaveTextContent('demo@cpal.test'),
+    )
+
+    const logoutButton = screen.getByTestId('logout-button')
+    // Fire both clicks before either POST settles — the button's own
+    // `loggingOut`-disabled state (not AuthContext's token-identity guard,
+    // which only narrows the blast radius of a race that already happened)
+    // is what must prevent a second POST from ever being sent.
+    await user.click(logoutButton)
+    await user.click(logoutButton)
+
+    await waitFor(() => expect(logoutButton).toBeDisabled())
+    // Once logout actually completes, status flips to anonymous and the
+    // button is unmounted entirely (see the "does not render ... while
+    // anonymous" test above) rather than re-enabled.
+    await waitFor(() => expect(screen.queryByTestId('logout-button')).not.toBeInTheDocument())
+
+    const logoutCalls = fetchMock.mock.calls.filter(([input]) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      return url.includes('/auth/logout.php')
+    })
+    expect(logoutCalls).toHaveLength(1)
+  })
+
   it('does not render a "Sign out" button while anonymous (no authenticated session to end)', async () => {
     vi.stubGlobal(
       'fetch',

@@ -153,9 +153,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * GET or third-party-triggerable link — `POST /api/v1/auth/logout.php`
    * rejects anything but POST with a 405, and this is the only call site in
    * the app). Mirrors CB21/CB35's "always ends the session client-side"
-   * intent: `setAuthToken(null)` runs unconditionally in `finally`
+   * intent: `finally` always ends *this call's own* session locally
    * regardless of whether the server call itself succeeded, same as
-   * `cpal_logout()` never refuses to end the local session. The caller
+   * `cpal_logout()` never refuses to end the local session — but see the B1
+   * note below for why clearing the token is conditional, not unconditional.
+   * The caller
    * (the logout button) is expected to swallow a thrown `ApiError` here —
    * the point of logging out is to stop being authenticated locally, which
    * has already happened by the time this throws.

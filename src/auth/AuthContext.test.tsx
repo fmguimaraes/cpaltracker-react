@@ -449,10 +449,13 @@ describe('AuthContext logout (FR10)', () => {
   })
 
   it('a slow logout settling after a newer login must not wipe out the newer token (review gate round 1, B1)', async () => {
-    // Reproduces the generic shape of manifestation 1/3: logout()'s own
+    // Covers the token-identity precondition behind the round-1 logout race:
     // `finally` used to call setAuthToken(null) unconditionally, so a slow
     // logout call that settles after the user has already logged back in
     // (got a new token) would erase that newer token out from under them.
+    // (Review gate round 2: this exercises the "logout settles after a later
+    // login" ordering specifically, not the double-logout race — see
+    // HelloWorld's own test for that one.)
     let resolveLogout!: (response: Response) => void
     vi.stubGlobal(
       'fetch',
@@ -497,8 +500,9 @@ describe('AuthContext logout (FR10)', () => {
     })
 
     // T2 must still be the live token — assert indirectly via a fresh
-    // authenticated call actually carrying an Authorization header, since
-    // client.ts exposes no token getter to the UI layer.
+    // authenticated call actually carrying an Authorization header, rather
+    // than reading `getAuthToken()` directly, so this test still proves the
+    // token is actually *used*, not just stored.
     vi.mocked(fetch).mockClear()
     await apiClient.get('/account.php').catch(() => undefined)
     const [, init] = vi.mocked(fetch).mock.calls.at(-1) as [RequestInfo | URL, RequestInit]
@@ -587,9 +591,14 @@ describe('AuthContext session-loss interceptor (FR11, FR12)', () => {
   })
 
   it('a stale request for a since-replaced token does not wipe out a newer, already-successful login (review gate round 1, B1)', async () => {
-    // Reproduces the review gate's manifestation 1/2: a slow authenticated
-    // call sent with T1 must not retroactively declare session loss once
-    // the user has already logged back in and is authenticated with T2.
+    // Covers the token-identity precondition behind the round-1 session-loss
+    // race: a slow authenticated call sent with T1 must not retroactively
+    // declare session loss once the user has already logged back in and is
+    // authenticated with T2. (Review gate round 2: this exercises "the stale
+    // call settles after a later login already finished" — not the narrower
+    // "stale 401 lands while that later login is still pending" ordering,
+    // which the client.ts-level test below covers via a direct `authToken`
+    // comparison instead of a full AuthContext render.)
     let resolveStaleCall!: (response: Response) => void
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
@@ -597,7 +606,7 @@ describe('AuthContext session-loss interceptor (FR11, FR12)', () => {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              token: init?.headers ? 'T2' : 'T2',
+              token: 'T2',
               expiresAt: '2026-10-16T00:00:00Z',
               account: accountSummary,
             }),
@@ -647,6 +656,84 @@ describe('AuthContext session-loss interceptor (FR11, FR12)', () => {
     )
     await act(async () => {
       await stalePending
+    })
+
+    expect(probe.auth.status).toBe('authenticated')
+    expect(probe.auth.notice).toBeNull()
+  })
+
+  it('a second stale 401 landing while a re-login is still pending does not get that re-login discarded as superseded (review gate round 2: exact race 2)', async () => {
+    // Exact reviewer-reproduced ordering: R0 and R1 are both sent with T1.
+    // R0's 401 arrives first and triggers a real session loss (clearing the
+    // token, bumping requestId). The user starts a new login, which stays
+    // pending. R1's 401 then arrives *while that login is still in flight*
+    // — by now the token is already null, so the token-identity guard must
+    // treat R1 as stale too, instead of bumping requestId a second time and
+    // getting the still-pending login discarded as superseded. Only after
+    // that does the login resolve with T2.
+    let resolveR0!: (response: Response) => void
+    let resolveR1!: (response: Response) => void
+    let resolveLogin!: (response: Response) => void
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/auth/login.php')) {
+        return new Promise<Response>((resolve) => (resolveLogin = resolve))
+      }
+      if (url.includes('/account.php')) {
+        const headers = new Headers(init?.headers)
+        if (!headers.has('Authorization')) {
+          return Promise.resolve(new Response(null, { status: 401 }))
+        }
+        if (!resolveR0) {
+          return new Promise<Response>((resolve) => (resolveR0 = resolve))
+        }
+        return new Promise<Response>((resolve) => (resolveR1 = resolve))
+      }
+      return Promise.resolve(new Response(null, { status: 401 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    setAuthToken('T1')
+    const r0Pending = apiClient.get('/account.php').catch(() => undefined)
+    const r1Pending = apiClient.get('/account.php').catch(() => undefined)
+
+    const unauthorized = () =>
+      new Response(
+        JSON.stringify({ error: { code: 'unauthorized', message: 'Missing, invalid or expired token.' } }),
+        { status: 401 },
+      )
+
+    // R0 settles first: a real session loss.
+    resolveR0(unauthorized())
+    await act(async () => {
+      await r0Pending
+    })
+    expect(probe.auth.status).toBe('anonymous')
+    expect(probe.auth.notice).toBe('session-expired')
+
+    const loginPending = probe.auth.login('demo@cpal.test', 'password')
+
+    // R1 settles second, while the login above is still pending.
+    resolveR1(unauthorized())
+    await act(async () => {
+      await r1Pending
+    })
+
+    resolveLogin(
+      new Response(
+        JSON.stringify({
+          token: 'T2',
+          expiresAt: '2026-10-16T00:00:00Z',
+          account: accountSummary,
+        }),
+        { status: 200 },
+      ),
+    )
+    await act(async () => {
+      await loginPending
     })
 
     expect(probe.auth.status).toBe('authenticated')

@@ -19,9 +19,13 @@ export function HelloWorld() {
    *
    * Review gate round 1: disabling the button while a logout is in flight
    * avoids sending a second POST with an already-consumed token in the
-   * first place — `AuthContext`'s own token-identity guard (B1) already
-   * makes a duplicate call harmless, but there is no reason to rely on that
-   * guard when the UI can simply not offer the duplicate click.
+   * first place. `AuthContext`'s own token-identity guard (B1) narrows the
+   * blast radius of a duplicate call in the common response ordering, but
+   * does not make every ordering harmless on its own (round 2 review: a
+   * reversed-arrival double logout can still surface a 'session-expired'
+   * notice instead of 'logged-out', safely but incorrectly labeled) — the
+   * disabled button is what actually prevents the duplicate call from being
+   * sent at all.
    */
   async function handleLogout() {
     setLoggingOut(true)
