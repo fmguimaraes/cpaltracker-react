@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
-import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 
 /**
@@ -44,13 +43,8 @@ export function Login() {
       await login(email, password)
       navigate('/', { replace: true })
     } catch (err) {
-      setSubmitError(
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Unknown error',
-      )
+      const message = err instanceof Error ? err.message : ''
+      setSubmitError(message || 'Something went wrong. Please try again.')
     }
   })
 
@@ -90,7 +84,10 @@ export function Login() {
               backgroundColor: 'var(--color-surface)',
               color: 'var(--color-text)',
             }}
-            {...register('email', { required: 'Email is required.' })}
+            {...register('email', {
+              required: 'Email is required.',
+              setValueAs: (value: string) => value.trim(),
+            })}
           />
           {errors.email && (
             <p

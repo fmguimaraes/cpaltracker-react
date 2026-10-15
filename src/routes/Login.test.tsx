@@ -164,6 +164,64 @@ describe('Login', () => {
     expect(emailError).toHaveAttribute('role', 'alert')
   })
 
+  it('treats a whitespace-only email as empty, matching the server\'s own trim (FR5)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderLogin()
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    await user.type(screen.getByLabelText('Email'), '   ')
+    await user.type(screen.getByLabelText('Password'), 'correct-horse')
+    await user.click(screen.getByTestId('login-submit'))
+
+    expect(await screen.findByTestId('login-email-error')).toHaveTextContent(
+      'Email is required.',
+    )
+    // no login request was issued beyond the bootstrap call
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('reaches a settled, anonymous state (not a stuck spinner) when a slow bootstrap resolves after a failed login', async () => {
+    let resolveBootstrap: (value: Response) => void = () => {}
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/auth/login.php')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: { code: 'invalid_credentials', message: 'Invalid email or password.' },
+            }),
+            { status: 401 },
+          ),
+        )
+      }
+      return new Promise<Response>((resolve) => {
+        resolveBootstrap = resolve
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderLogin()
+
+    // submit login before the bootstrap /account.php call has resolved
+    await user.type(screen.getByLabelText('Email'), 'demo@cpal.test')
+    await user.type(screen.getByLabelText('Password'), 'wrong-password')
+    await user.click(screen.getByTestId('login-submit'))
+
+    expect(await screen.findByTestId('login-error')).toHaveTextContent(
+      'Invalid email or password.',
+    )
+
+    // the stale bootstrap call finally resolves (also anonymous) — it must
+    // not leave the submit button stuck disabled/loading forever
+    resolveBootstrap(new Response(null, { status: 401 }))
+    await waitFor(() =>
+      expect(screen.getByTestId('login-submit')).not.toBeDisabled(),
+    )
+  })
+
   it('disables the submit button while the request is in flight', async () => {
     let resolveFetch: (value: Response) => void = () => {}
     const fetchMock = vi.fn((input: RequestInfo | URL) => {

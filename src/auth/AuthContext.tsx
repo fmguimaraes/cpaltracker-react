@@ -99,13 +99,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         '/auth/login.php',
         { email, password },
       )
-      if (id !== requestId.current) return
+      if (id !== requestId.current) {
+        // A newer auth action (another login, or logout) has started since
+        // this request was sent — never let a superseded success resolve
+        // as if it were the caller's own outcome.
+        throw new Error('Login superseded by a newer auth action')
+      }
       setAuthToken(token)
       setAccount({ ...summary, telephone: null, lastLoginAt: null })
       setStatus('authenticated')
       setError(null)
     } catch (err) {
-      if (id !== requestId.current) return
+      if (id === requestId.current) {
+        setStatus('anonymous')
+      }
       throw err
     }
   }, [])
