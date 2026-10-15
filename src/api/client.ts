@@ -1,19 +1,28 @@
 /**
  * Thin wrapper over fetch() against cpaltracker.web's /api/v1 (KAN-116).
  * Base URL is resolved from VITE_API_BASE_URL at build/runtime (KAN-60 FR2)
- * — no backend host is ever hardcoded here. Requests include cookies so the
- * same client backs both anonymous reads and the AuthContext's session
- * calls (stack decision §3: REST/cookie, not Supabase).
+ * — no backend host is ever hardcoded here. The API is bearer-token
+ * authenticated and never relies on cookies (api/v1/_lib.php — no
+ * Access-Control-Allow-Credentials header is ever sent); the token issued by
+ * POST /auth/login.php is held in memory here and attached as
+ * `Authorization: Bearer <token>` (stack decision §3).
  */
 
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly code?: string,
   ) {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+let authToken: string | null = null
+
+export function setAuthToken(token: string | null): void {
+  authToken = token
 }
 
 function resolveBaseUrl(): string {
@@ -26,31 +35,44 @@ function resolveBaseUrl(): string {
   return baseUrl.replace(/\/+$/, '')
 }
 
+interface ErrorBody {
+  error?: { code?: unknown; message?: unknown }
+}
+
+async function parseErrorBody(response: Response): Promise<ApiError> {
+  let message = response.statusText
+  let code: string | undefined
+  try {
+    const body = (await response.json()) as ErrorBody
+    if (typeof body.error?.message === 'string') message = body.error.message
+    if (typeof body.error?.code === 'string') code = body.error.code
+  } catch {
+    // body wasn't JSON — fall back to statusText
+  }
+  return new ApiError(response.status, message, code)
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${resolveBaseUrl()}${path}`
   const response = await fetch(url, {
     ...init,
-    credentials: 'include',
+    credentials: 'omit',
     headers: {
       Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...init?.headers,
     },
   })
 
   if (!response.ok) {
-    let message = response.statusText
-    try {
-      const body = (await response.json()) as { error?: string }
-      if (body.error) message = body.error
-    } catch {
-      // body wasn't JSON — fall back to statusText
-    }
-    throw new ApiError(response.status, message)
+    throw await parseErrorBody(response)
   }
 
   if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+  const text = await response.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
 
 export const apiClient = {
@@ -58,11 +80,11 @@ export const apiClient = {
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: 'PATCH',
-      body: body ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
 }

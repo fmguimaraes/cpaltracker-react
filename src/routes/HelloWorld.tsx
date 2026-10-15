@@ -43,7 +43,7 @@ export function HelloWorld() {
 
         {status === 'authenticated' && account && (
           <p data-testid="connected">
-            Connected to /api/v1 — signed in as <strong>{account.email}</strong>.
+            Connected to /api/v1 — signed in as <strong>{account.mail}</strong>.
           </p>
         )}
 
