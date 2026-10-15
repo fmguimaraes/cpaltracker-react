@@ -40,7 +40,13 @@ test('blocks submission and shows inline errors when email/password are empty (F
   await expect(page).toHaveURL(/\/login$/)
 })
 
-test('shows the mapped generic rejection message, never the raw backend body, on invalid credentials — identical for an existing-but-locked account and an unknown one (FR7, FR8, anti-enumeration)', async ({
+test('shows the mapped generic rejection message, never the raw backend body, on invalid credentials (FR7, FR8, anti-enumeration)', async ({
+  // Review gate round 1 (A1): this mocks one 401 invalid_credentials
+  // response — the same one a wrong-password, unknown-account, soft-deleted
+  // or locked account all produce identically at the real /api/v1 layer
+  // (see authOutcome.ts). It isn't a second request shape to compare
+  // against, so it can't itself prove "identical for a locked account too";
+  // that structural guarantee is authOutcome.test.ts's job.
   page,
 }) => {
   await page.route('**/auth/login.php', (route) =>
@@ -96,6 +102,9 @@ test('shows the neutral per-IP throttle message on a 429 rate_limited response, 
 test('shows the service-unavailable message on a 503 (DB outage) response (FR7)', async ({
   page,
 }) => {
+  // Review gate round 1 (A2): deliberately different from the mapped copy
+  // below, so this only passes if the UI actually maps the outcome instead
+  // of rendering the response body verbatim.
   await page.route('**/auth/login.php', (route) =>
     route.fulfill({
       status: 503,
@@ -103,7 +112,7 @@ test('shows the service-unavailable message on a 503 (DB outage) response (FR7)'
       body: JSON.stringify({
         error: {
           code: 'service_unavailable',
-          message: 'Le service est momentanément indisponible. Réessayez dans un instant.',
+          message: 'Database connection pool exhausted',
         },
       }),
     }),

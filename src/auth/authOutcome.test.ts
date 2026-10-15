@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../api/client'
+import type { AuthOutcome } from './authOutcome'
 import {
   AUTH_OUTCOME_MESSAGES,
   getAuthOutcomeMessage,
@@ -12,25 +13,37 @@ describe('mapAuthOutcome (FR7, FR8, NFR9)', () => {
     expect(mapAuthOutcome(err)).toBe('genericRejection')
   })
 
-  it('maps every anti-enumeration-collapsed 401 account state identically — unknown, soft-deleted, uninitialized-password, wrong-password, and locked all produce the same outcome', () => {
-    // The real /api/v1 login endpoint never distinguishes these at the
-    // status/code level (GAP4 is closed server-side — see authOutcome.ts) —
-    // they are all, today, the literal same ApiError shape. This test
-    // documents and guards that every one of them lands on the one neutral
-    // bucket; it would fail if a future change special-cased any of them
-    // (e.g. by having the client branch on a `reason` field the real API
-    // doesn't even send).
-    const accountStates = [
-      'unknown-account',
-      'soft-deleted',
-      'uninitialized-password',
-      'wrong-password',
-      'locked',
+  it('maps a 401 with any code other than "unauthorized" to genericRejection — there is no separate lockout branch to special-case (review gate round 1, A1)', () => {
+    // Review gate round 1 flagged that mapping the *same* ApiError shape
+    // repeatedly (unknown/soft-deleted/locked all built as an identical
+    // 401 invalid_credentials) can't distinguish "there is one branch" from
+    // "there are several branches that happen to produce the same string" —
+    // it would still pass if a future change added a real lockout branch
+    // keyed on some other 401 code. Exercise codes a future backend change
+    // could plausibly introduce (including one the real API doesn't send
+    // today, `account_locked`) and confirm every single one still falls
+    // through to the one neutral bucket, because the mapping only branches
+    // on `status === 401 && code === 'unauthorized'` vs. everything else.
+    const codes = [
+      'invalid_credentials',
+      'account_locked',
+      'account_disabled',
+      undefined,
+      'anything_else',
     ]
-    const outcomes = accountStates.map(() =>
-      mapAuthOutcome(new ApiError(401, 'Adresse ou mot de passe incorrect.', 'invalid_credentials')),
-    )
-    expect(new Set(outcomes)).toEqual(new Set(['genericRejection']))
+    for (const code of codes) {
+      expect(mapAuthOutcome(new ApiError(401, 'irrelevant', code))).toBe('genericRejection')
+    }
+  })
+
+  it('exposes exactly four outcome buckets — adding a fifth (e.g. a distinct lockout outcome) is a deliberate decision, not a silent addition', () => {
+    const outcomes: AuthOutcome[] = [
+      'genericRejection',
+      'sessionExpired',
+      'serviceUnavailable',
+      'ipThrottle',
+    ]
+    expect(Object.keys(AUTH_OUTCOME_MESSAGES).sort()).toEqual([...outcomes].sort())
   })
 
   it('maps a 401 unauthorized ApiError (expired/invalid bearer token) to sessionExpired, distinct from invalid_credentials', () => {

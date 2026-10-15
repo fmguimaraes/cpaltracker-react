@@ -171,12 +171,15 @@ describe('Login', () => {
     expect(screen.getByTestId('login-form')).toBeInTheDocument()
   })
 
-  it('shows the identical generic rejection copy for a locked-account 401, with no countdown and no distinguishing branch (FR8)', async () => {
-    // GAP4 is already closed at the /api/v1 layer: a locked account comes
-    // back as the exact same 401 invalid_credentials body as wrong-password
-    // (see authOutcome.ts). This test would fail if a future regression
-    // reintroduced a distinct lockout code path/copy (e.g. a minutes
-    // countdown, or a different testid/string) for this same response.
+  it('shows the generic rejection copy with no countdown on the 401 a locked account actually produces today (FR8)', async () => {
+    // Review gate round 1 (A1): GAP4 is closed at the /api/v1 layer itself —
+    // a locked account sends the exact same 401 invalid_credentials body as
+    // wrong-password (see authOutcome.ts), so there is no distinct request
+    // shape this test could send to prove a *separate* lockout branch wasn't
+    // special-cased; that structural guarantee is covered instead by
+    // authOutcome.test.ts's "maps a 401 with any code ... to genericRejection"
+    // test. This test documents the UI-level behavior for this input and
+    // guards the no-countdown invariant against this response specifically.
     const fetchMock = mockFetchSequence(
       new Response(
         JSON.stringify({
@@ -231,12 +234,17 @@ describe('Login', () => {
   })
 
   it('shows the service-unavailable copy on a 503 (DB outage) response (FR7)', async () => {
+    // Review gate round 1 (A2): the backend's 503 body message happens to
+    // equal the mapped copy today, so asserting against that exact body
+    // can't tell a real mapping from a verbatim err.message passthrough —
+    // use a deliberately different body message so the assertion only
+    // passes if the UI actually goes through the outcome mapping.
     const fetchMock = mockFetchSequence(
       new Response(
         JSON.stringify({
           error: {
             code: 'service_unavailable',
-            message: 'Le service est momentanément indisponible. Réessayez dans un instant.',
+            message: 'Database connection pool exhausted',
           },
         }),
         { status: 503 },

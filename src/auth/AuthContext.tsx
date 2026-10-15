@@ -99,9 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * success, stores the issued token + account summary. Race-guarded with
    * the same `requestId` pattern as `refresh`/`logout` so a stale in-flight
    * submission can't clobber a newer one. Errors are rethrown as-is (the
-   * real `{error:{code,message}}` body from the API) for the caller to
-   * display — this never adds client-side detail the backend's
-   * anti-enumeration behavior deliberately withholds.
+   * real `ApiError` carrying the API's `{error:{code,message}}` body) for
+   * the caller to map — see `src/auth/authOutcome.ts` (KAN-155) for the
+   * outcome→copy translation; this function never renders raw backend text
+   * itself.
    */
   const login = useCallback(async (email: string, password: string) => {
     const id = ++requestId.current
