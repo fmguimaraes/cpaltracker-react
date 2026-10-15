@@ -199,3 +199,99 @@ describe('AuthContext isAdmin (FR15)', () => {
     expect(probe.auth.isAdmin).toBe(false)
   })
 })
+
+/**
+ * KAN-151 — NFR3 / client-side security constraints regression guard.
+ *
+ * `/api/v1` is bearer-token, not cookie-session (stack decision §3, §7).
+ * NFR3's literal ask ("never store credentials or session secrets in
+ * localStorage/sessionStorage or app logs") still applies to this model: the
+ * token must stay in `client.ts`'s in-memory module variable and never leak
+ * to persistent storage, the DOM, or a logged error message. FR9's "CSRF
+ * token" ask does not translate to this architecture (no cookie session to
+ * protect) — see §7 of the stack decision for the full reconciliation.
+ */
+describe('AuthContext token handling (NFR3)', () => {
+  beforeEach(() => {
+    setAuthToken(null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    setAuthToken(null)
+  })
+
+  it('never persists the issued token to localStorage/sessionStorage across a full login→logout cycle', async () => {
+    const localSetSpy = vi.spyOn(Storage.prototype, 'setItem')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/auth/login.php')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                token: 'highly-sensitive-token',
+                expiresAt: '2026-10-16T00:00:00Z',
+                account: accountSummary,
+              }),
+              { status: 200 },
+            ),
+          )
+        }
+        if (url.includes('/auth/logout.php')) {
+          return Promise.resolve(new Response(null, { status: 204 }))
+        }
+        return Promise.resolve(new Response(null, { status: 401 }))
+      }),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    await act(async () => {
+      await probe.auth.login('demo@cpal.test', 'password')
+    })
+    await waitFor(() => expect(probe.auth.status).toBe('authenticated'))
+
+    await act(async () => {
+      await probe.auth.logout()
+    })
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    for (const call of localSetSpy.mock.calls) {
+      expect(call.join(' ')).not.toContain('highly-sensitive-token')
+    }
+    expect(window.localStorage.length).toBe(0)
+    expect(window.sessionStorage.length).toBe(0)
+
+    localSetSpy.mockRestore()
+  })
+
+  it('never logs the token via console.error when a login request fails', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { code: 'invalid_credentials', message: 'Invalid email or password.' },
+          }),
+          { status: 401 },
+        ),
+      ),
+    )
+
+    const probe = renderProbe()
+    await waitFor(() => expect(probe.auth.status).toBe('anonymous'))
+
+    await act(async () => {
+      await expect(
+        probe.auth.login('demo@cpal.test', 'wrong-password'),
+      ).rejects.toThrow()
+    })
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+    consoleErrorSpy.mockRestore()
+  })
+})
