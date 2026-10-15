@@ -43,6 +43,37 @@ describe('sanitizeSuite (FR3)', () => {
       '/contracts/42?tab=history#top',
     )
   })
+
+  it('drops values that resolve same-origin but normalize to a protocol-relative path (review gate, round 2)', () => {
+    // WHATWG dot-segment removal collapses each of these to a pathname
+    // starting with "//" even though the *input* resolves same-origin —
+    // checking only the input's origin (round 1's fix) is not enough.
+    expect(sanitizeSuite('/.//evil.example.com/phish')).toBe('')
+    expect(sanitizeSuite('/..//evil.example.com/phish')).toBe('')
+    expect(sanitizeSuite('/a/..//evil.example.com/phish')).toBe('')
+    expect(sanitizeSuite('/%2e//evil.example.com/phish')).toBe('')
+    expect(sanitizeSuite('/%2E%2E//evil.example.com/phish')).toBe('')
+    expect(sanitizeSuite('/./\\evil.example.com/phish')).toBe('')
+    expect(sanitizeSuite('/\t.//evil.example.com/phish')).toBe('')
+  })
+
+  it('is idempotent and never returns a value starting with // for any accepted or rejected input', () => {
+    const candidates = [
+      '/contracts/42',
+      '/contracts/42?tab=history#top',
+      '//evil.example.com/phish',
+      '/.//evil.example.com/phish',
+      '/%2e//evil.example.com/phish',
+      'https://evil.example.com/phish',
+      '',
+      'contracts/42',
+    ]
+    for (const candidate of candidates) {
+      const sanitized = sanitizeSuite(candidate)
+      expect(sanitized.startsWith('//')).toBe(false)
+      expect(sanitizeSuite(sanitized)).toBe(sanitized)
+    }
+  })
 })
 
 describe('buildLoginRedirectPath (FR13)', () => {

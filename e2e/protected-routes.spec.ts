@@ -53,6 +53,27 @@ test('redirects an already-authenticated visit to /login away to home (FR2)', as
   await expect(page.getByRole('heading', { name: 'cpaltracker-react' })).toBeVisible()
 })
 
+test('ignores a dot-segment open-redirect suite value and lands on home with no page error (FR3, review gate KAN-149 round 2)', async ({
+  page,
+}) => {
+  const pageErrors: Error[] = []
+  page.on('pageerror', (error) => pageErrors.push(error))
+
+  await page.route('**/account.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ account: authenticatedAccount }),
+    }),
+  )
+
+  await page.goto('/login?suite=' + encodeURIComponent('/.//evil.example.com/phish'))
+
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('heading', { name: 'cpaltracker-react' })).toBeVisible()
+  expect(pageErrors).toHaveLength(0)
+})
+
 test('redirects a mustChangePassword account away from the protected home route (FR14)', async ({
   page,
 }) => {

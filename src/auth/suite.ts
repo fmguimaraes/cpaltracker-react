@@ -6,10 +6,18 @@ import { LOGIN_PATH } from './paths'
  * !includes('://')`) is not sufficient on its own: the browser still
  * resolves protocol-relative values (`//evil.com`), backslash tricks
  * (`/\evil.com` — a browser treats `\` as `/`), and values containing
- * stripped control characters (`/\t/evil.com`) to a different origin, which
- * is a real open redirect (review gate, KAN-149 round 1). Resolve against
- * the current origin with the URL parser itself and require the result to
- * still be same-origin, rather than pattern-matching the raw string.
+ * stripped control characters (`/\t/evil.com`) to a different origin
+ * (review gate, KAN-149 round 1).
+ *
+ * Checking the *input*'s resolved origin is also not sufficient on its own
+ * (round 2): WHATWG dot-segment removal can collapse an in-origin-looking
+ * path into a protocol-relative one during normalization — `/.//evil.com`,
+ * `/..//evil.com` and their `%2e`-encoded or backslash/control-character
+ * variants all resolve same-origin yet *normalize* to a pathname starting
+ * with `//`, which the caller would then navigate to as if it were a plain
+ * path. The output has to be re-checked, not just the input: reject
+ * anything whose normalized pathname starts with `//` (i.e. would itself
+ * parse as protocol-relative if used as a fresh URL).
  */
 export function sanitizeSuite(suite: string | null | undefined): string {
   if (!suite) return ''
@@ -22,6 +30,7 @@ export function sanitizeSuite(suite: string | null | undefined): string {
     return ''
   }
   if (resolved.origin !== window.location.origin) return ''
+  if (resolved.pathname.startsWith('//')) return ''
 
   return `${resolved.pathname}${resolved.search}${resolved.hash}`
 }
