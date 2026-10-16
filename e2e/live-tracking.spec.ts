@@ -450,6 +450,14 @@ test('clears the selection and shows a generic message on an unauthorized/nonexi
  * asserted the success path): every non-success logo outcome must render
  * one identical, empty placeholder, and an admin/no-ClientID account must
  * never even request the logo.
+ *
+ * KAN-164 (NFR2) closes this file's remaining gap against NFR2's explicit
+ * list: the 404 and network-failure placeholder cases above were already
+ * covered, as was the admin-gated no-request case, but the forbidden (403)
+ * placeholder case and the non-admin/no-ClientID gated case were only
+ * Vitest-covered (ClientLogo.test.tsx), not E2E-covered. The two tests
+ * below close that gap; they are deliberately NOT duplicating the 404 or
+ * admin tests above.
  */
 
 test('renders a neutral, empty placeholder — not nothing, not an error — on the unified 404 (FR3, NFR7)', async ({
@@ -503,6 +511,59 @@ test('never requests or renders a logo for an admin account (FR2)', async ({ pag
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ account: { ...account, role: 'admin', clientId: null } }),
+    }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts: [] }) }),
+  )
+  await page.route('**/clients/logo.php/**', (route) => {
+    logoRequested = true
+    return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('fake-png') })
+  })
+
+  await page.goto('/live-tracking')
+  await expect(page.getByTestId('live-tracking-empty')).toBeVisible()
+
+  await expect(page.getByTestId('client-logo')).toHaveCount(0)
+  await expect(page.getByTestId('client-logo-placeholder')).toHaveCount(0)
+  expect(logoRequested).toBe(false)
+})
+
+test('renders the exact same placeholder on a forbidden (403) response as on the unified 404 (FR3, NFR2, NFR7)', async ({
+  page,
+}) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts: [] }) }),
+  )
+  // Forbidden must be indistinguishable from the 404 case above (GAP1):
+  // same placeholder markup, no text that could reveal the failure cause.
+  await page.route('**/clients/logo.php/7', (route) =>
+    route.fulfill({
+      status: 403,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'must_change_password', message: 'nope' } }),
+    }),
+  )
+
+  await page.goto('/live-tracking')
+
+  await expect(page.getByTestId('client-logo-placeholder')).toBeVisible()
+  await expect(page.getByTestId('client-logo')).toHaveCount(0)
+  expect((await page.getByTestId('client-logo-placeholder').textContent())?.trim()).toBe('')
+})
+
+test('never requests or renders a logo for a non-admin account with no ClientID (FR2, NFR2)', async ({
+  page,
+}) => {
+  let logoRequested = false
+  await page.route('**/account.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ account: { ...account, clientId: null } }),
     }),
   )
   await page.route('**/contracts/list.php', (route) =>
