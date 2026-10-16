@@ -111,6 +111,29 @@ describe('PilotageWorkspace (KAN-159 FR2-FR6, NFR2, NFR4)', () => {
     expect(screen.queryByTestId('pilotage-error')).not.toBeInTheDocument()
   })
 
+  it('mounts the settings form for the first device by default once eligible (KAN-163 FR7)', async () => {
+    stubFetch((url) => {
+      if (url.includes('/devices/positions.php')) {
+        return new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 })
+      }
+      return new Response(
+        JSON.stringify({
+          deviceId: 'CHIP-001',
+          contractId: 12,
+          reglageId: 1,
+          updatedAt: null,
+          config: { FREQ_MESURE_CL: '3' },
+        }),
+        { status: 200 },
+      )
+    })
+
+    render(<PilotageWorkspace contractId={12} />)
+
+    await waitFor(() => expect(screen.getByTestId('settings-form')).toBeInTheDocument())
+    expect(screen.getByTestId('settings-field-FREQ_MESURE_CL')).toBeInTheDocument()
+  })
+
   it('re-resolves eligibility when the contractId prop changes', async () => {
     let requestedContractId: string | null = null
     stubFetch((url) => {

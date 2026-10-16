@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import type { Position } from '../api/positions'
 import { DeviceList } from './DeviceList'
 
@@ -42,5 +43,30 @@ describe('DeviceList (KAN-159 FR5, FR6)', () => {
     render(<DeviceList devices={[{ ...device, timestamp: null }]} />)
 
     expect(screen.queryByTestId('pilotage-device-CHIP-001-last-seen')).not.toBeInTheDocument()
+  })
+
+  it('renders plain, non-interactive rows when no onSelect is supplied (KAN-163, unchanged default)', () => {
+    render(<DeviceList devices={[device]} />)
+
+    expect(screen.queryByTestId('pilotage-device-CHIP-001-select')).not.toBeInTheDocument()
+  })
+
+  it('calls onSelect with the chip id when a device row is clicked (KAN-163, FR7)', async () => {
+    const onSelect = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <DeviceList
+        devices={[device, { ...device, chipId: 'CHIP-002' }]}
+        selectedChipId="CHIP-001"
+        onSelect={onSelect}
+      />,
+    )
+
+    expect(screen.getByTestId('pilotage-device-CHIP-001-select')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('pilotage-device-CHIP-002-select')).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(screen.getByTestId('pilotage-device-CHIP-002-select'))
+
+    expect(onSelect).toHaveBeenCalledWith('CHIP-002')
   })
 })

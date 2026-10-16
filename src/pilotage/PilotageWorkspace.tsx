@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Position } from '../api/positions'
 import { DeviceList } from './DeviceList'
 import { loadPilotageWorkspace } from './loadPilotageWorkspace'
+import { SettingsForm } from './SettingsForm'
 
 type State =
   | { phase: 'loading' }
@@ -25,6 +26,13 @@ type State =
  * `isContractInactiveError()` is the shared primitive those stories call;
  * this is a known, explicitly-tracked gap, not a silent omission (see this
  * story's handoff report).
+ *
+ * KAN-163 (FR7-FR10, FR12) addition: alongside `DeviceList`, the eligible
+ * branch now also mounts `SettingsForm` for the selected device — the
+ * operator picks a device from the list (`DeviceList`'s `onSelect`) and
+ * this component tracks which one; the first device is selected by
+ * default so the form is visible without an extra click. Selection resets
+ * whenever the contract (and so the device list) changes.
  */
 export function PilotageWorkspace({
   contractId,
@@ -34,6 +42,7 @@ export function PilotageWorkspace({
   onUnauthorized?: () => void
 }) {
   const [state, setState] = useState<State>({ phase: 'loading' })
+  const [selectedChipId, setSelectedChipId] = useState<string | null>(null)
   // Same pattern as ContractPositions (KAN-160/168): kept in a ref so a new
   // inline `onUnauthorized` identity from the parent never re-triggers the
   // load effect below.
@@ -43,6 +52,7 @@ export function PilotageWorkspace({
   useEffect(() => {
     let cancelled = false
     setState({ phase: 'loading' })
+    setSelectedChipId(null)
     loadPilotageWorkspace(contractId)
       .then((result) => {
         if (cancelled) return
@@ -59,6 +69,7 @@ export function PilotageWorkspace({
           return
         }
         setState({ phase: 'eligible', devices: result.devices })
+        setSelectedChipId(result.devices[0]?.chipId ?? null)
       })
       .catch(() => {
         if (cancelled) return
@@ -100,5 +111,14 @@ export function PilotageWorkspace({
     return <DeviceList devices={[]} />
   }
 
-  return <DeviceList devices={state.devices} />
+  return (
+    <div className="flex flex-col gap-6 md:flex-row">
+      <DeviceList
+        devices={state.devices}
+        selectedChipId={selectedChipId ?? undefined}
+        onSelect={setSelectedChipId}
+      />
+      {selectedChipId && <SettingsForm deviceId={selectedChipId} />}
+    </div>
+  )
 }

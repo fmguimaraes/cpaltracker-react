@@ -13,8 +13,22 @@ import type { Position } from '../api/positions'
  * device's latest position *timestamp* (`GET /devices/positions.php`,
  * KAN-121) — explicitly labeled as that, never presented as a calibration
  * date.
+ *
+ * KAN-163 addition: `onSelect`/`selectedChipId` are optional so KAN-159's
+ * own behavior and tests (plain, non-interactive rows) are unchanged when a
+ * caller doesn't pass them. `PilotageWorkspace` passes both so the operator
+ * can pick which device's settings form (KAN-163's `SettingsForm`) to show
+ * (FR7).
  */
-export function DeviceList({ devices }: { devices: Position[] }) {
+export function DeviceList({
+  devices,
+  selectedChipId,
+  onSelect,
+}: {
+  devices: Position[]
+  selectedChipId?: string
+  onSelect?: (chipId: string) => void
+}) {
   if (devices.length === 0) {
     return (
       <p data-testid="pilotage-devices-empty" style={{ color: 'var(--color-text-muted)' }}>
@@ -25,25 +39,51 @@ export function DeviceList({ devices }: { devices: Position[] }) {
 
   return (
     <ul data-testid="pilotage-device-list" className="flex flex-col gap-2">
-      {devices.map((device) => (
-        <li
-          key={device.chipId}
-          data-testid={`pilotage-device-${device.chipId}`}
-          className="rounded-md border px-3 py-2 text-sm"
-          style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-        >
-          <span style={{ color: 'var(--color-text)' }}>{device.chipId}</span>
-          {device.timestamp && (
-            <span
-              data-testid={`pilotage-device-${device.chipId}-last-seen`}
-              className="ml-2"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              Dernière position connue : {device.timestamp}
-            </span>
-          )}
-        </li>
-      ))}
+      {devices.map((device) => {
+        const content = (
+          <>
+            <span style={{ color: 'var(--color-text)' }}>{device.chipId}</span>
+            {device.timestamp && (
+              <span
+                data-testid={`pilotage-device-${device.chipId}-last-seen`}
+                className="ml-2"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                Dernière position connue : {device.timestamp}
+              </span>
+            )}
+          </>
+        )
+
+        return (
+          <li
+            key={device.chipId}
+            data-testid={`pilotage-device-${device.chipId}`}
+            className="rounded-md border px-3 py-2 text-sm"
+            style={{
+              borderColor:
+                onSelect && selectedChipId === device.chipId
+                  ? 'var(--color-primary)'
+                  : 'var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+            }}
+          >
+            {onSelect ? (
+              <button
+                type="button"
+                data-testid={`pilotage-device-${device.chipId}-select`}
+                aria-pressed={selectedChipId === device.chipId}
+                onClick={() => onSelect(device.chipId)}
+                className="w-full text-left"
+              >
+                {content}
+              </button>
+            ) : (
+              content
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }
