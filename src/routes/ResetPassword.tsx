@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../api/client'
+import { Card } from '../chrome/Card'
+import { PageTitle } from '../chrome/PageTitle'
 import { FORGOT_PASSWORD_PATH, LOGIN_PATH } from '../auth/paths'
 import { isTokenTerminalOutcome, mapResetPasswordOutcome } from '../auth/resetPasswordOutcome'
 
@@ -39,7 +41,9 @@ export function ResetPassword() {
   const [searchParams] = useSearchParams()
   const [token] = useState(() => searchParams.get('t')?.trim() ?? '')
   const [tokenProblem, setTokenProblem] = useState<string | null>(
-    token === '' ? 'Lien incomplet. Reprenez le message reçu par e-mail.' : null,
+    token === ''
+      ? 'Lien incomplet. Reprenez le message reçu par e-mail.'
+      : null,
   )
   const [formError, setFormError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -79,26 +83,26 @@ export function ResetPassword() {
   if (success) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-          Nouveau mot de passe
-        </h1>
-        <p
-          role="status"
-          aria-live="polite"
-          data-testid="reset-password-success"
-          style={{ color: 'var(--color-text)' }}
-        >
-          Votre mot de passe a été modifié. Toutes vos autres sessions ont été
-          fermées — reconnectez-vous avec votre nouveau mot de passe.
-        </p>
-        <Link
-          to={LOGIN_PATH}
-          data-testid="reset-password-login-link"
-          className="text-sm underline"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          Se connecter
-        </Link>
+        <PageTitle>Nouveau mot de passe</PageTitle>
+        <Card className="flex flex-col gap-6">
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="reset-password-success"
+            style={{ color: 'var(--color-text)' }}
+          >
+            Votre mot de passe a été modifié. Toutes vos autres sessions ont été
+            fermées — reconnectez-vous avec votre nouveau mot de passe.
+          </p>
+          <Link
+            to={LOGIN_PATH}
+            data-testid="reset-password-login-link"
+            className="text-sm underline"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Se connecter
+          </Link>
+        </Card>
       </main>
     )
   }
@@ -106,152 +110,154 @@ export function ResetPassword() {
   if (tokenProblem) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-          Nouveau mot de passe
-        </h1>
-        <p
-          role="alert"
-          aria-live="assertive"
-          data-testid="reset-password-token-problem"
-          style={{ color: 'var(--color-danger)' }}
-        >
-          {tokenProblem}
-        </p>
-        <Link
-          to={FORGOT_PASSWORD_PATH}
-          data-testid="reset-password-request-new-link"
-          className="text-sm underline"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          Demander un nouveau lien
-        </Link>
+        <PageTitle>Nouveau mot de passe</PageTitle>
+        <Card className="flex flex-col gap-6">
+          <p
+            role="alert"
+            aria-live="assertive"
+            data-testid="reset-password-token-problem"
+            style={{ color: 'var(--color-danger)' }}
+          >
+            {tokenProblem}
+          </p>
+          <Link
+            to={FORGOT_PASSWORD_PATH}
+            data-testid="reset-password-request-new-link"
+            className="text-sm underline"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Demander un nouveau lien
+          </Link>
+        </Card>
       </main>
     )
   }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-      <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-        Nouveau mot de passe
-      </h1>
+      <PageTitle>Nouveau mot de passe</PageTitle>
 
-      <form
-        className="flex flex-col gap-4"
-        noValidate
-        onSubmit={onSubmit}
-        data-testid="reset-password-form"
-      >
-        {formError && (
-          <p
-            role="alert"
-            aria-live="assertive"
-            data-testid="reset-password-form-error"
-            className="text-sm"
-            style={{ color: 'var(--color-danger)' }}
-          >
-            {formError}
-          </p>
-        )}
-
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="reset-password-password"
-            className="text-sm font-medium"
-            style={{ color: 'var(--color-text)' }}
-          >
-            Nouveau mot de passe
-          </label>
-          <input
-            id="reset-password-password"
-            type="password"
-            autoComplete="new-password"
-            data-testid="reset-password-password"
-            aria-invalid={errors.password ? 'true' : 'false'}
-            aria-describedby={
-              errors.password ? 'reset-password-password-error' : undefined
-            }
-            className="rounded-md border px-3 py-2 text-sm"
-            style={{
-              borderColor: 'var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              color: 'var(--color-text)',
-            }}
-            {...register('password', {
-              required: 'Mot de passe requis.',
-              deps: ['confirmation'],
-            })}
-          />
-          {errors.password && (
-            <p
-              id="reset-password-password-error"
-              role="alert"
-              aria-live="assertive"
-              data-testid="reset-password-password-error"
-              className="text-sm"
-              style={{ color: 'var(--color-danger)' }}
-            >
-              {errors.password.message}
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="reset-password-confirmation"
-            className="text-sm font-medium"
-            style={{ color: 'var(--color-text)' }}
-          >
-            Confirmer le mot de passe
-          </label>
-          <input
-            id="reset-password-confirmation"
-            type="password"
-            autoComplete="new-password"
-            data-testid="reset-password-confirmation"
-            aria-invalid={errors.confirmation ? 'true' : 'false'}
-            aria-describedby={
-              errors.confirmation ? 'reset-password-confirmation-error' : undefined
-            }
-            className="rounded-md border px-3 py-2 text-sm"
-            style={{
-              borderColor: 'var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              color: 'var(--color-text)',
-            }}
-            {...register('confirmation', {
-              required: 'Confirmation requise.',
-              validate: (value) =>
-                value === watch('password') || 'Les deux saisies diffèrent.',
-            })}
-          />
-          {errors.confirmation && (
-            <p
-              id="reset-password-confirmation-error"
-              role="alert"
-              aria-live="assertive"
-              data-testid="reset-password-confirmation-error"
-              className="text-sm"
-              style={{ color: 'var(--color-danger)' }}
-            >
-              {errors.confirmation.message}
-            </p>
-          )}
-        </div>
-
-        <button
-          type="submit"
-          disabled={!isValid || isSubmitting}
-          data-testid="reset-password-submit"
-          className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
-          style={{
-            borderColor: 'var(--color-border)',
-            backgroundColor: 'var(--color-surface)',
-            color: 'var(--color-text)',
-          }}
+      <Card>
+        <form
+          className="flex flex-col gap-4"
+          noValidate
+          onSubmit={onSubmit}
+          data-testid="reset-password-form"
         >
-          Enregistrer
-        </button>
-      </form>
+          {formError && (
+            <p
+              role="alert"
+              aria-live="assertive"
+              data-testid="reset-password-form-error"
+              className="text-sm"
+              style={{ color: 'var(--color-danger)' }}
+            >
+              {formError}
+            </p>
+          )}
+
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="reset-password-password"
+              className="text-sm font-medium"
+              style={{ color: 'var(--color-text)' }}
+            >
+              Nouveau mot de passe
+            </label>
+            <input
+              id="reset-password-password"
+              type="password"
+              autoComplete="new-password"
+              data-testid="reset-password-password"
+              aria-invalid={errors.password ? 'true' : 'false'}
+              aria-describedby={
+                errors.password ? 'reset-password-password-error' : undefined
+              }
+              className="rounded-md border px-3 py-2 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text)',
+              }}
+              {...register('password', {
+                required: 'Mot de passe requis.',
+                deps: ['confirmation'],
+              })}
+            />
+            {errors.password && (
+              <p
+                id="reset-password-password-error"
+                role="alert"
+                aria-live="assertive"
+                data-testid="reset-password-password-error"
+                className="text-sm"
+                style={{ color: 'var(--color-danger)' }}
+              >
+                {errors.password.message}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="reset-password-confirmation"
+              className="text-sm font-medium"
+              style={{ color: 'var(--color-text)' }}
+            >
+              Confirmer le mot de passe
+            </label>
+            <input
+              id="reset-password-confirmation"
+              type="password"
+              autoComplete="new-password"
+              data-testid="reset-password-confirmation"
+              aria-invalid={errors.confirmation ? 'true' : 'false'}
+              aria-describedby={
+                errors.confirmation
+                  ? 'reset-password-confirmation-error'
+                  : undefined
+              }
+              className="rounded-md border px-3 py-2 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text)',
+              }}
+              {...register('confirmation', {
+                required: 'Confirmation requise.',
+                validate: (value) =>
+                  value === watch('password') || 'Les deux saisies diffèrent.',
+              })}
+            />
+            {errors.confirmation && (
+              <p
+                id="reset-password-confirmation-error"
+                role="alert"
+                aria-live="assertive"
+                data-testid="reset-password-confirmation-error"
+                className="text-sm"
+                style={{ color: 'var(--color-danger)' }}
+              >
+                {errors.confirmation.message}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={!isValid || isSubmitting}
+            data-testid="reset-password-submit"
+            className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
+            style={{
+              borderColor: 'var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text)',
+            }}
+          >
+            Enregistrer
+          </button>
+        </form>
+      </Card>
     </main>
   )
 }

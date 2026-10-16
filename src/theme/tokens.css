@@ -108,3 +108,36 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
 }
+
+/*
+ * KAN-171 (FR11, NFR8) — app-wide accessibility rules, replicating CB21
+ * (`auth.css`'s global `:focus-visible`/`prefers-reduced-motion` rules,
+ * which already applied site-wide despite living in the auth stylesheet)
+ * on top of this design-token system rather than per component.
+ *
+ * `:focus-visible` (not a bare `:focus`) so the ring only appears for
+ * keyboard/assistive-tech focus, not every mouse click — a plain `:focus`
+ * rule would needlessly outline a button after it's clicked with a mouse.
+ * Token-driven (`--color-primary`) rather than a hardcoded color, per FR5.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/*
+ * `prefers-reduced-motion: reduce` disables transitions/animations
+ * app-wide. `!important` matches CB21's own override intent — a user who
+ * has asked their OS to reduce motion should never see a component-level
+ * `transition`/`animation` declaration win over this.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

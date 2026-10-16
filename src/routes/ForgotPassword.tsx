@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import { apiClient } from '../api/client'
+import { Card } from '../chrome/Card'
+import { PageTitle } from '../chrome/PageTitle'
 import {
   FORGOT_PASSWORD_MESSAGES,
   mapForgotPasswordOutcome,
@@ -57,120 +59,114 @@ export function ForgotPassword() {
   if (outcome) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-        <h1
-          className="text-xl font-semibold"
-          style={{ color: 'var(--color-text)' }}
-        >
-          Mot de passe oublié
-        </h1>
-        <p
-          role="status"
-          aria-live="polite"
-          data-testid="forgot-password-confirmation"
-          style={{ color: 'var(--color-text)' }}
-        >
-          {FORGOT_PASSWORD_MESSAGES[outcome]}
-        </p>
-        <Link
-          to={LOGIN_PATH}
-          data-testid="forgot-password-back-to-login"
-          className="text-sm underline"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          Retour à la connexion
-        </Link>
+        <PageTitle>Mot de passe oublié</PageTitle>
+        <Card className="flex flex-col gap-6">
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="forgot-password-confirmation"
+            style={{ color: 'var(--color-text)' }}
+          >
+            {FORGOT_PASSWORD_MESSAGES[outcome]}
+          </p>
+          <Link
+            to={LOGIN_PATH}
+            data-testid="forgot-password-back-to-login"
+            className="text-sm underline"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Retour à la connexion
+          </Link>
+        </Card>
       </main>
     )
   }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-      <h1
-        className="text-xl font-semibold"
-        style={{ color: 'var(--color-text)' }}
-      >
-        Mot de passe oublié
-      </h1>
+      <PageTitle>Mot de passe oublié</PageTitle>
       <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
         Saisissez votre adresse e-mail et nous vous enverrons un lien de
         réinitialisation.
       </p>
 
-      <form
-        className="flex flex-col gap-4"
-        noValidate
-        onSubmit={onSubmit}
-        data-testid="forgot-password-form"
-      >
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="forgot-password-email"
-            className="text-sm font-medium"
-            style={{ color: 'var(--color-text)' }}
-          >
-            Adresse e-mail
-          </label>
-          <input
-            id="forgot-password-email"
-            type="email"
-            autoComplete="username"
-            data-testid="forgot-password-email"
-            aria-invalid={errors.email ? 'true' : 'false'}
-            aria-describedby={
-              errors.email ? 'forgot-password-email-error' : undefined
-            }
-            className="rounded-md border px-3 py-2 text-sm"
+      <Card>
+        <form
+          className="flex flex-col gap-4"
+          noValidate
+          onSubmit={onSubmit}
+          data-testid="forgot-password-form"
+        >
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="forgot-password-email"
+              className="text-sm font-medium"
+              style={{ color: 'var(--color-text)' }}
+            >
+              Adresse e-mail
+            </label>
+            <input
+              id="forgot-password-email"
+              type="email"
+              autoComplete="username"
+              data-testid="forgot-password-email"
+              aria-invalid={errors.email ? 'true' : 'false'}
+              aria-describedby={
+                errors.email ? 'forgot-password-email-error' : undefined
+              }
+              className="rounded-md border px-3 py-2 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text)',
+              }}
+              {...register('email', {
+                required: 'Adresse e-mail requise.',
+                setValueAs: (value: string) => value.trim(),
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: 'Adresse e-mail invalide.',
+                },
+              })}
+            />
+            {errors.email && (
+              <p
+                id="forgot-password-email-error"
+                role="alert"
+                aria-live="assertive"
+                data-testid="forgot-password-email-error"
+                className="text-sm"
+                style={{ color: 'var(--color-danger)' }}
+              >
+                {errors.email.message}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={!isValid || isSubmitting}
+            data-testid="forgot-password-submit"
+            className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
             style={{
               borderColor: 'var(--color-border)',
               backgroundColor: 'var(--color-surface)',
               color: 'var(--color-text)',
             }}
-            {...register('email', {
-              required: 'Adresse e-mail requise.',
-              setValueAs: (value: string) => value.trim(),
-              pattern: {
-                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                message: 'Adresse e-mail invalide.',
-              },
-            })}
-          />
-          {errors.email && (
-            <p
-              id="forgot-password-email-error"
-              role="alert"
-              aria-live="assertive"
-              data-testid="forgot-password-email-error"
-              className="text-sm"
-              style={{ color: 'var(--color-danger)' }}
-            >
-              {errors.email.message}
-            </p>
-          )}
-        </div>
+          >
+            Envoyer le lien de réinitialisation
+          </button>
 
-        <button
-          type="submit"
-          disabled={!isValid || isSubmitting}
-          data-testid="forgot-password-submit"
-          className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
-          style={{
-            borderColor: 'var(--color-border)',
-            backgroundColor: 'var(--color-surface)',
-            color: 'var(--color-text)',
-          }}
-        >
-          Envoyer le lien de réinitialisation
-        </button>
-
-        <Link
-          to={LOGIN_PATH}
-          data-testid="forgot-password-back-to-login"
-          className="text-sm underline"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          Retour à la connexion
-        </Link>
-      </form>
+          <Link
+            to={LOGIN_PATH}
+            data-testid="forgot-password-back-to-login"
+            className="text-sm underline"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Retour à la connexion
+          </Link>
+        </form>
+      </Card>
     </main>
   )
 }

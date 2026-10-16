@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { fetchContracts, type Contract } from '../api/contracts'
+import { PageTitle } from '../chrome/PageTitle'
 import { HistoryAccessGate } from '../history/HistoryAccessGate'
 import { formatIsoDate } from '../history/dateRange'
 import { HistoryReadyPanel } from '../history/HistoryReadyPanel'
@@ -85,11 +86,9 @@ export function HistoryDashboard() {
   }, [])
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-8">
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
       <header>
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-          Historique
-        </h1>
+        <PageTitle>Historique</PageTitle>
       </header>
 
       {state === 'loading' && (

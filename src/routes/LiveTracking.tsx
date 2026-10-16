@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchContracts, type Contract } from '../api/contracts'
-import { ClientLogo } from '../live-tracking/ClientLogo'
+import { PageTitle } from '../chrome/PageTitle'
 import { ContractMessage } from '../live-tracking/ContractMessage'
 import { ContractPositions } from '../live-tracking/ContractPositions'
 import { GlobalMessage } from '../live-tracking/GlobalMessage'
@@ -22,8 +22,13 @@ type LoadState = 'loading' | 'loaded' | 'error'
  * Map rendering itself (FR3-FR7) is `ContractPositions`/`PositionsMap`
  * (KAN-160) — this component only tracks which contract is selected and
  * mounts that child, `ContractMessage`, and `HistoryDashboardLink` when it
- * is. `ClientLogo`/`GlobalMessage` (KAN-165, FR11/FR13) aren't gated on a
- * selection — they're shown for the whole visit.
+ * is. `GlobalMessage` (KAN-165, FR13) isn't gated on a selection — it's
+ * shown for the whole visit.
+ *
+ * KAN-171 moved `ClientLogo` (previously mounted here) into the new shared
+ * `AppChrome` (`App.tsx`), which now wraps this route — see `AppChrome`'s
+ * own doc comment for why. The heading below uses the shared `PageTitle`
+ * (FR9/FR10) instead of this route's own ad-hoc `<h1>` styling.
  *
  * KAN-168 (FR15): the zero-contracts and empty-map states already existed
  * (`live-tracking-empty`, `positions-empty`); this component additionally
@@ -71,13 +76,8 @@ export function LiveTracking() {
   }, [])
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-8">
-      <header className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-          Suivi en direct
-        </h1>
-        <ClientLogo />
-      </header>
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
+      <PageTitle>Suivi en direct</PageTitle>
 
       <GlobalMessage />
 

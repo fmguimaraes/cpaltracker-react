@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchContracts, type Contract } from '../api/contracts'
+import { PageTitle } from '../chrome/PageTitle'
 import { PilotageWorkspace } from '../pilotage/PilotageWorkspace'
 
 type LoadState = 'loading' | 'loaded' | 'error'
@@ -54,11 +55,9 @@ export function DevicePilotage() {
   }, [])
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-8">
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
       <header>
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-          Pilotage des devices
-        </h1>
+        <PageTitle>Pilotage des devices</PageTitle>
       </header>
 
       {state === 'loading' && (

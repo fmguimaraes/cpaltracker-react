@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { PageTitle } from '../chrome/PageTitle'
 import { useThemeStore } from '../store/themeStore'
 
 export function HelloWorld() {
@@ -39,11 +40,9 @@ export function HelloWorld() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-8">
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
       <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-          cpaltracker-react
-        </h1>
+        <PageTitle>cpaltracker-react</PageTitle>
         <div className="flex items-center gap-2">
           <button
             type="button"

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { Card } from '../chrome/Card'
+import { PageTitle } from '../chrome/PageTitle'
 import { useAuth } from '../auth/AuthContext'
 import { HOME_PATH } from '../auth/paths'
 import { EmailForm } from './account/EmailForm'
@@ -48,52 +50,52 @@ export function Account() {
   const firstConnection = account.mustChangePassword || searchParams.has('premiere')
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 p-8">
-      <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-        Mon compte
-      </h1>
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
+      <PageTitle>Mon compte</PageTitle>
 
-      {firstConnection && (
-        <p
-          data-testid="account-first-connection-notice"
-          className="text-sm"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          Choisissez votre mot de passe. Celui qui vous a été communiqué est
-          provisoire. Tant qu'il n'est pas remplacé, l'application reste
-          inaccessible.
-        </p>
-      )}
+      <Card className="flex flex-col gap-8">
+        {firstConnection && (
+          <p
+            data-testid="account-first-connection-notice"
+            className="text-sm"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Choisissez votre mot de passe. Celui qui vous a été communiqué est
+            provisoire. Tant qu'il n'est pas remplacé, l'application reste
+            inaccessible.
+          </p>
+        )}
 
-      <PasswordForm />
+        <PasswordForm />
 
-      {!firstConnection && (
-        <>
-          <PhoneForm account={account} />
-          <EmailForm account={account} />
+        {!firstConnection && (
+          <>
+            <PhoneForm account={account} />
+            <EmailForm account={account} />
 
-          <div className="flex items-center justify-between">
-            <Link
-              to={HOME_PATH}
-              data-testid="account-back-to-app"
-              className="text-sm underline"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              Retour à l'application
-            </Link>
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={loggingOut}
-              data-testid="account-logout"
-              className="text-sm underline disabled:opacity-50"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              Se déconnecter
-            </button>
-          </div>
-        </>
-      )}
+            <div className="flex items-center justify-between">
+              <Link
+                to={HOME_PATH}
+                data-testid="account-back-to-app"
+                className="text-sm underline"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                Retour à l'application
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                data-testid="account-logout"
+                className="text-sm underline disabled:opacity-50"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                Se déconnecter
+              </button>
+            </div>
+          </>
+        )}
+      </Card>
     </main>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
+import { AppChrome } from './chrome/AppChrome'
 import {
   CHANGE_PASSWORD_PATH,
   DEVICE_PILOTAGE_PATH,
@@ -36,7 +37,9 @@ export function App() {
             path="/"
             element={
               <RequireAuth>
-                <HelloWorld />
+                <AppChrome>
+                  <HelloWorld />
+                </AppChrome>
               </RequireAuth>
             }
           />
@@ -44,7 +47,9 @@ export function App() {
             path={LIVE_TRACKING_PATH}
             element={
               <RequireAuth>
-                <LiveTracking />
+                <AppChrome>
+                  <LiveTracking />
+                </AppChrome>
               </RequireAuth>
             }
           />
@@ -52,7 +57,9 @@ export function App() {
             path={HISTORY_DASHBOARD_PATH}
             element={
               <RequireAuth>
-                <HistoryDashboard />
+                <AppChrome>
+                  <HistoryDashboard />
+                </AppChrome>
               </RequireAuth>
             }
           />
@@ -60,7 +67,9 @@ export function App() {
             path={DEVICE_PILOTAGE_PATH}
             element={
               <RequireAuth>
-                <DevicePilotage />
+                <AppChrome>
+                  <DevicePilotage />
+                </AppChrome>
               </RequireAuth>
             }
           />

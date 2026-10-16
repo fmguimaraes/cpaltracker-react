@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Card } from '../chrome/Card'
+import { PageTitle } from '../chrome/PageTitle'
 import { useAuth } from '../auth/AuthContext'
 import { getAuthOutcomeMessage } from '../auth/authOutcome'
 import { LOGIN_NOTICE_MESSAGES, parseLoginNotice } from '../auth/loginNotice'
@@ -85,12 +87,7 @@ export function Login() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-      <h1
-        className="text-xl font-semibold"
-        style={{ color: 'var(--color-text)' }}
-      >
-        Sign in
-      </h1>
+      <PageTitle>Sign in</PageTitle>
 
       {notice && (
         <p
@@ -104,125 +101,127 @@ export function Login() {
         </p>
       )}
 
-      <form
-        className="flex flex-col gap-4"
-        noValidate
-        onSubmit={onSubmit}
-        data-testid="login-form"
-      >
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="login-email"
-            className="text-sm font-medium"
-            style={{ color: 'var(--color-text)' }}
-          >
-            Email
-          </label>
-          <input
-            id="login-email"
-            type="email"
-            autoComplete="username"
-            data-testid="login-email"
-            aria-invalid={errors.email ? 'true' : 'false'}
-            aria-describedby={errors.email ? 'login-email-error' : undefined}
-            className="rounded-md border px-3 py-2 text-sm"
-            style={{
-              borderColor: 'var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              color: 'var(--color-text)',
-            }}
-            {...register('email', {
-              required: 'Email is required.',
-              setValueAs: (value: string) => value.trim(),
-            })}
-          />
-          {errors.email && (
+      <Card>
+        <form
+          className="flex flex-col gap-4"
+          noValidate
+          onSubmit={onSubmit}
+          data-testid="login-form"
+        >
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="login-email"
+              className="text-sm font-medium"
+              style={{ color: 'var(--color-text)' }}
+            >
+              Email
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="username"
+              data-testid="login-email"
+              aria-invalid={errors.email ? 'true' : 'false'}
+              aria-describedby={errors.email ? 'login-email-error' : undefined}
+              className="rounded-md border px-3 py-2 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text)',
+              }}
+              {...register('email', {
+                required: 'Email is required.',
+                setValueAs: (value: string) => value.trim(),
+              })}
+            />
+            {errors.email && (
+              <p
+                id="login-email-error"
+                role="alert"
+                aria-live="assertive"
+                data-testid="login-email-error"
+                className="text-sm"
+                style={{ color: 'var(--color-danger)' }}
+              >
+                {errors.email.message}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="login-password"
+              className="text-sm font-medium"
+              style={{ color: 'var(--color-text)' }}
+            >
+              Password
+            </label>
+            <input
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              data-testid="login-password"
+              aria-invalid={errors.password ? 'true' : 'false'}
+              aria-describedby={
+                errors.password ? 'login-password-error' : undefined
+              }
+              className="rounded-md border px-3 py-2 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text)',
+              }}
+              {...register('password', { required: 'Password is required.' })}
+            />
+            {errors.password && (
+              <p
+                id="login-password-error"
+                role="alert"
+                aria-live="assertive"
+                data-testid="login-password-error"
+                className="text-sm"
+                style={{ color: 'var(--color-danger)' }}
+              >
+                {errors.password.message}
+              </p>
+            )}
+          </div>
+
+          {submitError && (
             <p
-              id="login-email-error"
               role="alert"
               aria-live="assertive"
-              data-testid="login-email-error"
+              data-testid="login-error"
               className="text-sm"
               style={{ color: 'var(--color-danger)' }}
             >
-              {errors.email.message}
+              {submitError}
             </p>
           )}
-        </div>
 
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="login-password"
-            className="text-sm font-medium"
-            style={{ color: 'var(--color-text)' }}
-          >
-            Password
-          </label>
-          <input
-            id="login-password"
-            type="password"
-            autoComplete="current-password"
-            data-testid="login-password"
-            aria-invalid={errors.password ? 'true' : 'false'}
-            aria-describedby={
-              errors.password ? 'login-password-error' : undefined
-            }
-            className="rounded-md border px-3 py-2 text-sm"
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            data-testid="login-submit"
+            className="rounded-md px-3 py-2 text-sm font-semibold disabled:opacity-60"
             style={{
-              borderColor: 'var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              color: 'var(--color-text)',
+              backgroundColor: 'var(--color-primary)',
+              color: 'var(--color-primary-contrast)',
             }}
-            {...register('password', { required: 'Password is required.' })}
-          />
-          {errors.password && (
-            <p
-              id="login-password-error"
-              role="alert"
-              aria-live="assertive"
-              data-testid="login-password-error"
-              className="text-sm"
-              style={{ color: 'var(--color-danger)' }}
-            >
-              {errors.password.message}
-            </p>
-          )}
-        </div>
-
-        {submitError && (
-          <p
-            role="alert"
-            aria-live="assertive"
-            data-testid="login-error"
-            className="text-sm"
-            style={{ color: 'var(--color-danger)' }}
           >
-            {submitError}
-          </p>
-        )}
+            {isSubmitting ? 'Signing in…' : 'Sign in'}
+          </button>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          data-testid="login-submit"
-          className="rounded-md px-3 py-2 text-sm font-semibold disabled:opacity-60"
-          style={{
-            backgroundColor: 'var(--color-primary)',
-            color: 'var(--color-primary-contrast)',
-          }}
-        >
-          {isSubmitting ? 'Signing in…' : 'Sign in'}
-        </button>
-
-        <Link
-          to={FORGOT_PASSWORD_PATH}
-          data-testid="login-forgot-password-link"
-          className="text-sm underline"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          Forgot password?
-        </Link>
-      </form>
+          <Link
+            to={FORGOT_PASSWORD_PATH}
+            data-testid="login-forgot-password-link"
+            className="text-sm underline"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Forgot password?
+          </Link>
+        </form>
+      </Card>
     </main>
   )
 }
