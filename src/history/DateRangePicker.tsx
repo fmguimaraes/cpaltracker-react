@@ -61,11 +61,19 @@ export function DateRangePicker({
           value={startInput}
           onChange={(event) => setStartInput(event.target.value)}
           data-testid="date-range-start"
-          aria-invalid={fieldError?.field === 'start'}
+          aria-invalid={fieldError?.field === 'start' || rangeError !== null}
+          aria-describedby={
+            fieldError?.field === 'start' ? 'date-range-start-error' : rangeError ? 'date-range-error' : undefined
+          }
         />
       </label>
       {fieldError?.field === 'start' && (
-        <p role="alert" data-testid="date-range-start-error" style={{ color: 'var(--color-danger)' }}>
+        <p
+          id="date-range-start-error"
+          role="alert"
+          data-testid="date-range-start-error"
+          style={{ color: 'var(--color-danger)' }}
+        >
           {fieldError.message}
         </p>
       )}
@@ -79,11 +87,19 @@ export function DateRangePicker({
           value={endInput}
           onChange={(event) => setEndInput(event.target.value)}
           data-testid="date-range-end"
-          aria-invalid={fieldError?.field === 'end'}
+          aria-invalid={fieldError?.field === 'end' || rangeError !== null}
+          aria-describedby={
+            fieldError?.field === 'end' ? 'date-range-end-error' : rangeError ? 'date-range-error' : undefined
+          }
         />
       </label>
       {fieldError?.field === 'end' && (
-        <p role="alert" data-testid="date-range-end-error" style={{ color: 'var(--color-danger)' }}>
+        <p
+          id="date-range-end-error"
+          role="alert"
+          data-testid="date-range-end-error"
+          style={{ color: 'var(--color-danger)' }}
+        >
           {fieldError.message}
         </p>
       )}
@@ -98,7 +114,7 @@ export function DateRangePicker({
       </button>
 
       {rangeError && (
-        <p role="alert" data-testid="date-range-error" style={{ color: 'var(--color-danger)' }}>
+        <p id="date-range-error" role="alert" data-testid="date-range-error" style={{ color: 'var(--color-danger)' }}>
           {rangeError}
         </p>
       )}

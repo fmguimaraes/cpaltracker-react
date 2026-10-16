@@ -98,8 +98,8 @@ describe('validateDateRangeInputs (FR5-FR8)', () => {
 describe('computeLegacyDefaultRange (FR3)', () => {
   const now = new Date(Date.UTC(2026, 5, 15))
 
-  it('uses the whole contract period when both bounds are set and FinContrat is in the past', () => {
-    const contractStart = new Date(Date.UTC(2025, 0, 1))
+  it('uses the whole contract period when both bounds are set, FinContrat is in the past, and the span is within 1 year', () => {
+    const contractStart = new Date(Date.UTC(2025, 10, 1))
     const contractEnd = new Date(Date.UTC(2026, 2, 1))
 
     expect(computeLegacyDefaultRange(contractStart, contractEnd, now)).toEqual({
@@ -109,7 +109,7 @@ describe('computeLegacyDefaultRange (FR3)', () => {
   })
 
   it('caps the upper bound at "now" for an open-ended contract (FinContrat null or in the future)', () => {
-    const contractStart = new Date(Date.UTC(2025, 0, 1))
+    const contractStart = new Date(Date.UTC(2026, 1, 1))
 
     expect(computeLegacyDefaultRange(contractStart, null, now)).toEqual({
       start: contractStart,
@@ -121,6 +121,43 @@ describe('computeLegacyDefaultRange (FR3)', () => {
       start: contractStart,
       end: now,
     })
+  })
+
+  it('clamps the start to 1 year before the resolved end when the whole contract period is over a year (review gate round 1: FR8\'s endpoint-wide cap applies to the default too)', () => {
+    const contractStart = new Date(Date.UTC(2020, 0, 1))
+    const contractEnd = new Date(Date.UTC(2026, 2, 1))
+
+    expect(computeLegacyDefaultRange(contractStart, contractEnd, now)).toEqual({
+      start: new Date(Date.UTC(2025, 2, 1)),
+      end: contractEnd,
+    })
+  })
+
+  it('clamps an open-ended, long-running contract\'s start to 1 year before "now"', () => {
+    const contractStart = new Date(Date.UTC(2020, 0, 1))
+
+    expect(computeLegacyDefaultRange(contractStart, null, now)).toEqual({
+      start: new Date(Date.UTC(2025, 5, 15)),
+      end: now,
+    })
+  })
+
+  it('clamps a future/malformed DebutContrat (after the resolved end) to the end itself, never a reversed range', () => {
+    const contractStart = new Date(Date.UTC(2027, 0, 1))
+
+    expect(computeLegacyDefaultRange(contractStart, null, now)).toEqual({
+      start: now,
+      end: now,
+    })
+  })
+
+  it('clamps when FinContrat precedes DebutContrat (malformed contract data) to a zero-span range, never reversed', () => {
+    const contractStart = new Date(Date.UTC(2026, 0, 1))
+    const contractEnd = new Date(Date.UTC(2025, 0, 1))
+
+    const result = computeLegacyDefaultRange(contractStart, contractEnd, now)
+    expect(result.start.getTime()).toBeLessThanOrEqual(result.end.getTime())
+    expect(result.end).toEqual(contractEnd)
   })
 
   it('falls back to 30 days before the resolved upper bound when there is no DebutContrat', () => {
