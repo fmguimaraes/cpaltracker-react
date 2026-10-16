@@ -109,9 +109,9 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     expect(screen.queryByTestId('positions-error')).not.toBeInTheDocument()
   })
 
-  it('reports unauthorized via onUnauthorized on a 403 too', async () => {
+  it('treats a 403 as a generic error, not an unauthorized-contract signal (review gate: the only 403 this endpoint returns is mustChangePassword, unrelated to contract authorization)', async () => {
     stubFetch(
-      new Response(JSON.stringify({ error: { code: 'forbidden', message: 'Forbidden' } }), {
+      new Response(JSON.stringify({ error: { code: 'must_change_password', message: 'Forbidden' } }), {
         status: 403,
       }),
     )
@@ -119,7 +119,8 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
 
     render(<ContractPositions contractId={12} onUnauthorized={onUnauthorized} />)
 
-    await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByTestId('positions-error')).toBeInTheDocument())
+    expect(onUnauthorized).not.toHaveBeenCalled()
   })
 
   it('re-fetches when the contractId prop changes', async () => {

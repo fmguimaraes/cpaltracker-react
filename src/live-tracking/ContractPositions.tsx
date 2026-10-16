@@ -30,14 +30,19 @@ function formatLastUpdated(date: Date): string {
  * only, reusing the same `fetchPositions` call as the initial load and as
  * a contract switch.
  *
- * KAN-168 (FR15): a 404/403 from `devices/positions.php` means this
- * contract id is unauthorized or doesn't exist for the caller — the
- * backend's uniform-404 anti-enumeration convention means those two cases
- * are indistinguishable by design, so this component doesn't try. It
- * reports the condition to the parent via `onUnauthorized` instead of
- * rendering its own error, since the correct UI response (clear the
- * selection, show a generic message) lives one level up, where the
- * selector is.
+ * KAN-168 (FR15): a 404 from `devices/positions.php` means this contract id
+ * is unauthorized or doesn't exist for the caller — `cpal_contrat_autorise()`
+ * returns the same uniform 404 for both cases by design, so this component
+ * doesn't try to tell them apart. It reports the condition to the parent via
+ * `onUnauthorized` instead of rendering its own error, since the correct UI
+ * response (clear the selection, show a generic message) lives one level
+ * up, where the selector is.
+ *
+ * Only 404 triggers this — the endpoint's one 403 means `mustChangePassword`
+ * (an account-level gate unrelated to this contract, and one that redirects
+ * the user away from this screen entirely before this component ever
+ * mounts), not a contract-authorization signal, so folding it in here would
+ * mislabel it as "this contract isn't available."
  */
 export function ContractPositions({
   contractId,
@@ -80,7 +85,7 @@ export function ContractPositions({
       })
       .catch((err) => {
         if (cancelled) return
-        if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+        if (err instanceof ApiError && err.status === 404) {
           onUnauthorizedRef.current?.()
           return
         }
