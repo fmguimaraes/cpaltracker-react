@@ -72,7 +72,8 @@ export function LiveTracking() {
       )}
 
       {state === 'loaded' && contracts.length > 0 && (
-        <section
+        <div
+          role="radiogroup"
           className="flex flex-col gap-2"
           data-testid="contract-selector"
           aria-label="Sélection du contrat"
@@ -81,8 +82,9 @@ export function LiveTracking() {
             <button
               key={contract.contractId}
               type="button"
+              role="radio"
               data-testid={`contract-option-${contract.contractId}`}
-              aria-pressed={selectedId === contract.contractId}
+              aria-checked={selectedId === contract.contractId}
               onClick={() => setSelectedId(contract.contractId)}
               className="rounded-md border px-3 py-2 text-left text-sm"
               style={{
@@ -98,7 +100,7 @@ export function LiveTracking() {
               {contract.clientName ? ` (${contract.clientName})` : ''}
             </button>
           ))}
-        </section>
+        </div>
       )}
     </main>
   )

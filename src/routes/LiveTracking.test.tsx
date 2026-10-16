@@ -95,11 +95,11 @@ describe('LiveTracking (KAN-158 FR1/FR2)', () => {
     renderLiveTracking()
 
     const option = await screen.findByTestId('contract-option-12')
-    expect(option).toHaveAttribute('aria-pressed', 'false')
+    expect(option).toHaveAttribute('aria-checked', 'false')
 
     await userEvent.click(option)
 
-    expect(option).toHaveAttribute('aria-pressed', 'true')
+    expect(option).toHaveAttribute('aria-checked', 'true')
   })
 
   it('shows a generic error state on a service failure, never raw backend text', async () => {

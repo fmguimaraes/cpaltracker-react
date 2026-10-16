@@ -21,6 +21,6 @@ interface ContractsListResponse {
 }
 
 export async function fetchContracts(): Promise<Contract[]> {
-  const { contracts } = await apiClient.get<ContractsListResponse>('/contracts/list.php')
-  return contracts
+  const body = await apiClient.get<ContractsListResponse>('/contracts/list.php')
+  return body.contracts ?? []
 }
