@@ -269,13 +269,20 @@ describe('AuthContext token handling (NFR3)', () => {
   })
 
   it('never logs the issued token via console across a full login→logout cycle (review gate round 1: a failed-login-only test cannot catch a logging regression, since no token is ever issued on that path)', async () => {
-    const consoleSpies = [
-      vi.spyOn(console, 'error').mockImplementation(() => {}),
-      vi.spyOn(console, 'warn').mockImplementation(() => {}),
-      vi.spyOn(console, 'log').mockImplementation(() => {}),
-      vi.spyOn(console, 'info').mockImplementation(() => {}),
-      vi.spyOn(console, 'debug').mockImplementation(() => {}),
-    ]
+    // Review gate round 3 (escalated, user call: close the small fix):
+    // a named list (error/warn/log/info/debug) misses console.dir() — which
+    // writes via util.inspect directly, bypassing those spies — and any
+    // other console method a future Node/polyfill adds. Spy on every
+    // function the console object currently exposes instead.
+    const consoleMethodKeys = (Object.keys(console) as Array<keyof typeof console>).filter(
+      (key) => typeof console[key] === 'function',
+    )
+    // Sanity check on the discovery itself: if this ever comes back empty
+    // (or missing console.dir), the test below would pass vacuously.
+    expect(consoleMethodKeys).toContain('dir')
+    const consoleSpies = consoleMethodKeys.map((key) =>
+      vi.spyOn(console, key as 'log').mockImplementation(() => {}),
+    )
     vi.stubGlobal(
       'fetch',
       vi.fn((input: RequestInfo | URL) => {
@@ -316,9 +323,14 @@ describe('AuthContext token handling (NFR3)', () => {
     // to "[object Object]", so `console.log('login', { token })` — the most
     // realistic way a token leaks — would have passed undetected.
     // `util.inspect(..., { depth: null })` expands nested values instead.
+    // Round 3: inspect's own default maxStringLength/maxArrayLength would
+    // silently truncate a long enough payload before the substring check
+    // ever sees the token — disable both limits.
     for (const spy of consoleSpies) {
       for (const call of spy.mock.calls) {
-        expect(inspect(call, { depth: null })).not.toContain('never-logged-token')
+        expect(
+          inspect(call, { depth: null, maxStringLength: Infinity, maxArrayLength: Infinity }),
+        ).not.toContain('never-logged-token')
       }
     }
   })
