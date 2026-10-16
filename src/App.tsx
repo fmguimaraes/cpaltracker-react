@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthContext'
 import {
   CHANGE_PASSWORD_PATH,
   FORGOT_PASSWORD_PATH,
+  HISTORY_DASHBOARD_PATH,
   LIVE_TRACKING_PATH,
   RESET_PASSWORD_PATH,
 } from './auth/paths'
@@ -11,6 +12,7 @@ import { useThemeStore } from './store/themeStore'
 import { Account } from './routes/Account'
 import { ForgotPassword } from './routes/ForgotPassword'
 import { HelloWorld } from './routes/HelloWorld'
+import { HistoryDashboard } from './routes/HistoryDashboard'
 import { LiveTracking } from './routes/LiveTracking'
 import { Login } from './routes/Login'
 import { NotFound } from './routes/NotFound'
@@ -41,6 +43,14 @@ export function App() {
             element={
               <RequireAuth>
                 <LiveTracking />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={HISTORY_DASHBOARD_PATH}
+            element={
+              <RequireAuth>
+                <HistoryDashboard />
               </RequireAuth>
             }
           />

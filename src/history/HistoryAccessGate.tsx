@@ -1,0 +1,95 @@
+import { useEffect, useRef, type ReactNode } from 'react'
+import { useDefaultDateRange, type DefaultDateRangeState } from './useDefaultDateRange'
+
+type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
+
+/**
+ * KAN-172 (FR25, NFR5) — the History Dashboard's access-security gate.
+ *
+ * Wraps `useDefaultDateRange` (KAN-170, FR3) purely for its already-built
+ * 404-vs-generic-error distinction: fetching a contract's history is the
+ * only call this story needs to make to prove the selected `contractId` is
+ * actually accessible, and that hook already makes exactly that call. This
+ * component adds no gating logic of its own — the `/api/v1` 404 on an
+ * unauthorized-or-nonexistent contract (`cpal_contrat_autorise()`'s uniform
+ * anti-enumeration response, same backend fact KAN-168/KAN-170 already rely
+ * on) is the ONLY signal used to decide FR25's merged state. No client-side
+ * allow-list check against the fetched contract list is ever done here —
+ * gating stays entirely server-owned (epic KAN-139 constraint).
+ *
+ * FR25: a nonexistent contract and one belonging to another client both
+ * surface as the exact same `history-access-error` message — this
+ * component never has enough information to tell them apart (the backend
+ * deliberately returns the same 404 either way) and must not try.
+ *
+ * NFR5: the message text, the `role="alert"` markup, and the timing (one
+ * fetch either way) are identical regardless of which of the two cases
+ * applies — there is nothing in this component's output that could leak
+ * which one occurred.
+ *
+ * KAN-174/KAN-175 own what actually renders once a contract is confirmed
+ * accessible (map, charts, checklist, lot-hooks, selection summary — FR4,
+ * FR9-FR24). This gate's `children` render prop is deliberately the only
+ * extension point: it is called with the resolved default range and the
+ * already-fetched `HistoryResponse` only once `status === 'ready'`, so later
+ * stories plug in without this file changing.
+ */
+export function HistoryAccessGate({
+  contractId,
+  onUnauthorized,
+  children,
+}: {
+  contractId: number
+  /**
+   * Called once when access turns out to be denied, so the caller (the
+   * contract selector) can clear its selection — mirrors
+   * `ContractPositions`'s/`LiveTracking`'s KAN-168 `onUnauthorized` pattern.
+   * Not called on every render while the denied state persists.
+   */
+  onUnauthorized?: () => void
+  children: (resolved: ReadyState) => ReactNode
+}) {
+  const state = useDefaultDateRange(contractId)
+
+  const onUnauthorizedRef = useRef(onUnauthorized)
+  onUnauthorizedRef.current = onUnauthorized
+  const notifiedRef = useRef(false)
+
+  useEffect(() => {
+    if (state.status === 'unauthorized' && !notifiedRef.current) {
+      notifiedRef.current = true
+      onUnauthorizedRef.current?.()
+    }
+    if (state.status !== 'unauthorized') {
+      notifiedRef.current = false
+    }
+  }, [state.status])
+
+  if (state.status === 'loading') {
+    return (
+      <p data-testid="history-access-loading" style={{ color: 'var(--color-text-muted)' }}>
+        Chargement de l'historique…
+      </p>
+    )
+  }
+
+  if (state.status === 'unauthorized') {
+    // FR25/NFR5 — identical message and markup for "doesn't exist" and
+    // "exists but isn't yours"; never mentions the contract id.
+    return (
+      <p data-testid="history-access-error" role="alert" style={{ color: 'var(--color-danger)' }}>
+        Ce contrat n'est pas disponible. Sélectionnez-en un autre.
+      </p>
+    )
+  }
+
+  if (state.status === 'error') {
+    return (
+      <p data-testid="history-fetch-error" role="alert" style={{ color: 'var(--color-danger)' }}>
+        Impossible de charger l'historique de ce contrat. Réessayez plus tard.
+      </p>
+    )
+  }
+
+  return <>{children(state)}</>
+}

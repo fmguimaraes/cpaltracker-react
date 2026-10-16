@@ -26,9 +26,9 @@ export const CHANGE_PASSWORD_PATH = '/change-password'
 export const LIVE_TRACKING_PATH = '/live-tracking'
 
 /**
- * KAN-165 (FR14) — the History Dashboard route (legacy `dashboard.php`
- * equivalent, CB-10). Epic KAN-139 owns building the page itself; this
- * story only needs the path so Live Tracking's "Open History Dashboard"
- * link has somewhere to point.
+ * KAN-165 (FR14) — originally added only so Live Tracking's "Open History
+ * Dashboard" link had somewhere to point. KAN-172 (FR1, FR2) builds the
+ * route itself (`routes/HistoryDashboard.tsx`); KAN-174/KAN-175 build the
+ * rest of its content on top.
  */
 export const HISTORY_DASHBOARD_PATH = '/history'
