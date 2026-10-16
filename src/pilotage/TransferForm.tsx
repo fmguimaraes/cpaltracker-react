@@ -67,6 +67,8 @@ export function TransferForm({
   useEffect(() => {
     let cancelled = false
     setPhase({ status: 'loading' })
+    setFlash(null)
+    setContractInactive(false)
     fetchTransferTargets()
       .then((targets) => {
         if (cancelled) return

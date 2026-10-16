@@ -144,6 +144,29 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
     expect(screen.getByTestId('transfer-form-submit')).toBeDisabled()
   })
 
+  it('clears the contract-inactive disabled state when the operator switches devices', async () => {
+    stubTargets()
+    vi.spyOn(transferApi, 'postDeviceTransfer').mockRejectedValue(
+      new ApiError(409, "Ce contrat n'est pas actif aujourd'hui.", 'contract_inactive'),
+    )
+    const user = userEvent.setup()
+    const { rerender } = render(<TransferForm deviceId="CHIP-001" />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+
+    await user.selectOptions(screen.getByTestId('transfer-field-target'), '34')
+    await user.type(screen.getByTestId('transfer-field-startDate'), '2026-06-10')
+    await user.click(screen.getByTestId('transfer-form-submit'))
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form-submit')).toBeDisabled())
+
+    rerender(<TransferForm deviceId="CHIP-002" />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+    expect(screen.queryByTestId('transfer-contract-inactive')).not.toBeInTheDocument()
+    expect(screen.getByTestId('transfer-form-submit')).not.toBeDisabled()
+  })
+
   it('shows an error state when the target list fails to load', async () => {
     vi.spyOn(transferTargetsModule, 'fetchTransferTargets').mockRejectedValue(new Error('network error'))
     render(<TransferForm deviceId="CHIP-001" />)
