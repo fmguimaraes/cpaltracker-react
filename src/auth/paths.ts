@@ -32,3 +32,9 @@ export const LIVE_TRACKING_PATH = '/live-tracking'
  * rest of its content on top.
  */
 export const HISTORY_DASHBOARD_PATH = '/history'
+
+/**
+ * KAN-159 — the Device Pilotage contract selector / device-list workspace
+ * (epic KAN-140, `pilotage.php` equivalent, CB1/CB2).
+ */
+export const DEVICE_PILOTAGE_PATH = '/pilotage'

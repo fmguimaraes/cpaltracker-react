@@ -1,0 +1,104 @@
+import { useEffect, useRef, useState } from 'react'
+import type { Position } from '../api/positions'
+import { DeviceList } from './DeviceList'
+import { loadPilotageWorkspace } from './loadPilotageWorkspace'
+
+type State =
+  | { phase: 'loading' }
+  | { phase: 'error' }
+  | { phase: 'ineligible'; message: string }
+  | { phase: 'empty' }
+  | { phase: 'eligible'; devices: Position[] }
+
+/**
+ * KAN-159 (FR2-FR6, NFR2, NFR4, NFR9, NFR10) — one contract's pilotage
+ * workspace: resolves eligibility (FR3) and renders its device list
+ * (FR5/FR6), consuming only `/api/v1` (NFR2) and never computing MAIN
+ * eligibility itself (NFR4) — see `loadPilotageWorkspace.ts`'s doc comment
+ * for exactly which API calls back this and why.
+ *
+ * FR4 (active/inactive banner): deliberately NOT rendered by this
+ * component. There is no GET-readable "is this contract active today"
+ * flag in `/api/v1` (GAP2/GAP3) and this story has no write control of its
+ * own to surface the one signal that does exist (a 409 `contract_inactive`
+ * from a settings/transfer submit — KAN-163/166/169). `activeState.ts`'s
+ * `isContractInactiveError()` is the shared primitive those stories call;
+ * this is a known, explicitly-tracked gap, not a silent omission (see this
+ * story's handoff report).
+ */
+export function PilotageWorkspace({
+  contractId,
+  onUnauthorized,
+}: {
+  contractId: number
+  onUnauthorized?: () => void
+}) {
+  const [state, setState] = useState<State>({ phase: 'loading' })
+  // Same pattern as ContractPositions (KAN-160/168): kept in a ref so a new
+  // inline `onUnauthorized` identity from the parent never re-triggers the
+  // load effect below.
+  const onUnauthorizedRef = useRef(onUnauthorized)
+  onUnauthorizedRef.current = onUnauthorized
+
+  useEffect(() => {
+    let cancelled = false
+    setState({ phase: 'loading' })
+    loadPilotageWorkspace(contractId)
+      .then((result) => {
+        if (cancelled) return
+        if (result.kind === 'unauthorized') {
+          onUnauthorizedRef.current?.()
+          return
+        }
+        if (result.kind === 'ineligible') {
+          setState({ phase: 'ineligible', message: result.message })
+          return
+        }
+        if (result.kind === 'empty') {
+          setState({ phase: 'empty' })
+          return
+        }
+        setState({ phase: 'eligible', devices: result.devices })
+      })
+      .catch(() => {
+        if (cancelled) return
+        setState({ phase: 'error' })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [contractId])
+
+  if (state.phase === 'loading') {
+    return (
+      <p data-testid="pilotage-loading" style={{ color: 'var(--color-text-muted)' }}>
+        Chargement du pilotage…
+      </p>
+    )
+  }
+
+  if (state.phase === 'error') {
+    return (
+      <p data-testid="pilotage-error" role="alert" style={{ color: 'var(--color-danger)' }}>
+        Impossible de charger le pilotage de ce contrat. Réessayez plus tard.
+      </p>
+    )
+  }
+
+  if (state.phase === 'ineligible') {
+    // FR3: the server's own message, shown verbatim — this is the API's
+    // intentional, designed-to-be-shown refusal text (pilotage_logic.php's
+    // `cpal_pilotage_erreur_resolution()`), not raw error/stack-trace detail.
+    return (
+      <p data-testid="pilotage-ineligible" role="alert" style={{ color: 'var(--color-danger)' }}>
+        {state.message}
+      </p>
+    )
+  }
+
+  if (state.phase === 'empty') {
+    return <DeviceList devices={[]} />
+  }
+
+  return <DeviceList devices={state.devices} />
+}

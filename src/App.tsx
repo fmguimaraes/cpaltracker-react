@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import {
   CHANGE_PASSWORD_PATH,
+  DEVICE_PILOTAGE_PATH,
   FORGOT_PASSWORD_PATH,
   HISTORY_DASHBOARD_PATH,
   LIVE_TRACKING_PATH,
@@ -10,6 +11,7 @@ import {
 } from './auth/paths'
 import { useThemeStore } from './store/themeStore'
 import { Account } from './routes/Account'
+import { DevicePilotage } from './routes/DevicePilotage'
 import { ForgotPassword } from './routes/ForgotPassword'
 import { HelloWorld } from './routes/HelloWorld'
 import { HistoryDashboard } from './routes/HistoryDashboard'
@@ -51,6 +53,14 @@ export function App() {
             element={
               <RequireAuth>
                 <HistoryDashboard />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={DEVICE_PILOTAGE_PATH}
+            element={
+              <RequireAuth>
+                <DevicePilotage />
               </RequireAuth>
             }
           />
