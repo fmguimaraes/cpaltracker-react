@@ -1,4 +1,4 @@
-import type { Plugin } from 'vite'
+import type { Plugin, ResolvedConfig } from 'vite'
 
 /**
  * KAN-177 — CSP & security-header hardening.
@@ -26,17 +26,31 @@ import type { Plugin } from 'vite'
  * *attributes*, not `<script>`), which CSP's `unsafe-inline` for styles
  * governs; that is a far lower-severity relaxation (no code execution) and
  * standard practice for apps using inline style attributes.
+ *
+ * Review gate round 1 (B1): an earlier version read `process.env.VITE_API_BASE_URL`
+ * directly. That diverges from what `client.ts`'s `resolveBaseUrl()` actually
+ * sees via `import.meta.env` whenever the value comes from a `.env` file
+ * rather than an inline shell variable — Vite's `loadEnv()` parses `.env*`
+ * files into its own resolved config and does NOT write them back into
+ * `process.env`. Under that divergence the plugin would silently fall back
+ * to `connect-src 'self'` (no API origin) while the app itself still had a
+ * working API base URL — CSP would then block every real `/api/v1` call at
+ * runtime, with no build error. Fixed by reading `ResolvedConfig.env`
+ * (captured via the `configResolved` hook), the exact same resolved value
+ * Vite injects into `import.meta.env` for client code, regardless of
+ * whether it came from the shell or a `.env` file.
  */
 export function securityHeadersPlugin(): Plugin {
+  let resolvedEnv: ResolvedConfig['env'] | undefined
+
   return {
     name: 'cpaltracker-security-headers',
     apply: 'build',
+    configResolved(config) {
+      resolvedEnv = config.env
+    },
     transformIndexHtml() {
-      // `apply: 'build'` guarantees this never runs under the dev server,
-      // so VITE_API_BASE_URL here is always the same build-time env var
-      // client.ts's resolveBaseUrl() reads from import.meta.env — set by
-      // whoever invokes `npm run build` (per KAN-60 FR2's convention).
-      const apiBaseUrl = process.env.VITE_API_BASE_URL
+      const apiBaseUrl = resolvedEnv?.VITE_API_BASE_URL as string | undefined
       const connectSrc = ["'self'"]
       if (apiBaseUrl) {
         try {
