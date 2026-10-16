@@ -30,6 +30,9 @@ function stubFetch(contractsResponse: Response | (() => Response)) {
           typeof contractsResponse === 'function' ? contractsResponse() : contractsResponse
         return Promise.resolve(response)
       }
+      if (url.includes('/devices/positions.php')) {
+        return Promise.resolve(new Response(JSON.stringify({ positions: [] }), { status: 200 }))
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     }),
   )
@@ -82,7 +85,7 @@ describe('LiveTracking (KAN-158 FR1/FR2)', () => {
     expect(screen.queryByTestId('contract-selector')).not.toBeInTheDocument()
   })
 
-  it('lets the user select a contract, toggling its pressed state', async () => {
+  it('lets the user select a contract, toggling its checked state and mounting ContractPositions', async () => {
     stubFetch(
       new Response(
         JSON.stringify({
@@ -100,6 +103,7 @@ describe('LiveTracking (KAN-158 FR1/FR2)', () => {
     await userEvent.click(option)
 
     expect(option).toHaveAttribute('aria-checked', 'true')
+    await waitFor(() => expect(screen.getByTestId('positions-empty')).toBeInTheDocument())
   })
 
   it('shows a generic error state on a service failure, never raw backend text', async () => {

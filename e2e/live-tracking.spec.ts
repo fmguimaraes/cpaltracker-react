@@ -95,3 +95,64 @@ test('a user with zero visible contracts gets an explicit empty state, no select
 
   await expect(page.getByTestId('live-tracking-empty')).toBeVisible()
 })
+
+test('selecting a contract renders one marker per positioned device with an accessible tooltip (FR3, FR4, FR7)', async ({
+  page,
+}) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD' }],
+      }),
+    }),
+  )
+  await page.route('**/devices/positions.php**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        positions: [
+          {
+            contractId: 12,
+            chipId: 'CHIP-001',
+            timestamp: '2026-10-10T08:00:05Z',
+            latitude: 48.8566,
+            longitude: 2.3522,
+            ambientTemperature: 19.1,
+            humidity: 55,
+            mass: 420,
+            mpuTemperature: 21.5,
+            accelG: 1.02,
+          },
+          {
+            contractId: 12,
+            chipId: 'CHIP-002',
+            timestamp: null,
+            latitude: null,
+            longitude: null,
+            ambientTemperature: null,
+            humidity: null,
+            mass: null,
+            mpuTemperature: null,
+            accelG: null,
+          },
+        ],
+      }),
+    }),
+  )
+
+  await page.goto('/live-tracking')
+  await page.getByTestId('contract-option-12').click()
+
+  const markers = page.locator('.leaflet-marker-icon')
+  await expect(markers).toHaveCount(1)
+
+  await markers.first().focus()
+  await expect(page.locator('.leaflet-tooltip')).toContainText('10/10/2026 08:00 UTC')
+  await expect(page.locator('.leaflet-tooltip')).toContainText('Masse: 420 kg')
+})
