@@ -5,7 +5,25 @@ import { computeLegacyDefaultRange, formatIsoDate } from './dateRange'
 
 export type DefaultDateRangeState =
   | { status: 'loading' }
-  | { status: 'ready'; start: Date; end: Date; history: HistoryResponse }
+  | {
+      status: 'ready'
+      start: Date | null
+      end: Date | null
+      history: HistoryResponse
+      /**
+       * KAN-176 (FR5-FR8, NFR8) — re-fetches with an explicit,
+       * already-validated range (`DateRangePicker`'s `onApply` payload,
+       * `null` on a side meaning "unbounded", same convention
+       * `fetchContractHistory` itself uses). This is the wiring
+       * `DateRangePicker` (KAN-170) was built against but never had a
+       * caller for until this story: calling it moves the state straight
+       * back to `'loading'` then `'ready'`/`'unauthorized'`/`'error'`,
+       * exactly like the initial default-range load, so every consumer
+       * of this hook (`HistoryAccessGate`) needs no separate code path
+       * for an explicit vs. a defaulted range.
+       */
+      applyRange: (range: { start: Date | null; end: Date | null }) => void
+    }
   | { status: 'unauthorized' }
   | { status: 'error' }
 
@@ -36,10 +54,14 @@ export type DefaultDateRangeState =
  *      that resolve to a different range, a second, corrected fetch
  *      replaces it.
  *
- * This only runs when the caller hasn't supplied an explicit range yet
- * (FR3 is specifically about the no-range-supplied case) — a caller with
- * an explicit user-picked range should call `fetchContractHistory`
- * directly instead of through this hook.
+ * The two-request dance above only runs once, for the initial no-range-
+ * supplied load (FR3 is specifically about that case). KAN-176 (FR5-FR8,
+ * NFR8) adds the other half: once `status === 'ready'`, the resolved
+ * state carries an `applyRange` callback a caller can invoke with an
+ * already-validated explicit range (`DateRangePicker`'s `onApply`
+ * payload) to re-fetch directly — single request, no default-guessing —
+ * and land back in this same `'ready'`/`'unauthorized'`/`'error'` state
+ * machine.
  */
 export function useDefaultDateRange(contractId: number): DefaultDateRangeState {
   const [state, setState] = useState<DefaultDateRangeState>({ status: 'loading' })
@@ -47,6 +69,26 @@ export function useDefaultDateRange(contractId: number): DefaultDateRangeState {
   useEffect(() => {
     let cancelled = false
     setState({ status: 'loading' })
+
+    // KAN-176 — the explicit-range path `applyRange` uses. Shared with the
+    // default-range `load()` below (same fetch/error handling) so an
+    // explicit, user-picked range and the FR3 default are resolved through
+    // the exact same success/unauthorized/error mapping.
+    async function loadExplicit(range: { start: Date | null; end: Date | null }) {
+      setState({ status: 'loading' })
+      try {
+        const response = await fetchContractHistory(contractId, range)
+        if (cancelled) return
+        setState({ status: 'ready', start: range.start, end: range.end, history: response, applyRange: loadExplicit })
+      } catch (err) {
+        if (cancelled) return
+        if (err instanceof ApiError && err.status === 404) {
+          setState({ status: 'unauthorized' })
+          return
+        }
+        setState({ status: 'error' })
+      }
+    }
 
     async function load() {
       const now = new Date()
@@ -65,13 +107,25 @@ export function useDefaultDateRange(contractId: number): DefaultDateRangeState {
           formatIsoDate(guess.end) === formatIsoDate(resolved.end)
 
         if (guessMatchesResolved) {
-          setState({ status: 'ready', start: resolved.start, end: resolved.end, history: firstResponse })
+          setState({
+            status: 'ready',
+            start: resolved.start,
+            end: resolved.end,
+            history: firstResponse,
+            applyRange: loadExplicit,
+          })
           return
         }
 
         const correctedResponse = await fetchContractHistory(contractId, resolved)
         if (cancelled) return
-        setState({ status: 'ready', start: resolved.start, end: resolved.end, history: correctedResponse })
+        setState({
+          status: 'ready',
+          start: resolved.start,
+          end: resolved.end,
+          history: correctedResponse,
+          applyRange: loadExplicit,
+        })
       } catch (err) {
         if (cancelled) return
         // Mirrors ContractPositions's KAN-168 handling: a 404 here means

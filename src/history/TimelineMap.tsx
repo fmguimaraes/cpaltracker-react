@@ -152,7 +152,15 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
 
   return (
     <div className="flex flex-col gap-3" data-testid="timeline-map">
-      <div style={{ height: 480, width: '100%' }}>
+      {/*
+       * KAN-176 (FR26) — `var(--color-surface)` shows through at the map's
+       * edges/corners (and briefly while tiles are still loading) instead
+       * of Leaflet's own hardcoded light-grey default, which otherwise
+       * stayed a light rectangle in dark mode even with the tile-pane
+       * invert filter below (`tokens.css`'s `.leaflet-tile-pane` rule,
+       * scoped so it never touches markers/trail/tooltips).
+       */}
+      <div style={{ height: 480, width: '100%', backgroundColor: 'var(--color-surface)' }}>
         <MapContainer
           ref={mapRef}
           center={INITIAL_CENTER}

@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDefaultDateRange } from './useDefaultDateRange'
 import { formatIsoDate } from './dateRange'
@@ -71,7 +71,7 @@ describe('useDefaultDateRange (KAN-170 FR3)', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'))
     expect(callCount()).toBe(2)
     if (result.current.status === 'ready') {
-      expect(formatIsoDate(result.current.start)).toBe('2026-01-01')
+      expect(formatIsoDate(result.current.start as Date)).toBe('2026-01-01')
     }
   })
 
@@ -86,8 +86,8 @@ describe('useDefaultDateRange (KAN-170 FR3)', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'))
     expect(callCount()).toBe(2)
     if (result.current.status === 'ready') {
-      expect(formatIsoDate(result.current.end)).toBe(formatIsoDate(NOW))
-      expect(formatIsoDate(result.current.start)).toBe('2025-06-15')
+      expect(formatIsoDate(result.current.end as Date)).toBe(formatIsoDate(NOW))
+      expect(formatIsoDate(result.current.start as Date)).toBe('2025-06-15')
     }
   })
 
@@ -107,8 +107,8 @@ describe('useDefaultDateRange (KAN-170 FR3)', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'))
     if (result.current.status === 'ready') {
       const sentRange = validateDateRangeInputs(
-        formatIsoDate(result.current.start),
-        formatIsoDate(result.current.end),
+        formatIsoDate(result.current.start as Date),
+        formatIsoDate(result.current.end as Date),
       )
       expect(sentRange.ok).toBe(true)
     }
@@ -134,5 +134,59 @@ describe('useDefaultDateRange (KAN-170 FR3)', () => {
     const { result } = renderHook(() => useDefaultDateRange(12))
 
     await waitFor(() => expect(result.current.status).toBe('error'))
+  })
+
+  describe('applyRange (KAN-176 FR5-FR8, NFR8 — DateRangePicker wiring)', () => {
+    it('re-fetches with the explicit range and lands back in "ready" with that exact range, not a re-derived default', async () => {
+      const callCount = stubFetchSequence([
+        new Response(JSON.stringify(historyBody()), { status: 200 }),
+        new Response(JSON.stringify(historyBody()), { status: 200 }),
+      ])
+
+      const { result } = renderHook(() => useDefaultDateRange(12))
+      await waitFor(() => expect(result.current.status).toBe('ready'))
+
+      const explicitStart = new Date(Date.UTC(2026, 0, 1))
+      const explicitEnd = new Date(Date.UTC(2026, 0, 15))
+      if (result.current.status !== 'ready') throw new Error('expected ready')
+      // `act`'s callback must stay sync (no returned promise) here, or `act`
+      // silently switches to async mode without being awaited and the
+      // `applyRange` state transitions race the assertions below.
+      act(() => {
+        if (result.current.status === 'ready') result.current.applyRange({ start: explicitStart, end: explicitEnd })
+      })
+
+      await waitFor(() => expect(callCount()).toBe(2))
+      await waitFor(() => expect(result.current.status).toBe('ready'))
+      if (result.current.status === 'ready') {
+        expect(formatIsoDate(result.current.start as Date)).toBe('2026-01-01')
+        expect(formatIsoDate(result.current.end as Date)).toBe('2026-01-15')
+      }
+    })
+
+    it('reports "unauthorized" when the explicit range re-fetch 404s, same as the default path', async () => {
+      const responses = [
+        new Response(JSON.stringify(historyBody()), { status: 200 }),
+        new Response(JSON.stringify({ error: { code: 'not_found', message: 'Not found' } }), { status: 404 }),
+      ]
+      let call = 0
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => {
+          const response = responses[Math.min(call, responses.length - 1)]
+          call += 1
+          return Promise.resolve(response.clone())
+        }),
+      )
+
+      const { result } = renderHook(() => useDefaultDateRange(12))
+      await waitFor(() => expect(result.current.status).toBe('ready'))
+      if (result.current.status !== 'ready') throw new Error('expected ready')
+      act(() => {
+        if (result.current.status === 'ready') result.current.applyRange({ start: null, end: null })
+      })
+
+      await waitFor(() => expect(result.current.status).toBe('unauthorized'))
+    })
   })
 })

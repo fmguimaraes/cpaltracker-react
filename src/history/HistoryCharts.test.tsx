@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { HistoryRow } from '../api/history'
+import { useThemeStore } from '../store/themeStore'
+import { CHART_COLORS } from '../theme/chartColors'
 import { HistoryCharts } from './HistoryCharts'
 
 /**
@@ -17,11 +19,20 @@ import { HistoryCharts } from './HistoryCharts'
  */
 vi.mock('plotly.js-dist-min', () => ({ default: {} }))
 vi.mock('react-plotly.js/factory', () => ({
-  default: () => (props: { data: Array<{ name: string }>; layout: { title: { text: string } } }) => (
-    <div data-testid="mock-plot" data-trace-names={props.data.map((trace) => trace.name).join(',')}>
-      {props.layout.title.text}
-    </div>
-  ),
+  default: () =>
+    (props: {
+      data: Array<{ name: string }>
+      layout: { title: { text: string }; paper_bgcolor: string; plot_bgcolor: string }
+    }) => (
+      <div
+        data-testid="mock-plot"
+        data-trace-names={props.data.map((trace) => trace.name).join(',')}
+        data-paper-bgcolor={props.layout.paper_bgcolor}
+        data-plot-bgcolor={props.layout.plot_bgcolor}
+      >
+        {props.layout.title.text}
+      </div>
+    ),
 }))
 
 function row(overrides: Partial<HistoryRow>): HistoryRow {
@@ -42,6 +53,10 @@ function row(overrides: Partial<HistoryRow>): HistoryRow {
 }
 
 describe('HistoryCharts (KAN-175 FR19, FR20)', () => {
+  afterEach(() => {
+    act(() => useThemeStore.getState().setTheme('light'))
+  })
+
   it('shows an empty-state message instead of charts when there are no rows', () => {
     render(<HistoryCharts rows={[]} />)
     expect(screen.getByTestId('history-charts-empty')).toBeInTheDocument()
@@ -69,5 +84,19 @@ describe('HistoryCharts (KAN-175 FR19, FR20)', () => {
     expect(tempChart?.getAttribute('data-trace-names')).toBe('CHIP-A')
     expect(fetchSpy).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
+  })
+
+  it('passes the light-theme Plotly colors by default, and the dark-theme ones once the theme store flips (FR26)', () => {
+    const rows = [row({ c: 'CHIP-A', t: 1000, ta: 20 })]
+    render(<HistoryCharts rows={rows} />)
+
+    const plot = screen.getByTestId('history-chart-ta').querySelector('[data-testid="mock-plot"]')
+    expect(plot?.getAttribute('data-paper-bgcolor')).toBe(CHART_COLORS.light.paper)
+
+    act(() => useThemeStore.getState().setTheme('dark'))
+
+    const plotAfter = screen.getByTestId('history-chart-ta').querySelector('[data-testid="mock-plot"]')
+    expect(plotAfter?.getAttribute('data-paper-bgcolor')).toBe(CHART_COLORS.dark.paper)
+    expect(plotAfter?.getAttribute('data-plot-bgcolor')).toBe(CHART_COLORS.dark.plot)
   })
 })

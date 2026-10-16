@@ -57,4 +57,10 @@ describe('tokens.css (KAN-167 FR5/FR6/NFR9 — centralized color/theme tokens)',
     expect(themeBlock).toContain('--breakpoint-sm: 480px')
     expect(themeBlock).toContain('--breakpoint-md: 768px')
   })
+
+  it('inverts the Leaflet tile pane only (never markers/trail/tooltips) in dark mode (FR26)', () => {
+    expect(tokensCss).toMatch(
+      /:root\[data-theme='dark'\]\s+\.timeline-map\s+\.leaflet-tile-pane\s*\{\s*filter:\s*invert\(1\)/,
+    )
+  })
 })

@@ -1,6 +1,8 @@
 import Plotly from 'plotly.js-dist-min'
 import createPlotlyComponent from 'react-plotly.js/factory'
 import type { HistoryRow } from '../api/history'
+import { useThemeStore } from '../store/themeStore'
+import { CHART_COLORS } from '../theme/chartColors'
 import { buildChartTraces, CHART_FIELD_LABELS, type ChartField } from './chartData'
 
 // NFR1 — bundled via the `./factory` entry point with `plotly.js-dist-min`
@@ -31,6 +33,17 @@ const Plot = createPlotlyComponent(Plotly)
  * component makes no attempt at incremental updates), and makes no network
  * call of its own — FR20's "no refetch" holds trivially because this
  * component never calls `fetch`.
+ *
+ * KAN-176 (FR26) — Plotly draws its chart background/gridlines/text as SVG
+ * presentation attributes, which (unlike a CSS `style` property) never
+ * resolve `var(--token)`; passing a `var(...)` string straight into
+ * `paper_bgcolor`/`font.color` is silently ignored and the chart stays
+ * Plotly's own white/black default regardless of the app's theme — a real
+ * dark-mode defect this story's review flagged. `CHART_COLORS` mirrors the
+ * same tokens as plain hex (the `breakpoints.ts` pattern, same reasoning),
+ * and the component re-subscribes to `useThemeStore` so flipping the theme
+ * re-renders every chart with the matching palette with no reload (FR26,
+ * NFR6 "single state change").
  */
 export interface HistoryChartsProps {
   rows: HistoryRow[]
@@ -40,6 +53,8 @@ export interface HistoryChartsProps {
 const FIELDS: ChartField[] = ['ta', 'hr', 'm']
 
 export function HistoryCharts({ rows, visibleDeviceIds = null }: HistoryChartsProps) {
+  const theme = useThemeStore((state) => state.theme)
+  const colors = CHART_COLORS[theme]
   const hasRows = rows.length > 0
 
   if (!hasRows) {
@@ -73,13 +88,27 @@ export function HistoryCharts({ rows, visibleDeviceIds = null }: HistoryChartsPr
                 marker: { color: trace.color, size: 4 },
               }))}
               layout={{
-                title: { text: CHART_FIELD_LABELS[field] },
+                title: { text: CHART_FIELD_LABELS[field], font: { color: colors.text } },
                 autosize: true,
                 height: 260,
                 margin: { l: 50, r: 20, t: 40, b: 40 },
-                xaxis: { title: { text: 'Horodatage (époque, ms)' } },
-                yaxis: { title: { text: CHART_FIELD_LABELS[field] } },
+                paper_bgcolor: colors.paper,
+                plot_bgcolor: colors.plot,
+                font: { color: colors.text },
+                xaxis: {
+                  title: { text: 'Horodatage (époque, ms)' },
+                  color: colors.text,
+                  gridcolor: colors.grid,
+                  linecolor: colors.grid,
+                },
+                yaxis: {
+                  title: { text: CHART_FIELD_LABELS[field] },
+                  color: colors.text,
+                  gridcolor: colors.grid,
+                  linecolor: colors.grid,
+                },
                 showlegend: true,
+                legend: { font: { color: colors.text } },
               }}
               style={{ width: '100%' }}
               useResizeHandler

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { fetchContracts, type Contract } from '../api/contracts'
 import { PageTitle } from '../chrome/PageTitle'
+import { DateRangePicker } from '../history/DateRangePicker'
 import { HistoryAccessGate } from '../history/HistoryAccessGate'
 import { formatIsoDate } from '../history/dateRange'
 import { HistoryReadyPanel } from '../history/HistoryReadyPanel'
@@ -168,11 +169,31 @@ export function HistoryDashboard() {
             <section data-testid="history-dashboard-ready" className="flex flex-col gap-2">
               <p style={{ color: 'var(--color-text)' }}>
                 Contrat {resolved.history.contract.ContratRef} — période du{' '}
-                {formatIsoDate(resolved.start)} au {formatIsoDate(resolved.end)}.
+                {resolved.start ? formatIsoDate(resolved.start) : '…'} au{' '}
+                {resolved.end ? formatIsoDate(resolved.end) : '…'}.
               </p>
               <p style={{ color: 'var(--color-text-muted)' }}>
                 {resolved.history.devices.length} appareil(s), {resolved.history.count} mesure(s).
               </p>
+              {/*
+               * KAN-176 (FR5-FR8, NFR8) — `DateRangePicker` (KAN-170) was
+               * built, validated and unit-tested from the start but never
+               * had a mount point: this is it. `resolved.applyRange` is
+               * `useDefaultDateRange`'s explicit-range re-fetch (same
+               * state machine as the FR3 default load, see its own doc
+               * comment), so applying a new range here goes through the
+               * exact same ready/unauthorized/error handling as the
+               * initial load — a rejected range (reversed/malformed/
+               * over-span) is caught by `DateRangePicker`'s own
+               * `validateDateRangeInputs` call before `onApply`/
+               * `applyRange` are ever reached (FR5: no request while
+               * invalid).
+               */}
+              <DateRangePicker
+                initialStart={resolved.start}
+                initialEnd={resolved.end}
+                onApply={resolved.applyRange}
+              />
               <HistoryReadyPanel history={resolved.history} />
             </section>
           )}

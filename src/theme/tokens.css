@@ -141,3 +141,21 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * KAN-176 (FR26) — `TimelineMap`'s OpenStreetMap raster tiles (`TileLayer`,
+ * KAN-174) have no dark variant of their own (there is no free/bundled dark
+ * OSM tile source — NFR1 rules out adding a CDN-hosted one just for this),
+ * so without this rule the map stayed a bright-white rectangle in the
+ * middle of an otherwise dark-themed page — the review-flagged FR26 gap.
+ * A CSS filter inverting the raster is the standard technique other
+ * Leaflet-based dark UIs use: it recolors the tile imagery itself (land,
+ * water, roads) into a dark palette while leaving overlays untouched.
+ * Scoped to `.leaflet-tile-pane` specifically (not the whole `.timeline-map`
+ * container) so markers, the trail polyline and tooltips — drawn in
+ * Leaflet's separate overlay/marker panes — are NEVER inverted; only the
+ * base map imagery is.
+ */
+:root[data-theme='dark'] .timeline-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}

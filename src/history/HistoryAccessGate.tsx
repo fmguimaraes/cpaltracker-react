@@ -32,7 +32,11 @@ type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
  * FR9-FR24). This gate's `children` render prop is deliberately the only
  * extension point: it is called with the resolved default range and the
  * already-fetched `HistoryResponse` only once `status === 'ready'`, so later
- * stories plug in without this file changing.
+ * stories plug in without this file changing. KAN-176 (FR5-FR8, NFR8) is
+ * exactly that: it mounts `DateRangePicker` in `HistoryDashboard` and wires
+ * its `onApply` straight to the `applyRange` callback this gate's resolved
+ * state now carries (from `useDefaultDateRange`) — this file itself needed
+ * no change for that.
  *
  * KAN-175 (FR4, FR23) — the `status === 'error'` branch below (a generic
  * network/fetch failure distinct from the `unauthorized` 404 above) is the
