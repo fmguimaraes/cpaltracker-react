@@ -21,3 +21,6 @@ export const RESET_PASSWORD_PATH = '/reset-password'
  * its stale "KAN-155" attribution, are gone).
  */
 export const CHANGE_PASSWORD_PATH = '/change-password'
+
+/** KAN-158 — the Live Tracking contract selector / last-known-position view. */
+export const LIVE_TRACKING_PATH = '/live-tracking'

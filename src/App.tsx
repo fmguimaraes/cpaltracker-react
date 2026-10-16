@@ -1,11 +1,17 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
-import { CHANGE_PASSWORD_PATH, FORGOT_PASSWORD_PATH, RESET_PASSWORD_PATH } from './auth/paths'
+import {
+  CHANGE_PASSWORD_PATH,
+  FORGOT_PASSWORD_PATH,
+  LIVE_TRACKING_PATH,
+  RESET_PASSWORD_PATH,
+} from './auth/paths'
 import { useThemeStore } from './store/themeStore'
 import { Account } from './routes/Account'
 import { ForgotPassword } from './routes/ForgotPassword'
 import { HelloWorld } from './routes/HelloWorld'
+import { LiveTracking } from './routes/LiveTracking'
 import { Login } from './routes/Login'
 import { NotFound } from './routes/NotFound'
 import { RequireAuth } from './routes/RequireAuth'
@@ -27,6 +33,14 @@ export function App() {
             element={
               <RequireAuth>
                 <HelloWorld />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={LIVE_TRACKING_PATH}
+            element={
+              <RequireAuth>
+                <LiveTracking />
               </RequireAuth>
             }
           />
