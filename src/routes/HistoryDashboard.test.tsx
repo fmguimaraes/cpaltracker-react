@@ -5,6 +5,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthContext'
 import { HistoryDashboard } from './HistoryDashboard'
 
+// KAN-175: the ready state now mounts `HistoryReadyPanel` -> `HistoryCharts`,
+// which imports real Plotly (`plotly.js-dist-min`) — it renders onto a
+// `<canvas>` and probes WebGL at import time, neither of which jsdom
+// implements (see `HistoryCharts.test.tsx`'s comment for the full
+// explanation). Mocked here too so this file's own fixtures (which don't
+// exercise the charts themselves) stay free of that unrelated noise.
+vi.mock('plotly.js-dist-min', () => ({ default: {} }))
+vi.mock('react-plotly.js/factory', () => ({
+  default: () => () => null,
+}))
+
 const account = {
   userId: 1,
   clientId: null,

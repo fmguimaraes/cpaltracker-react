@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useDefaultDateRange, type DefaultDateRangeState } from './useDefaultDateRange'
 
 type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
@@ -33,6 +33,14 @@ type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
  * extension point: it is called with the resolved default range and the
  * already-fetched `HistoryResponse` only once `status === 'ready'`, so later
  * stories plug in without this file changing.
+ *
+ * KAN-175 (FR4, FR23) — the `status === 'error'` branch below (a generic
+ * network/fetch failure distinct from the `unauthorized` 404 above) is the
+ * `history-fetch-error` extension point KAN-172 deliberately scaffolded as
+ * a plain, static message and left for this story to give real dismissible
+ * banner behavior: a local `dismissed` flag (reset whenever `contractId`
+ * changes, so switching contracts always re-shows a genuinely new failure)
+ * lets the user clear the banner without it reappearing on its own.
  */
 export function HistoryAccessGate({
   contractId,
@@ -65,6 +73,14 @@ export function HistoryAccessGate({
     }
   }, [state.status])
 
+  // FR23 — dismissible, not auto-dismissing: the banner stays hidden once
+  // the user closes it, UNTIL a genuinely new failure (a different
+  // contract selection) could occur.
+  const [dismissed, setDismissed] = useState(false)
+  useEffect(() => {
+    setDismissed(false)
+  }, [contractId])
+
   if (state.status === 'loading') {
     return (
       <p data-testid="history-access-loading" style={{ color: 'var(--color-text-muted)' }}>
@@ -84,9 +100,25 @@ export function HistoryAccessGate({
   }
 
   if (state.status === 'error') {
+    if (dismissed) return null
     return (
-      <p data-testid="history-fetch-error" role="alert" style={{ color: 'var(--color-danger)' }}>
-        Impossible de charger l'historique de ce contrat. Réessayez plus tard.
+      <p
+        data-testid="history-fetch-error"
+        role="alert"
+        className="flex items-center justify-between gap-3"
+        style={{ color: 'var(--color-danger)' }}
+      >
+        <span>Impossible de charger l'historique de ce contrat. Réessayez plus tard.</span>
+        <button
+          type="button"
+          data-testid="history-fetch-error-dismiss"
+          aria-label="Fermer ce message"
+          onClick={() => setDismissed(true)}
+          className="rounded-md border px-2 py-0.5 text-xs"
+          style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}
+        >
+          Fermer
+        </button>
       </p>
     )
   }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HistoryAccessGate } from './HistoryAccessGate'
 
@@ -102,5 +102,21 @@ describe('HistoryAccessGate (KAN-172 FR25, NFR5)', () => {
 
     await waitFor(() => expect(screen.getByTestId('history-fetch-error')).toBeInTheDocument())
     expect(screen.queryByTestId('history-access-error')).not.toBeInTheDocument()
+  })
+
+  it('the fetch-error banner is dismissible (KAN-175 FR4, FR23)', async () => {
+    stubFetch(
+      new Response(JSON.stringify({ error: { code: 'service_unavailable', message: 'DB down' } }), {
+        status: 503,
+      }),
+    )
+
+    render(
+      <HistoryAccessGate contractId={12}>{() => <p data-testid="child">child</p>}</HistoryAccessGate>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('history-fetch-error')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('history-fetch-error-dismiss'))
+    expect(screen.queryByTestId('history-fetch-error')).not.toBeInTheDocument()
   })
 })
