@@ -17,7 +17,13 @@ const account = {
   mustChangePassword: false,
 }
 
-function stubFetch(contractsResponse: Response | (() => Response)) {
+function stubFetch(
+  contractsResponse: Response | (() => Response),
+  positionsResponse: Response | (() => Response) = new Response(
+    JSON.stringify({ positions: [] }),
+    { status: 200 },
+  ),
+) {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL) => {
@@ -31,7 +37,9 @@ function stubFetch(contractsResponse: Response | (() => Response)) {
         return Promise.resolve(response)
       }
       if (url.includes('/devices/positions.php')) {
-        return Promise.resolve(new Response(JSON.stringify({ positions: [] }), { status: 200 }))
+        const response =
+          typeof positionsResponse === 'function' ? positionsResponse() : positionsResponse
+        return Promise.resolve(response)
       }
       if (url.includes('/messages/global.php') || url.includes('/messages/contract.php')) {
         return Promise.resolve(new Response(JSON.stringify({ message: null }), { status: 200 }))
@@ -124,5 +132,29 @@ describe('LiveTracking (KAN-158 FR1/FR2)', () => {
 
     await waitFor(() => expect(screen.getByTestId('live-tracking-error')).toBeInTheDocument())
     expect(screen.getByTestId('live-tracking-error')).not.toHaveTextContent('DB is down')
+  })
+
+  it('clears the selection and shows a generic message on an unauthorized/nonexistent contract, revealing nothing (KAN-168 FR15)', async () => {
+    stubFetch(
+      new Response(
+        JSON.stringify({
+          contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD' }],
+        }),
+        { status: 200 },
+      ),
+      new Response(JSON.stringify({ error: { code: 'not_found', message: 'Not found' } }), {
+        status: 404,
+      }),
+    )
+
+    renderLiveTracking()
+
+    const option = await screen.findByTestId('contract-option-12')
+    await userEvent.click(option)
+
+    await waitFor(() => expect(screen.getByTestId('contract-access-error')).toBeInTheDocument())
+    expect(option).toHaveAttribute('aria-checked', 'false')
+    expect(screen.queryByTestId('positions-error')).not.toBeInTheDocument()
+    expect(screen.getByTestId('contract-access-error')).not.toHaveTextContent('12')
   })
 })

@@ -23,13 +23,34 @@ type LoadState = 'loading' | 'loaded' | 'error'
  * (KAN-160) — this component only tracks which contract is selected and
  * mounts that child, `ContractMessage`, and `HistoryDashboardLink` when it
  * is. `ClientLogo`/`GlobalMessage` (KAN-165, FR11/FR13) aren't gated on a
- * selection — they're shown for the whole visit. Device filters and
- * error/empty-state/theming polish are KAN-168's job.
+ * selection — they're shown for the whole visit.
+ *
+ * KAN-168 (FR15): the zero-contracts and empty-map states already existed
+ * (`live-tracking-empty`, `positions-empty`); this component additionally
+ * clears the selection and shows a generic `contract-access-error` message
+ * when `ContractPositions` reports the selected contract as unauthorized
+ * or nonexistent (`onUnauthorized`), never revealing which contracts exist.
  */
 export function LiveTracking() {
   const [state, setState] = useState<LoadState>('loading')
   const [contracts, setContracts] = useState<Contract[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [accessError, setAccessError] = useState<string | null>(null)
+
+  // KAN-168 (FR15): a 404/403 on the selected contract means it's
+  // unauthorized or doesn't exist for this account — the backend's
+  // uniform-404 convention means those are indistinguishable by design, so
+  // the UI never tries to tell them apart either. Clear the selection and
+  // show a generic message, revealing nothing about which contracts exist.
+  function handleUnauthorizedContract() {
+    setSelectedId(null)
+    setAccessError("Ce contrat n'est pas disponible. Sélectionnez-en un autre.")
+  }
+
+  function selectContract(contractId: number) {
+    setAccessError(null)
+    setSelectedId(contractId)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -96,7 +117,7 @@ export function LiveTracking() {
               role="radio"
               data-testid={`contract-option-${contract.contractId}`}
               aria-checked={selectedId === contract.contractId}
-              onClick={() => setSelectedId(contract.contractId)}
+              onClick={() => selectContract(contract.contractId)}
               className="rounded-md border px-3 py-2 text-left text-sm"
               style={{
                 borderColor:
@@ -114,10 +135,16 @@ export function LiveTracking() {
         </div>
       )}
 
+      {accessError && (
+        <p data-testid="contract-access-error" role="alert" style={{ color: 'var(--color-danger)' }}>
+          {accessError}
+        </p>
+      )}
+
       {selectedId !== null && (
         <>
           <ContractMessage contractId={selectedId} />
-          <ContractPositions contractId={selectedId} />
+          <ContractPositions contractId={selectedId} onUnauthorized={handleUnauthorizedContract} />
           <HistoryDashboardLink contractId={selectedId} />
         </>
       )}

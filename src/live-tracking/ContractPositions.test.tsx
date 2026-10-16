@@ -95,6 +95,33 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     expect(screen.getByTestId('positions-error')).not.toHaveTextContent('DB is down')
   })
 
+  it('reports unauthorized via onUnauthorized on a 404, rendering no local error state (KAN-168 FR15)', async () => {
+    stubFetch(
+      new Response(JSON.stringify({ error: { code: 'not_found', message: 'Not found' } }), {
+        status: 404,
+      }),
+    )
+    const onUnauthorized = vi.fn()
+
+    render(<ContractPositions contractId={12} onUnauthorized={onUnauthorized} />)
+
+    await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId('positions-error')).not.toBeInTheDocument()
+  })
+
+  it('reports unauthorized via onUnauthorized on a 403 too', async () => {
+    stubFetch(
+      new Response(JSON.stringify({ error: { code: 'forbidden', message: 'Forbidden' } }), {
+        status: 403,
+      }),
+    )
+    const onUnauthorized = vi.fn()
+
+    render(<ContractPositions contractId={12} onUnauthorized={onUnauthorized} />)
+
+    await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1))
+  })
+
   it('re-fetches when the contractId prop changes', async () => {
     let requestedContractId: string | null = null
     vi.stubGlobal(

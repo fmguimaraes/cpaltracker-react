@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ApiError } from '../api/client'
 import { fetchPositions, type Position } from '../api/positions'
 import { DeviceFilter } from './DeviceFilter'
 import { useDeviceVisibilityStore } from './deviceVisibilityStore'
@@ -28,8 +29,23 @@ function formatLastUpdated(date: Date): string {
  * codebase (verified by `grep -r "socket.io" src`) — refresh is manual
  * only, reusing the same `fetchPositions` call as the initial load and as
  * a contract switch.
+ *
+ * KAN-168 (FR15): a 404/403 from `devices/positions.php` means this
+ * contract id is unauthorized or doesn't exist for the caller — the
+ * backend's uniform-404 anti-enumeration convention means those two cases
+ * are indistinguishable by design, so this component doesn't try. It
+ * reports the condition to the parent via `onUnauthorized` instead of
+ * rendering its own error, since the correct UI response (clear the
+ * selection, show a generic message) lives one level up, where the
+ * selector is.
  */
-export function ContractPositions({ contractId }: { contractId: number }) {
+export function ContractPositions({
+  contractId,
+  onUnauthorized,
+}: {
+  contractId: number
+  onUnauthorized?: () => void
+}) {
   const [state, setState] = useState<LoadState>('loading')
   const [positions, setPositions] = useState<Position[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -43,6 +59,10 @@ export function ContractPositions({ contractId }: { contractId: number }) {
   // instead of overwriting the new contract's data (mirrors the `cancelled`
   // guard below, but reusable from `refresh()`, which runs outside the effect).
   const activeContractIdRef = useRef(contractId)
+  // Updated every render rather than added as an effect dependency, so a
+  // new inline callback identity from the parent never re-triggers the fetch.
+  const onUnauthorizedRef = useRef(onUnauthorized)
+  onUnauthorizedRef.current = onUnauthorized
 
   useEffect(() => {
     let cancelled = false
@@ -58,8 +78,12 @@ export function ContractPositions({ contractId }: { contractId: number }) {
         setState('loaded')
         setLastUpdated(new Date())
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return
+        if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+          onUnauthorizedRef.current?.()
+          return
+        }
         setState('error')
       })
     return () => {

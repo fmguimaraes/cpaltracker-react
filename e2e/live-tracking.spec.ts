@@ -5,6 +5,11 @@ import { test, expect } from '@playwright/test'
  * selector (FR1/FR2). The map/refresh/filter/messaging behaviour is later
  * stories' job (KAN-160/162/165/168) — this file only covers the gate and
  * the selector's admin-vs-non-admin disclosure.
+ *
+ * KAN-168 adds one composed "primary flow" test spanning the whole feature
+ * end to end (its own AC literally asks for this, distinct from the
+ * per-feature tests above which exercise one FR group at a time), plus the
+ * unauthorized/malformed-contract state (FR15).
  */
 
 const account = {
@@ -310,4 +315,124 @@ test('shows the global and per-contract messages as plain text, the logo when fl
   expect(params.get('contrat_id')).toBe('12')
   expect(params.get('date_from')).toBeTruthy()
   expect(params.get('date_to')).toBeTruthy()
+})
+
+test('primary flow: login-gated access, select a contract, markers render, refresh updates "last updated", open History Dashboard (KAN-168)', async ({
+  page,
+}) => {
+  // FR1: anonymous visit redirects to /login rather than rendering anything.
+  await page.route('**/account.php', (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'unauthorized', message: 'Not signed in' } }),
+    }),
+  )
+  await page.goto('/live-tracking')
+  await expect(page).toHaveURL(/\/login\?suite=%2Flive-tracking$/)
+
+  // Now authenticated — the same page is reachable and the full flow works.
+  await page.unroute('**/account.php')
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD' }],
+      }),
+    }),
+  )
+  await page.route('**/messages/global.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: null }) }),
+  )
+  await page.route('**/messages/contract.php**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: null }) }),
+  )
+  await page.route('**/clients/logo-flag.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hasLogo: false }) }),
+  )
+
+  let positionsRequestCount = 0
+  await page.route('**/devices/positions.php**', (route) => {
+    positionsRequestCount += 1
+    const mass = positionsRequestCount === 1 ? 420 : 430
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        positions: [
+          {
+            contractId: 12,
+            chipId: 'CHIP-001',
+            timestamp: '2026-10-10T08:00:05Z',
+            latitude: 48.8566,
+            longitude: 2.3522,
+            ambientTemperature: 19.1,
+            humidity: 55,
+            mass,
+            mpuTemperature: 21.5,
+            accelG: 1.02,
+          },
+        ],
+      }),
+    })
+  })
+
+  await page.goto('/live-tracking')
+
+  await page.getByTestId('contract-option-12').click()
+
+  const markers = page.locator('.leaflet-marker-icon')
+  await expect(markers).toHaveCount(1)
+
+  // The exact "last updated" timestamp string is unit-tested elsewhere
+  // (KAN-162) with a controllable clock; the second-granularity format here
+  // can't be asserted to *change* without a flaky race against real time,
+  // so this flow checks what a real user would: the refresh completes
+  // without error and genuinely re-fetches (not a no-op).
+  const lastUpdated = page.getByTestId('positions-last-updated')
+  await expect(lastUpdated).toBeVisible()
+
+  await page.getByTestId('positions-refresh').click()
+  await expect(markers).toHaveCount(1)
+  await expect(page.getByTestId('positions-refresh-error')).toHaveCount(0)
+  expect(positionsRequestCount).toBe(2)
+
+  const historyHref = await page.getByTestId('history-dashboard-link').getAttribute('href')
+  expect(historyHref).toContain('/history?')
+  expect(historyHref).toContain('contrat_id=12')
+})
+
+test('clears the selection and shows a generic message on an unauthorized/nonexistent contract (KAN-168 FR15)', async ({
+  page,
+}) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        contracts: [{ contractId: 99, contractRef: 'REF-099', contractType: 'STD' }],
+      }),
+    }),
+  )
+  await page.route('**/devices/positions.php**', (route) =>
+    route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'not_found', message: 'Not found' } }),
+    }),
+  )
+
+  await page.goto('/live-tracking')
+  await page.getByTestId('contract-option-99').click()
+
+  await expect(page.getByTestId('contract-access-error')).toBeVisible()
+  await expect(page.getByTestId('contract-option-99')).toHaveAttribute('aria-checked', 'false')
+  expect(await page.getByTestId('contract-access-error').textContent()).not.toContain('99')
 })
