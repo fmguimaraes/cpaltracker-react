@@ -54,6 +54,14 @@ type Phase =
  *   `fetchDeviceConfig()` the mount effect uses, so the placeholders reflect
  *   the just-saved values (and `reset({})` clears the now-stale typed
  *   values, since they've become "current" rather than "pending").
+ * - FR4 (KAN-173 addition): a 409 `contract_inactive` additionally disables
+ *   the submit control going forward, same reactive signal and intent
+ *   `TransferForm.tsx` (KAN-169) already applies on its own submit path —
+ *   before this story the two forms disagreed (`TransferForm` disabled
+ *   itself on this signal, this one did not), which FR4's own text ("the UI
+ *   SHALL disable the settings *and transfer* submit controls") does not
+ *   allow; `isContractInactiveError()` is the one shared primitive, so both
+ *   forms now react to it identically.
  * - FR20 ("refresh safety"): the feature spec (FR20/CB19/CB28) is about a
  *   *browser* refresh never replaying the POST — true here by construction
  *   (`handleSubmit` always calls `preventDefault`; there is no
@@ -76,6 +84,7 @@ export function SettingsForm({
 }) {
   const [phase, setPhase] = useState<Phase>({ status: 'loading' })
   const [flash, setFlash] = useState<Flash | null>(null)
+  const [contractInactive, setContractInactive] = useState(false)
   const {
     register,
     handleSubmit,
@@ -93,6 +102,7 @@ export function SettingsForm({
     let cancelled = false
     setPhase({ status: 'loading' })
     setFlash(null)
+    setContractInactive(false)
     reset({})
     fetchDeviceConfig(deviceId)
       .then((result) => {
@@ -159,6 +169,7 @@ export function SettingsForm({
     } catch (error) {
       if (latestDeviceIdRef.current !== submittedFor) return // FR20 — stale, device switched meanwhile
       if (isContractInactiveError(error)) {
+        setContractInactive(true)
         setFlash({ kind: 'error', message: (error as Error).message })
       } else if (isNoChangeError(error)) {
         setFlash({ kind: 'info', message: (error as Error).message })
@@ -230,7 +241,7 @@ export function SettingsForm({
       <button
         type="submit"
         data-testid="settings-form-submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || contractInactive}
         className="self-start rounded-md border px-3 py-1 text-sm"
         style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
       >

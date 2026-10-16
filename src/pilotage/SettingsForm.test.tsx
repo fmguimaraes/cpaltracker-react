@@ -221,6 +221,10 @@ describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
       ),
     )
     expect(refetchSpy).toHaveBeenCalledTimes(1) // only the initial mount load, no post-failure refresh
+    // KAN-173 (FR4): matches TransferForm's own reaction to this same signal —
+    // once the API reports the contract inactive, the submit control stays
+    // disabled rather than inviting another write that will only be refused again.
+    expect(screen.getByTestId('settings-form-submit')).toBeDisabled()
   })
 
   it('on a 400 "no values changed" response, shows the API message as an informational flash (FR11)', async () => {

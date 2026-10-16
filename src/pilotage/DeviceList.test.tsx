@@ -69,4 +69,11 @@ describe('DeviceList (KAN-159 FR5, FR6)', () => {
 
     expect(onSelect).toHaveBeenCalledWith('CHIP-002')
   })
+
+  it('virtualizes a large device set without crashing, rather than rendering every row (KAN-173, NFR5)', () => {
+    const devices = Array.from({ length: 80 }, (_, i) => ({ ...device, chipId: `CHIP-${i}` }))
+    render(<DeviceList devices={devices} />)
+
+    expect(screen.getByTestId('pilotage-device-list-scroll')).toBeInTheDocument()
+  })
 })

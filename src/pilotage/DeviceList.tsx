@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Position } from '../api/positions'
 
 /**
@@ -19,6 +21,16 @@ import type { Position } from '../api/positions'
  * caller doesn't pass them. `PilotageWorkspace` passes both so the operator
  * can pick which device's settings form (KAN-163's `SettingsForm`) to show
  * (FR7).
+ *
+ * KAN-173 (NFR5) addition: "device and history lists SHALL remain
+ * responsive for a contract's full device set (virtualize if large)" —
+ * beyond `VIRTUALIZE_THRESHOLD` rows are windowed with
+ * `@tanstack/react-virtual`, the same package and threshold
+ * `DeviceChecklist.tsx` (KAN-175, NFR3) already established for the
+ * analogous history device list, rather than a second ad hoc convention.
+ * Below the threshold (every contract this story has actually seen) rows
+ * render directly, so this story's own and every prior KAN-159/163 test
+ * keeps asserting the exact same markup.
  */
 export function DeviceList({
   devices,
@@ -29,6 +41,14 @@ export function DeviceList({
   selectedChipId?: string
   onSelect?: (chipId: string) => void
 }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const virtualizer = useVirtualizer({
+    count: devices.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT_PX,
+    enabled: devices.length > VIRTUALIZE_THRESHOLD,
+  })
+
   if (devices.length === 0) {
     return (
       <p data-testid="pilotage-devices-empty" style={{ color: 'var(--color-text-muted)' }}>
@@ -37,53 +57,92 @@ export function DeviceList({
     )
   }
 
+  function renderRow(device: Position) {
+    const content = (
+      <>
+        <span style={{ color: 'var(--color-text)' }}>{device.chipId}</span>
+        {device.timestamp && (
+          <span
+            data-testid={`pilotage-device-${device.chipId}-last-seen`}
+            className="ml-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Dernière position connue : {device.timestamp}
+          </span>
+        )}
+      </>
+    )
+
+    return (
+      <li
+        key={device.chipId}
+        data-testid={`pilotage-device-${device.chipId}`}
+        className="rounded-md border px-3 py-2 text-sm"
+        style={{
+          borderColor:
+            onSelect && selectedChipId === device.chipId
+              ? 'var(--color-primary)'
+              : 'var(--color-border)',
+          backgroundColor: 'var(--color-surface)',
+        }}
+      >
+        {onSelect ? (
+          <button
+            type="button"
+            data-testid={`pilotage-device-${device.chipId}-select`}
+            aria-pressed={selectedChipId === device.chipId}
+            onClick={() => onSelect(device.chipId)}
+            className="w-full text-left"
+          >
+            {content}
+          </button>
+        ) : (
+          content
+        )}
+      </li>
+    )
+  }
+
+  if (devices.length > VIRTUALIZE_THRESHOLD) {
+    return (
+      <div
+        ref={scrollRef}
+        data-testid="pilotage-device-list-scroll"
+        className="w-full"
+        style={{ height: VIRTUALIZED_VIEWPORT_PX, overflow: 'auto' }}
+      >
+        <ul
+          data-testid="pilotage-device-list"
+          className="w-full"
+          style={{ height: virtualizer.getTotalSize(), position: 'relative' }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => (
+            <div
+              key={virtualRow.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: virtualRow.size,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              {renderRow(devices[virtualRow.index])}
+            </div>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
   return (
     <ul data-testid="pilotage-device-list" className="flex flex-col gap-2">
-      {devices.map((device) => {
-        const content = (
-          <>
-            <span style={{ color: 'var(--color-text)' }}>{device.chipId}</span>
-            {device.timestamp && (
-              <span
-                data-testid={`pilotage-device-${device.chipId}-last-seen`}
-                className="ml-2"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                Dernière position connue : {device.timestamp}
-              </span>
-            )}
-          </>
-        )
-
-        return (
-          <li
-            key={device.chipId}
-            data-testid={`pilotage-device-${device.chipId}`}
-            className="rounded-md border px-3 py-2 text-sm"
-            style={{
-              borderColor:
-                onSelect && selectedChipId === device.chipId
-                  ? 'var(--color-primary)'
-                  : 'var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-            }}
-          >
-            {onSelect ? (
-              <button
-                type="button"
-                data-testid={`pilotage-device-${device.chipId}-select`}
-                aria-pressed={selectedChipId === device.chipId}
-                onClick={() => onSelect(device.chipId)}
-                className="w-full text-left"
-              >
-                {content}
-              </button>
-            ) : (
-              content
-            )}
-          </li>
-        )
-      })}
+      {devices.map((device) => renderRow(device))}
     </ul>
   )
 }
+
+const VIRTUALIZE_THRESHOLD = 50
+const ROW_HEIGHT_PX = 56
+const VIRTUALIZED_VIEWPORT_PX = 400

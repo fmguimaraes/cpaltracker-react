@@ -109,7 +109,7 @@ test('an accepted change shows a success flash and refreshes the displayed place
   await expect(page.getByTestId('settings-field-FREQ_MESURE_CL')).toHaveAttribute('placeholder', '10')
 })
 
-test('a 409 contract_inactive response shows the server message and does not change the placeholder (FR11)', async ({
+test('a 409 contract_inactive response shows the server message, does not change the placeholder, and disables the submit control (FR4, FR11)', async ({
   page,
 }) => {
   await mockEligibleWorkspace(page, {
@@ -135,6 +135,10 @@ test('a 409 contract_inactive response shows the server message and does not cha
     "Ce contrat n'est pas actif aujourd'hui",
   )
   await expect(page.getByTestId('settings-field-FREQ_MESURE_CL')).toHaveAttribute('placeholder', '3')
+  // KAN-173 (FR4): matches TransferForm's own reaction to this same signal —
+  // the UI must disable the settings *and* transfer submit controls once the
+  // API reports the contract inactive, not only one of the two forms.
+  await expect(page.getByTestId('settings-form-submit')).toBeDisabled()
 })
 
 test('a 400 "no values changed" response is shown as an informational result, not an error (FR11)', async ({
