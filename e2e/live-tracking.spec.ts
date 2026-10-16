@@ -275,10 +275,10 @@ test('shows the global and per-contract messages as plain text, the logo when fl
       body: JSON.stringify({ message: { date: null, contenu: 'Message du contrat 12.' } }),
     }),
   )
-  await page.route('**/clients/logo-flag.php', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hasLogo: true }) }),
-  )
-  await page.route('**/clients/logo.php', (route) =>
+  // KAN-161: the single unified-404 endpoint, scoped to the account's own
+  // clientId (7 — see `account` above), replaces KAN-165's
+  // logo-flag.php + logo.php two-call model.
+  await page.route('**/clients/logo.php/7', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'image/png',
@@ -297,7 +297,7 @@ test('shows the global and per-contract messages as plain text, the logo when fl
   await expect(page.getByTestId('global-message')).toContainText('<b>Maintenance</b> ce soir.')
   expect(await page.locator('[data-testid="global-message"] b').count()).toBe(0)
 
-  // FR13: logo shown once the flag reports true.
+  // FR1 (KAN-161): logo shown once the unified endpoint serves the image.
   await expect(page.getByTestId('client-logo')).toBeVisible()
 
   // FR14: no History Dashboard link before a contract is selected.
@@ -351,8 +351,15 @@ test('primary flow: login-gated access, select a contract, markers render, refre
   await page.route('**/messages/contract.php**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: null }) }),
   )
-  await page.route('**/clients/logo-flag.php', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hasLogo: false }) }),
+  // KAN-161: no logo for this account — the unified 404 (same body as an
+  // out-of-scope clientId, by design) renders the neutral placeholder;
+  // this flow doesn't assert on it either way.
+  await page.route('**/clients/logo.php/7', (route) =>
+    route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'not_found', message: 'No logo found for this client.' } }),
+    }),
   )
 
   let positionsRequestCount = 0
@@ -435,4 +442,81 @@ test('clears the selection and shows a generic message on an unauthorized/nonexi
   await expect(page.getByTestId('contract-access-error')).toBeVisible()
   await expect(page.getByTestId('contract-option-99')).toHaveAttribute('aria-checked', 'false')
   expect(await page.getByTestId('contract-access-error').textContent()).not.toContain('99')
+})
+
+/**
+ * KAN-161 (FR1-FR4, NFR6, NFR7) — Logo Rendering & Unified-404 Error
+ * Handling. Supersedes KAN-165's own logo coverage above (which only
+ * asserted the success path): every non-success logo outcome must render
+ * one identical, empty placeholder, and an admin/no-ClientID account must
+ * never even request the logo.
+ */
+
+test('renders a neutral, empty placeholder — not nothing, not an error — on the unified 404 (FR3, NFR7)', async ({
+  page,
+}) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts: [] }) }),
+  )
+  // The unified 404: the exact same body whether clientId 7 is out of
+  // scope or simply has no logo (client_logo_logic.php) — this UI never
+  // tries to tell those apart either.
+  await page.route('**/clients/logo.php/7', (route) =>
+    route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'not_found', message: 'No logo found for this client.' } }),
+    }),
+  )
+
+  await page.goto('/live-tracking')
+
+  await expect(page.getByTestId('client-logo-placeholder')).toBeVisible()
+  await expect(page.getByTestId('client-logo')).toHaveCount(0)
+  expect((await page.getByTestId('client-logo-placeholder').textContent())?.trim()).toBe('')
+})
+
+test('renders the exact same placeholder on a network/service failure as on the unified 404 (FR3, NFR7)', async ({
+  page,
+}) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts: [] }) }),
+  )
+  await page.route('**/clients/logo.php/7', (route) => route.abort('failed'))
+
+  await page.goto('/live-tracking')
+
+  await expect(page.getByTestId('client-logo-placeholder')).toBeVisible()
+  await expect(page.getByTestId('client-logo')).toHaveCount(0)
+})
+
+test('never requests or renders a logo for an admin account (FR2)', async ({ page }) => {
+  let logoRequested = false
+  await page.route('**/account.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ account: { ...account, role: 'admin', clientId: null } }),
+    }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts: [] }) }),
+  )
+  await page.route('**/clients/logo.php/**', (route) => {
+    logoRequested = true
+    return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('fake-png') })
+  })
+
+  await page.goto('/live-tracking')
+  await expect(page.getByTestId('live-tracking-empty')).toBeVisible()
+
+  await expect(page.getByTestId('client-logo')).toHaveCount(0)
+  await expect(page.getByTestId('client-logo-placeholder')).toHaveCount(0)
+  expect(logoRequested).toBe(false)
 })

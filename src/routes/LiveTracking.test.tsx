@@ -44,8 +44,16 @@ function stubFetch(
       if (url.includes('/messages/global.php') || url.includes('/messages/contract.php')) {
         return Promise.resolve(new Response(JSON.stringify({ message: null }), { status: 200 }))
       }
-      if (url.includes('/clients/logo-flag.php')) {
-        return Promise.resolve(new Response(JSON.stringify({ hasLogo: false }), { status: 200 }))
+      if (url.includes('/clients/logo.php/')) {
+        // KAN-161: the unified-404 default for this suite's `account`
+        // (clientId: null) is moot — `ClientLogo` never requests it at all
+        // for a no-ClientID account — but a 404 is kept here as a safe
+        // default in case a future test switches to a client with an id.
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { code: 'not_found', message: 'No logo found for this client.' } }), {
+            status: 404,
+          }),
+        )
       }
       throw new Error(`Unexpected fetch: ${url}`)
     }),
