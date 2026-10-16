@@ -1,8 +1,8 @@
 /*
- * Centralized design tokens (KAN-60 FR5/FR6/FR7). Every themed surface
- * consumes these variables; no component hardcodes a raw color/spacing
- * value these already cover. Reconciles the legacy two-breakpoint split
- * (768px/480px, cpaltracker.web CB22) into one token-driven scale.
+ * Centralized design tokens (KAN-60 scaffold; colors/themes/breakpoints
+ * completed by KAN-167, FR5-7/NFR9). Every themed surface consumes these
+ * variables; no component hardcodes a raw color/spacing/breakpoint value
+ * these already cover.
  */
 
 :root {
@@ -12,6 +12,7 @@
   --color-text: #1a1d21;
   --color-text-muted: #5b6168;
   --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
   --color-primary-contrast: #ffffff;
   --color-danger: #b42318;
   --color-success: #15803d;
@@ -36,11 +37,54 @@
   --font-size-base: 1rem;
   --font-size-lg: 1.25rem;
   --font-size-xl: 1.75rem;
+}
 
-  /* Single reconciled breakpoint scale (desktop-first — see
-     react-frontend-stack-decision.md §4). */
-  --breakpoint-tablet: 768px;
-  --breakpoint-mobile: 480px;
+/*
+ * KAN-167 (FR7) — the single reconciled breakpoint token set that replaces
+ * cpaltracker.web's two independent "mobile" conventions (CB22: 768px in
+ * styles.css vs. 480px in auth.css). A plain CSS custom property cannot be
+ * read inside an `@media` condition, so the KAN-60 scaffold's `:root
+ * --breakpoint-tablet/--breakpoint-mobile` declarations were never actually
+ * wirable into a real responsive rule — this `@theme` block is what makes a
+ * single, named breakpoint scale *functional* in this Tailwind v4 build:
+ * every value declared under the `--breakpoint-*` namespace here both (a)
+ * becomes a real runtime CSS variable (usable via `var(--breakpoint-sm)`
+ * wherever a length is valid, e.g. in JS-read computed styles) and (b)
+ * drives Tailwind's generated `sm:`/`md:`/`max-sm:`/`max-md:` utility
+ * variants at build time.
+ *
+ * Reconciliation choice: rather than inventing a second, parallel naming
+ * convention (e.g. `tablet`/`mobile`) alongside Tailwind's own default
+ * `sm`/`md`/`lg`/`xl`/`2xl` scale — which would just be a THIRD breakpoint
+ * convention on top of the two legacy ones — this redefines Tailwind's own
+ * canonical scale so there is exactly ONE breakpoint system in the app:
+ *   - `--breakpoint-sm` is overridden from Tailwind's default 640px to
+ *     480px — the legacy auth.css "mobile" cutoff (CB22).
+ *   - `--breakpoint-md` is pinned to 768px — the legacy styles.css
+ *     sidebar/logo/title cutoff (CB17/CB18/CB22). This equals Tailwind's own
+ *     v4 default already; it is declared explicitly (not left implicit) so
+ *     it keeps meaning "the styles.css cutoff" even if a future Tailwind
+ *     major version changes its own default.
+ *   - `lg`/`xl`/`2xl` are left at Tailwind's defaults — no legacy rule ever
+ *     needed a third/fourth breakpoint, so there is nothing to reconcile
+ *     there; a later story can widen the scale without touching this pair.
+ *
+ * Every responsive style SHALL use these variants (`sm:`/`md:`/`max-sm:`/
+ * `max-md:` or `var(--breakpoint-sm|md)`) rather than a literal pixel width
+ * in a hand-written `@media` rule (FR7; KPI "0 literal-width responsive
+ * rules"). This codebase is desktop-first (react-frontend-stack-decision.md
+ * §4), so prefer the `max-sm:`/`max-md:` variants (shrink-below-cutoff) over
+ * the mobile-first `sm:`/`md:` ones when replicating legacy layout
+ * behavior.
+ *
+ * JS-side consumers (e.g. a future `useMediaQuery` hook) cannot read an
+ * `@theme` value out of a stylesheet at `matchMedia()` time without a DOM
+ * round trip, so `src/theme/breakpoints.ts` mirrors these same two pixel
+ * values as plain TS constants — keep both in sync if either changes.
+ */
+@theme {
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
 }
 
 :root[data-theme='dark'] {
@@ -50,6 +94,7 @@
   --color-text: #e7e9ec;
   --color-text-muted: #9aa1a9;
   --color-primary: #60a5fa;
+  --color-primary-hover: #93c5fd;
   --color-primary-contrast: #0b1220;
   --color-danger: #f87171;
   --color-success: #4ade80;
