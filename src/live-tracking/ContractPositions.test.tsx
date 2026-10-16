@@ -1,13 +1,27 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ContractPositions } from './ContractPositions'
+import { useDeviceVisibilityStore } from './deviceVisibilityStore'
+
+const onePosition = {
+  contractId: 12,
+  chipId: 'CHIP-001',
+  timestamp: '2026-10-10T08:00:05Z',
+  latitude: 48.8566,
+  longitude: 2.3522,
+  ambientTemperature: 19.1,
+  humidity: 55,
+  mass: 420,
+  mpuTemperature: 21.5,
+  accelG: 1.02,
+}
 
 function stubFetch(response: Response) {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.includes('/devices/positions.php')) return Promise.resolve(response)
+      if (url.includes('/devices/positions.php')) return Promise.resolve(response.clone())
       throw new Error(`Unexpected fetch: ${url}`)
     }),
   )
@@ -16,6 +30,7 @@ function stubFetch(response: Response) {
 describe('ContractPositions (KAN-160 FR3/FR4)', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    useDeviceVisibilityStore.getState().showAll()
   })
 
   it('renders exactly one marker per positioned device, omitting devices with no coordinates', async () => {
@@ -96,5 +111,101 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
 
     rerender(<ContractPositions contractId={34} />)
     await waitFor(() => expect(requestedContractId).toBe('34'))
+  })
+
+  it('shows a last-updated time after the initial load succeeds', async () => {
+    stubFetch(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+
+    render(<ContractPositions contractId={12} />)
+
+    await waitFor(() => expect(screen.getByTestId('positions-last-updated')).toBeInTheDocument())
+  })
+
+  it('keeps showing the prior snapshot and a small inline error when a refresh fails', async () => {
+    let callCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        callCount += 1
+        if (callCount === 1) {
+          return Promise.resolve(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { code: 'service_unavailable', message: 'DB is down' } }), {
+            status: 503,
+          }),
+        )
+      }),
+    )
+
+    render(<ContractPositions contractId={12} />)
+    await waitFor(() => expect(document.querySelector('.position-map')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId('positions-refresh'))
+
+    await waitFor(() => expect(screen.getByTestId('positions-refresh-error')).toBeInTheDocument())
+    expect(document.querySelector('.position-map')).toBeInTheDocument()
+    expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1)
+  })
+
+  it('updates last-updated and clears a prior refresh error once a refresh succeeds', async () => {
+    let callCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        callCount += 1
+        if (callCount === 2) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ error: { code: 'service_unavailable', message: 'DB is down' } }), {
+              status: 503,
+            }),
+          )
+        }
+        return Promise.resolve(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+      }),
+    )
+
+    render(<ContractPositions contractId={12} />)
+    await waitFor(() => expect(document.querySelector('.position-map')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId('positions-refresh'))
+    await waitFor(() => expect(screen.getByTestId('positions-refresh-error')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId('positions-refresh'))
+    await waitFor(() => expect(screen.queryByTestId('positions-refresh-error')).not.toBeInTheDocument())
+  })
+
+  it('filters a device out of the map when unchecked in the device filter', async () => {
+    stubFetch(
+      new Response(
+        JSON.stringify({
+          positions: [
+            onePosition,
+            { ...onePosition, chipId: 'CHIP-002', latitude: 45.75, longitude: 4.85 },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    render(<ContractPositions contractId={12} />)
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(2))
+
+    fireEvent.click(screen.getByTestId('device-filter-CHIP-002'))
+
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
+  })
+
+  it('resets the device filter to show-all when the contract changes', async () => {
+    stubFetch(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+
+    const { rerender } = render(<ContractPositions contractId={12} />)
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
+
+    fireEvent.click(screen.getByTestId('device-filter-CHIP-001'))
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(0))
+
+    rerender(<ContractPositions contractId={34} />)
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
   })
 })

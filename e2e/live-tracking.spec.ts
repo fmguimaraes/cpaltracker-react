@@ -156,3 +156,82 @@ test('selecting a contract renders one marker per positioned device with an acce
   await expect(page.locator('.leaflet-tooltip')).toContainText('10/10/2026 08:00 UTC')
   await expect(page.locator('.leaflet-tooltip')).toContainText('Masse: 420 kg')
 })
+
+test('manual refresh keeps the prior snapshot on failure, and the device filter hides markers without a new request (FR8, FR9, FR10)', async ({
+  page,
+}) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD' }],
+      }),
+    }),
+  )
+
+  let positionsRequestCount = 0
+  await page.route('**/devices/positions.php**', (route) => {
+    positionsRequestCount += 1
+    if (positionsRequestCount === 2) {
+      return route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'service_unavailable', message: 'DB is down' } }),
+      })
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        positions: [
+          {
+            contractId: 12,
+            chipId: 'CHIP-001',
+            timestamp: '2026-10-10T08:00:05Z',
+            latitude: 48.8566,
+            longitude: 2.3522,
+            ambientTemperature: 19.1,
+            humidity: 55,
+            mass: 420,
+            mpuTemperature: 21.5,
+            accelG: 1.02,
+          },
+          {
+            contractId: 12,
+            chipId: 'CHIP-002',
+            timestamp: '2026-10-10T08:00:05Z',
+            latitude: 45.75,
+            longitude: 4.85,
+            ambientTemperature: 19.1,
+            humidity: 55,
+            mass: 300,
+            mpuTemperature: 21.5,
+            accelG: 1.02,
+          },
+        ],
+      }),
+    })
+  })
+
+  await page.goto('/live-tracking')
+  await page.getByTestId('contract-option-12').click()
+
+  const markers = page.locator('.leaflet-marker-icon')
+  await expect(markers).toHaveCount(2)
+  await expect(page.getByTestId('positions-last-updated')).toBeVisible()
+
+  await page.getByTestId('device-filter-CHIP-002').uncheck()
+  await expect(markers).toHaveCount(1)
+  expect(positionsRequestCount).toBe(1)
+
+  await page.getByTestId('positions-refresh').click()
+  await expect(page.getByTestId('positions-refresh-error')).toBeVisible()
+  await expect(markers).toHaveCount(1)
+
+  await page.getByTestId('positions-refresh').click()
+  await expect(page.getByTestId('positions-refresh-error')).not.toBeVisible()
+})

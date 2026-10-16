@@ -1,33 +1,54 @@
 import { useEffect, useState } from 'react'
 import { fetchPositions, type Position } from '../api/positions'
+import { DeviceFilter } from './DeviceFilter'
+import { useDeviceVisibilityStore } from './deviceVisibilityStore'
 import { PositionsMap } from './PositionsMap'
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
+function formatLastUpdated(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 /**
- * KAN-160 (FR3/FR4) — fetches and renders the selected contract's
- * last-known device positions. Split out of `LiveTracking.tsx` so that
- * component stays focused on FR1/FR2 (gate + contract selector); this one
- * owns the FR3-FR7 map concern, re-fetching whenever `contractId` changes.
+ * KAN-160/KAN-162 (FR3/FR4/FR8/FR9/FR10) — fetches and renders the selected
+ * contract's last-known device positions, with a manual refresh and a
+ * client-side device-visibility filter.
  *
- * NFR5 ("markers visible < 1.5s after the response resolves"): nothing
- * here does extra work between the fetch resolving and the map receiving
- * its `positions` prop — there is no intermediate transform step that
- * could itself become the bottleneck; `PositionsMap`'s own render is a
- * plain Leaflet marker-per-device pass over an already-small list.
+ * KAN-162's Technical Requirement ("update 'last updated' only on success,
+ * not on failure — keep showing the prior snapshot") is why the initial
+ * load and a later refresh use separate state: `state`/`positions` only
+ * ever move forward on success, while `refreshing`/`refreshError` are
+ * transient UI state that never touch the last-good snapshot. A refresh
+ * failure therefore surfaces a small inline error alongside the existing
+ * map rather than replacing it with a full error state.
+ *
+ * No polling and no socket.io-client anywhere here or elsewhere in this
+ * codebase (verified by `grep -r "socket.io" src`) — refresh is manual
+ * only, reusing the same `fetchPositions` call as the initial load and as
+ * a contract switch.
  */
 export function ContractPositions({ contractId }: { contractId: number }) {
   const [state, setState] = useState<LoadState>('loading')
   const [positions, setPositions] = useState<Position[]>([])
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const showAll = useDeviceVisibilityStore((s) => s.showAll)
+  const hiddenChipIds = useDeviceVisibilityStore((s) => s.hiddenChipIds)
 
   useEffect(() => {
     let cancelled = false
     setState('loading')
+    setRefreshError(null)
+    showAll()
     fetchPositions(contractId)
       .then((result) => {
         if (cancelled) return
         setPositions(result)
         setState('loaded')
+        setLastUpdated(new Date())
       })
       .catch(() => {
         if (cancelled) return
@@ -36,7 +57,23 @@ export function ContractPositions({ contractId }: { contractId: number }) {
     return () => {
       cancelled = true
     }
-  }, [contractId])
+  }, [contractId, showAll])
+
+  function refresh() {
+    setRefreshing(true)
+    setRefreshError(null)
+    fetchPositions(contractId)
+      .then((result) => {
+        setPositions(result)
+        setLastUpdated(new Date())
+      })
+      .catch(() => {
+        setRefreshError('Impossible de rafraîchir les positions. Dernières positions connues affichées.')
+      })
+      .finally(() => {
+        setRefreshing(false)
+      })
+  }
 
   if (state === 'loading') {
     return (
@@ -54,13 +91,44 @@ export function ContractPositions({ contractId }: { contractId: number }) {
     )
   }
 
-  if (positions.length === 0) {
-    return (
-      <p data-testid="positions-empty" style={{ color: 'var(--color-text-muted)' }}>
-        Aucune position disponible pour ce contrat.
-      </p>
-    )
-  }
+  const visiblePositions = positions.filter((p) => !hiddenChipIds.has(p.chipId))
 
-  return <PositionsMap positions={positions} />
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={refresh}
+          disabled={refreshing}
+          data-testid="positions-refresh"
+          className="rounded-md border px-3 py-1 text-sm"
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+        >
+          {refreshing ? 'Rafraîchissement…' : 'Rafraîchir'}
+        </button>
+        {lastUpdated && (
+          <span data-testid="positions-last-updated" style={{ color: 'var(--color-text-muted)' }}>
+            Dernière mise à jour : {formatLastUpdated(lastUpdated)}
+          </span>
+        )}
+      </div>
+
+      {refreshError && (
+        <p data-testid="positions-refresh-error" role="alert" style={{ color: 'var(--color-danger)' }}>
+          {refreshError}
+        </p>
+      )}
+
+      {positions.length === 0 ? (
+        <p data-testid="positions-empty" style={{ color: 'var(--color-text-muted)' }}>
+          Aucune position disponible pour ce contrat.
+        </p>
+      ) : (
+        <>
+          <DeviceFilter chipIds={positions.map((p) => p.chipId)} />
+          <PositionsMap positions={visiblePositions} />
+        </>
+      )}
+    </div>
+  )
 }
