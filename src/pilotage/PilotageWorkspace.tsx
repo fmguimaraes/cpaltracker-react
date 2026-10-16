@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Position } from '../api/positions'
+import type { TransferResult } from '../api/transfer'
 import { DeviceList } from './DeviceList'
 import { loadPilotageWorkspace } from './loadPilotageWorkspace'
 import { SettingsForm } from './SettingsForm'
+import { TransferForm } from './TransferForm'
+import { TransferHistory } from './TransferHistory'
 
 type State =
   | { phase: 'loading' }
@@ -33,6 +36,19 @@ type State =
  * this component tracks which one; the first device is selected by
  * default so the form is visible without an extra click. Selection resets
  * whenever the contract (and so the device list) changes.
+ *
+ * KAN-169 (FR14-FR18) addition: alongside `SettingsForm`, the eligible
+ * branch also mounts `TransferForm` (for the selected device) and
+ * `TransferHistory`, as a separate section rather than replacing either
+ * existing form. This component owns the transfer-history list because
+ * CB29/FR18 scope it to "the contract's devices," not one device — a
+ * transfer recorded for any device under this contract is appended here
+ * and shown by `TransferHistory` regardless of which device is currently
+ * selected in `DeviceList`. The list is reset whenever the contract
+ * changes, for the same reason `selectedChipId` is. See
+ * `TransferHistory.tsx`'s doc comment for why this is a session log, not
+ * the full persisted history (no `/api/v1` read endpoint exists for it
+ * yet — a documented gap, not fabricated data).
  */
 export function PilotageWorkspace({
   contractId,
@@ -43,6 +59,7 @@ export function PilotageWorkspace({
 }) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selectedChipId, setSelectedChipId] = useState<string | null>(null)
+  const [transferHistory, setTransferHistory] = useState<TransferResult[]>([])
   // Same pattern as ContractPositions (KAN-160/168): kept in a ref so a new
   // inline `onUnauthorized` identity from the parent never re-triggers the
   // load effect below.
@@ -53,6 +70,7 @@ export function PilotageWorkspace({
     let cancelled = false
     setState({ phase: 'loading' })
     setSelectedChipId(null)
+    setTransferHistory([])
     loadPilotageWorkspace(contractId)
       .then((result) => {
         if (cancelled) return
@@ -112,13 +130,27 @@ export function PilotageWorkspace({
   }
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row">
-      <DeviceList
-        devices={state.devices}
-        selectedChipId={selectedChipId ?? undefined}
-        onSelect={setSelectedChipId}
-      />
-      {selectedChipId && <SettingsForm deviceId={selectedChipId} />}
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 md:flex-row">
+        <DeviceList
+          devices={state.devices}
+          selectedChipId={selectedChipId ?? undefined}
+          onSelect={setSelectedChipId}
+        />
+        {selectedChipId && <SettingsForm deviceId={selectedChipId} />}
+      </div>
+
+      {selectedChipId && (
+        <section data-testid="pilotage-transfer-section" className="flex flex-col gap-6 md:flex-row">
+          <TransferForm
+            deviceId={selectedChipId}
+            onTransferred={(result) => setTransferHistory((prev) => [...prev, result])}
+          />
+          <div data-testid="pilotage-transfer-history" className="flex-1">
+            <TransferHistory entries={transferHistory} />
+          </div>
+        </section>
+      )}
     </div>
   )
 }

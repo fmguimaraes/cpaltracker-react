@@ -134,6 +134,35 @@ describe('PilotageWorkspace (KAN-159 FR2-FR6, NFR2, NFR4)', () => {
     expect(screen.getByTestId('settings-field-FREQ_MESURE_CL')).toBeInTheDocument()
   })
 
+  it('mounts the transfer form and history section for the first device by default (KAN-169 FR14, FR18)', async () => {
+    stubFetch((url) => {
+      if (url.includes('/devices/positions.php')) {
+        return new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 })
+      }
+      if (url.includes('/devices/config.php')) {
+        return new Response(
+          JSON.stringify({ deviceId: 'CHIP-001', contractId: 12, reglageId: 1, updatedAt: null, config: {} }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/contracts/list.php')) {
+        return new Response(
+          JSON.stringify({
+            contracts: [{ contractId: 34, contractRef: 'REF-034-STD', contractType: 'STD' }],
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response('{}', { status: 200 })
+    })
+
+    render(<PilotageWorkspace contractId={12} />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('transfer-target-option-34')).toBeInTheDocument())
+    expect(screen.getByTestId('transfer-history-empty')).toBeInTheDocument()
+  })
+
   it('re-resolves eligibility when the contractId prop changes', async () => {
     let requestedContractId: string | null = null
     stubFetch((url) => {
