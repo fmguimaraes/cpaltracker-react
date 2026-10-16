@@ -139,6 +139,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return JSON.parse(text) as T
 }
 
+/**
+ * KAN-165 (FR13) — for binary responses (the client logo image), which
+ * `request()` above can't handle: it always calls `response.text()` then
+ * `JSON.parse()`. A plain `<img src="…">` can't carry the bearer token
+ * either (the API is bearer-only, never cookies — NFR1), so the logo has
+ * to be fetched here with the same `Authorization` header as every other
+ * call and handed to the caller as a `Blob` to turn into an object URL.
+ */
+export async function fetchBinary(path: string): Promise<Blob> {
+  const sentToken = authToken
+  const url = `${resolveBaseUrl()}${path}`
+  const response = await fetch(url, {
+    credentials: 'omit',
+    headers: {
+      ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : {}),
+    },
+  })
+
+  if (!response.ok) {
+    throw await parseErrorBody(response)
+  }
+
+  return response.blob()
+}
+
 export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: 'GET' }),
   post: <T>(path: string, body?: unknown) =>

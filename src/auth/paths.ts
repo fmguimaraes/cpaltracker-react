@@ -24,3 +24,11 @@ export const CHANGE_PASSWORD_PATH = '/change-password'
 
 /** KAN-158 — the Live Tracking contract selector / last-known-position view. */
 export const LIVE_TRACKING_PATH = '/live-tracking'
+
+/**
+ * KAN-165 (FR14) — the History Dashboard route (legacy `dashboard.php`
+ * equivalent, CB-10). Epic KAN-139 owns building the page itself; this
+ * story only needs the path so Live Tracking's "Open History Dashboard"
+ * link has somewhere to point.
+ */
+export const HISTORY_DASHBOARD_PATH = '/history'

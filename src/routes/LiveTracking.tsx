@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { fetchContracts, type Contract } from '../api/contracts'
+import { ClientLogo } from '../live-tracking/ClientLogo'
+import { ContractMessage } from '../live-tracking/ContractMessage'
 import { ContractPositions } from '../live-tracking/ContractPositions'
+import { GlobalMessage } from '../live-tracking/GlobalMessage'
+import { HistoryDashboardLink } from '../live-tracking/HistoryDashboardLink'
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
@@ -17,8 +21,10 @@ type LoadState = 'loading' | 'loaded' | 'error'
  *
  * Map rendering itself (FR3-FR7) is `ContractPositions`/`PositionsMap`
  * (KAN-160) — this component only tracks which contract is selected and
- * mounts that child when it is. Refresh, device filters and messaging are
- * KAN-162/165/168's job.
+ * mounts that child, `ContractMessage`, and `HistoryDashboardLink` when it
+ * is. `ClientLogo`/`GlobalMessage` (KAN-165, FR11/FR13) aren't gated on a
+ * selection — they're shown for the whole visit. Device filters and
+ * error/empty-state/theming polish are KAN-168's job.
  */
 export function LiveTracking() {
   const [state, setState] = useState<LoadState>('loading')
@@ -45,11 +51,14 @@ export function LiveTracking() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-8">
-      <header>
+      <header className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
           Suivi en direct
         </h1>
+        <ClientLogo />
       </header>
+
+      <GlobalMessage />
 
       {state === 'loading' && (
         <p data-testid="live-tracking-loading" style={{ color: 'var(--color-text-muted)' }}>
@@ -105,7 +114,13 @@ export function LiveTracking() {
         </div>
       )}
 
-      {selectedId !== null && <ContractPositions contractId={selectedId} />}
+      {selectedId !== null && (
+        <>
+          <ContractMessage contractId={selectedId} />
+          <ContractPositions contractId={selectedId} />
+          <HistoryDashboardLink contractId={selectedId} />
+        </>
+      )}
     </main>
   )
 }

@@ -33,6 +33,12 @@ function stubFetch(contractsResponse: Response | (() => Response)) {
       if (url.includes('/devices/positions.php')) {
         return Promise.resolve(new Response(JSON.stringify({ positions: [] }), { status: 200 }))
       }
+      if (url.includes('/messages/global.php') || url.includes('/messages/contract.php')) {
+        return Promise.resolve(new Response(JSON.stringify({ message: null }), { status: 200 }))
+      }
+      if (url.includes('/clients/logo-flag.php')) {
+        return Promise.resolve(new Response(JSON.stringify({ hasLogo: false }), { status: 200 }))
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     }),
   )

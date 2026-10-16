@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apiClient, setAuthToken, setSessionLossHandler } from './client'
+import { apiClient, fetchBinary, setAuthToken, setSessionLossHandler } from './client'
 
 /**
  * KAN-151 — CSRF Token Lifecycle & Client-Side Security Constraints.
@@ -282,5 +282,41 @@ describe('apiClient session-loss interceptor (FR11, FR12)', () => {
     await expect(pending).rejects.toThrow()
 
     expect(handler).not.toHaveBeenCalled()
+  })
+})
+
+describe('fetchBinary (KAN-165 FR13)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    setAuthToken(null)
+  })
+
+  it('sends credentials: "omit" and the bearer token, same as apiClient', async () => {
+    setAuthToken('a-token')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(new Blob(['x']), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBinary('/clients/logo.php')
+
+    const init = lastRequestInit(fetchMock)
+    expect(init.credentials).toBe('omit')
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer a-token')
+  })
+
+  it('throws the parsed error body on a non-ok response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: { code: 'not_found', message: 'Logo not found.' } }), {
+          status: 404,
+        }),
+      ),
+    )
+
+    await expect(fetchBinary('/clients/logo.php')).rejects.toMatchObject({
+      status: 404,
+      code: 'not_found',
+    })
   })
 })

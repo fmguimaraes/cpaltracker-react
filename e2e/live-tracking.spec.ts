@@ -235,3 +235,79 @@ test('manual refresh keeps the prior snapshot on failure, and the device filter 
   await page.getByTestId('positions-refresh').click()
   await expect(page.getByTestId('positions-refresh-error')).not.toBeVisible()
 })
+
+test('shows the global and per-contract messages as plain text, the logo when flagged, and a History Dashboard link carrying contract + date range (FR11, FR12, FR13, FR14)', async ({
+  page,
+}) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD' }],
+      }),
+    }),
+  )
+  await page.route('**/devices/positions.php**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ positions: [] }) }),
+  )
+  await page.route('**/messages/global.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        message: { date: '2026-10-10T08:00:00+00:00', contenu: '<b>Maintenance</b> ce soir.' },
+      }),
+    }),
+  )
+  await page.route('**/messages/contract.php**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: { date: null, contenu: 'Message du contrat 12.' } }),
+    }),
+  )
+  await page.route('**/clients/logo-flag.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hasLogo: true }) }),
+  )
+  await page.route('**/clients/logo.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      // A 1x1 transparent PNG — just needs to be valid image bytes.
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    }),
+  )
+
+  await page.goto('/live-tracking')
+
+  // FR11: global message shown immediately, as the literal text it is in
+  // the API response — never parsed as HTML (no <b> element rendered).
+  await expect(page.getByTestId('global-message')).toContainText('<b>Maintenance</b> ce soir.')
+  expect(await page.locator('[data-testid="global-message"] b').count()).toBe(0)
+
+  // FR13: logo shown once the flag reports true.
+  await expect(page.getByTestId('client-logo')).toBeVisible()
+
+  // FR14: no History Dashboard link before a contract is selected.
+  await expect(page.getByTestId('history-dashboard-link')).toHaveCount(0)
+
+  await page.getByTestId('contract-option-12').click()
+
+  // FR12: per-contract message shown once selected.
+  await expect(page.getByTestId('contract-message')).toContainText('Message du contrat 12.')
+
+  // FR14: link now present, carrying contrat_id + date_from + date_to.
+  const href = await page.getByTestId('history-dashboard-link').getAttribute('href')
+  expect(href).toContain('/history?')
+  const params = new URLSearchParams(href!.split('?')[1])
+  expect(params.get('contrat_id')).toBe('12')
+  expect(params.get('date_from')).toBeTruthy()
+  expect(params.get('date_to')).toBeTruthy()
+})
