@@ -208,4 +208,44 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     rerender(<ContractPositions contractId={34} />)
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
   })
+
+  it('discards a stale in-flight refresh if the contract changes before it resolves', async () => {
+    const deferred: { resolve?: (response: Response) => void } = {}
+    let callCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        callCount += 1
+        if (callCount === 2) {
+          return new Promise<Response>((resolve) => {
+            deferred.resolve = resolve
+          })
+        }
+        if (callCount === 3) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ positions: [{ ...onePosition, chipId: 'CHIP-OTHER' }] }),
+              { status: 200 },
+            ),
+          )
+        }
+        return Promise.resolve(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+      }),
+    )
+
+    const { rerender } = render(<ContractPositions contractId={12} />)
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
+
+    fireEvent.click(screen.getByTestId('positions-refresh'))
+    await waitFor(() => expect(callCount).toBe(2))
+
+    rerender(<ContractPositions contractId={34} />)
+    await waitFor(() => expect(screen.getByTestId('device-filter-CHIP-OTHER')).toBeInTheDocument())
+
+    deferred.resolve?.(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(screen.getByTestId('device-filter-CHIP-OTHER')).toBeInTheDocument()
+    expect(screen.queryByTestId('device-filter-CHIP-001')).not.toBeInTheDocument()
+  })
 })

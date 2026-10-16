@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchPositions, type Position } from '../api/positions'
 import { DeviceFilter } from './DeviceFilter'
 import { useDeviceVisibilityStore } from './deviceVisibilityStore'
@@ -38,10 +38,18 @@ export function ContractPositions({ contractId }: { contractId: number }) {
   const showAll = useDeviceVisibilityStore((s) => s.showAll)
   const hiddenChipIds = useDeviceVisibilityStore((s) => s.hiddenChipIds)
 
+  // Tracks which contractId is current so a refresh in flight when the
+  // user switches contracts can detect it's stale and discard its result
+  // instead of overwriting the new contract's data (mirrors the `cancelled`
+  // guard below, but reusable from `refresh()`, which runs outside the effect).
+  const activeContractIdRef = useRef(contractId)
+
   useEffect(() => {
     let cancelled = false
+    activeContractIdRef.current = contractId
     setState('loading')
     setRefreshError(null)
+    setRefreshing(false)
     showAll()
     fetchPositions(contractId)
       .then((result) => {
@@ -64,10 +72,12 @@ export function ContractPositions({ contractId }: { contractId: number }) {
     setRefreshError(null)
     fetchPositions(contractId)
       .then((result) => {
+        if (activeContractIdRef.current !== contractId) return
         setPositions(result)
         setLastUpdated(new Date())
       })
       .catch(() => {
+        if (activeContractIdRef.current !== contractId) return
         setRefreshError('Impossible de rafraîchir les positions. Dernières positions connues affichées.')
       })
       .finally(() => {
