@@ -17,11 +17,67 @@ export interface HistoryContract {
   FinContrat: string | null
 }
 
+/**
+ * One row per device per `T_CONTRATS_DEVICES` entry (`history_logic.php`'s
+ * `cpal_history_devices_du_contrat()`). `STATUT`/`MORT` are carried through
+ * unparsed — KAN-175 (device checklist) owns interpreting them; this story
+ * only needs `ChipID` to key the map's per-device series (CB19).
+ */
+export interface HistoryDevice {
+  ChipID: string
+  STATUT: string
+  MORT: number | string
+}
+
+/**
+ * One measurement row, key-flattened server-side exactly as CB12 documents
+ * (`history_logic.php::cpal_history_mesures()` — same short keys as the
+ * legacy `api_dashboard.php`, carried into `/api/v1` byte-for-byte so the
+ * KAN-174 map/slider logic ported from `map_timeline.js` needs no
+ * reshaping): `c` ChipID, `t` epoch-ms, `ts` raw EventDate, `p` HasPosition
+ * (0/1), `la`/`lo` lat/long, `ta` ambient temp, `hr` humidity, `m` mass,
+ * `g` acceleration, `tm` MPU temp. All measurement fields besides `c`/`t`/
+ * `ts`/`p` are nullable — a row can be geolocated with no sensor reading,
+ * or have a sensor reading with no position.
+ */
+export interface HistoryRow {
+  c: string
+  t: number
+  ts: string
+  p: 0 | 1
+  la: number | null
+  lo: number | null
+  ta: number | null
+  hr: number | null
+  m: number | null
+  g: number | null
+  tm: number | null
+}
+
+/**
+ * One lot-hook record (CB14), same short keys as the legacy endpoint
+ * (`history_logic.php::cpal_history_hooks()`): `c` ChipID, `lot` cPAL lot
+ * number, `cust` client lot number, `from`/`to` epoch-ms (half-open
+ * interval — CB22's `t >= from && t < to`), `net`/`gros` weights, `nb`
+ * quantity, `per` expiry date string.
+ */
+export interface HistoryHook {
+  c: string
+  lot: number | string
+  cust: string | null
+  from: number
+  to: number
+  net: number | null
+  gros: number | null
+  nb: number | null
+  per: string | null
+}
+
 export interface HistoryResponse {
   contract: HistoryContract
-  devices: unknown[]
-  rows: unknown[]
-  hooks: unknown[]
+  devices: HistoryDevice[]
+  rows: HistoryRow[]
+  hooks: HistoryHook[]
   count: number
   total: number
   sampled: boolean

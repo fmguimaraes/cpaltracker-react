@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { fetchContracts, type Contract } from '../api/contracts'
 import { HistoryAccessGate } from '../history/HistoryAccessGate'
 import { formatIsoDate } from '../history/dateRange'
+import { TimelineMap } from '../history/TimelineMap'
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
@@ -160,13 +161,12 @@ export function HistoryDashboard() {
       {selectedId !== null && (
         <HistoryAccessGate contractId={selectedId} onUnauthorized={handleUnauthorizedContract}>
           {(resolved) => (
-            // KAN-174 (map/time-slider/trail/replay) and KAN-175 (charts,
-            // device checklist, lot-hooks, selection summary — FR4, FR9,
-            // FR19-FR24) render the actual dashboard content here; this
-            // story only proves the contract is accessible and resolves the
-            // default date range (FR3, already KAN-170's job) before handing
-            // off. Kept intentionally minimal so neither later story has to
-            // unwind a placeholder implementation.
+            // KAN-175 (charts, device checklist, lot-hooks, selection
+            // summary — FR4, FR9, FR19-FR24) renders alongside the map
+            // here; this story (KAN-174, FR10-18/NFR1/NFR3) owns the
+            // time-slider/trail-replay map itself. `visibleDeviceIds` stays
+            // `null` (all devices) until KAN-175's checklist exists to
+            // drive it.
             <section data-testid="history-dashboard-ready" className="flex flex-col gap-2">
               <p style={{ color: 'var(--color-text)' }}>
                 Contrat {resolved.history.contract.ContratRef} — période du{' '}
@@ -175,6 +175,7 @@ export function HistoryDashboard() {
               <p style={{ color: 'var(--color-text-muted)' }}>
                 {resolved.history.devices.length} appareil(s), {resolved.history.count} mesure(s).
               </p>
+              <TimelineMap rows={resolved.history.rows} hooks={resolved.history.hooks} />
             </section>
           )}
         </HistoryAccessGate>
