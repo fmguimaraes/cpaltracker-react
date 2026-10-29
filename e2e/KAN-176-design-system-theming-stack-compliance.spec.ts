@@ -228,12 +228,14 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     // (FR26).
     const chart = page.getByTestId('history-chart-ta')
     const paperBackground = await chart.locator('.main-svg').first().evaluate((node) => getComputedStyle(node).backgroundColor)
-    expect(paperBackground).toBe('rgb(29, 33, 38)') // --color-surface dark: #1d2126
+    expect(paperBackground).toBe('rgb(34, 37, 46)') // --card dark: #22252e (KAN-223 FR4)
   })
 
   test('light mode (the default) leaves the map tiles un-filtered and charts on the light palette', async ({
     page,
   }) => {
+    // The default is dark (D7, KAN-223); light is an explicit stored choice.
+    await page.addInitScript(() => window.localStorage.setItem('cpaltracker:theme', 'light'))
     await mockToReadyState(page)
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
@@ -241,10 +243,11 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     const tilePaneFilter = await page
       .locator('.timeline-map .leaflet-tile-pane')
       .evaluate((node) => getComputedStyle(node).filter)
-    expect(tilePaneFilter).toBe('none')
+    // Light tiles are only softened (--map-tile-filter, KAN-223 F-19), never inverted.
+    expect(tilePaneFilter).toBe('saturate(0.55) sepia(0.12)')
 
     const chart = page.getByTestId('history-chart-ta')
     const paperBackground = await chart.locator('.main-svg').first().evaluate((node) => getComputedStyle(node).backgroundColor)
-    expect(paperBackground).toBe('rgb(244, 245, 247)') // --color-surface light: #f4f5f7
+    expect(paperBackground).toBe('rgb(238, 230, 212)') // --card light: #eee6d4 (KAN-223 FR4)
   })
 })
