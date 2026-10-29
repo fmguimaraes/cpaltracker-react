@@ -34,9 +34,12 @@
 
   /* Lines */
   --border: #353841; /* Filets de séparation — decorative, no contrast requirement */
-  /* New role: the separator is 1.44:1, a form control boundary needs 3:1 (3.32 / 3.01) */
-  --input: #686e7f;
+  /* New role: the separator is 1.44:1, a form control boundary needs 3:1. #686E7F passed on background
+     and card only (2.63 on secondary/accent, 2.97 on muted): same hue lifted to ≥ 3:1 on every surface
+     (3.03 secondary, 3.42 muted, 3.47 card, 3.83 background) */
+  --input: #71788a;
   --ring: #dd8c3e; /* Focus ring: 5–6:1 on every dark surface */
+  --ring-media: #dd8c3e; /* focus ring inside a --media frame (map): 7.2:1 on the frame, 6.4 on dark tiles */
 
   /* Accent */
   --primary: #dd8c3e; /* Orange principal — fills, active nav, key numbers */
@@ -108,6 +111,9 @@
   --input: #938267;
   /* #C57A30 is 2.73:1 on the cream card, below 3:1: reuse the primary-text orange */
   --ring: #85511f;
+  /* The --media frame stays dark in light theme (2.57:1 for #85511F) and its tiles are light: the
+     chart-1 orange passes on both (3.80 on the frame, 4.1 on the light land tile) */
+  --ring-media: #a8692a;
 
   --primary: #c57a30; /* fills: buttons, badges, active nav marker */
   /* White on #C57A30 is 3.39:1 and fails for labels; charcoal is 4.99:1 */
@@ -165,5 +171,8 @@
   --success-soft: color-mix(in oklab, var(--success) 12%, transparent);
   --offline-soft: color-mix(in oklab, var(--offline) 12%, transparent);
   --info-soft: color-mix(in oklab, var(--info) 12%, transparent);
-  --primary-soft: color-mix(in oklab, var(--primary) 12%, transparent);
+  /* Primary soft fill is opaque, always the 12 % mix over the card (same color as before on cards).
+     A translucent fill let the surface under it decide the contrast: primary-text fell to 4.17:1 over
+     secondary (dark) and to under 3:1 over the map frame (selected marker, light) */
+  --primary-soft: color-mix(in srgb, var(--primary) 12%, var(--card));
 }

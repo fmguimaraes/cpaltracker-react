@@ -4,8 +4,9 @@ import { test, expect, type Page } from '@playwright/test'
  * KAN-227 (epic KAN-217) - pilotage list at fleet scale (F-33, NFR5): a contract with 5000 devices
  * stays responsive because the kit `DataTable` virtualizes above 50 rows. At 1440 px only the rows
  * in view are mounted, the header stays sticky, the last device is reachable by scrolling, and
- * selection and sorting keep working. At 390 px the `MobileList` is paginated (20 cards, then
- * "Afficher plus"), it is not virtualized. Both themes, no console error.
+ * selection and sorting keep working. At 390 px the kit `MobileList` is windowed against the page
+ * scroll (KAN-217): only the cards around the viewport are mounted, the count shows the total, and
+ * the last device is reached by scrolling, with no "Afficher plus". Both themes, no console error.
  *
  * Set SHOTS_DIR to also write screenshots there (used for the audit, off by default).
  */
@@ -89,7 +90,7 @@ async function shot(page: Page, name: string) {
 
 for (const theme of ['dark', 'light'] as const) {
   test.describe(`KAN-227 pilotage virtualization, ${theme} theme`, () => {
-    test(`desktop 1440 px: ${DEVICE_COUNT} devices, few rows mounted, sticky header, last device by scroll, sort, select`, async ({
+    test(`V1 @SI-227-6 desktop 1440 px: ${DEVICE_COUNT} devices, few rows mounted, sticky header, last device by scroll, sort, select`, async ({
       page,
     }, testInfo) => {
       const errors = trackConsoleErrors(page)
@@ -183,7 +184,7 @@ for (const theme of ['dark', 'light'] as const) {
       expect(errors).toEqual([])
     })
 
-    test(`mobile 390 px: ${DEVICE_COUNT} devices are 20 cards then "Afficher plus", no horizontal scroll`, async ({
+    test(`V2 @SI-227-7 mobile 390 px: ${DEVICE_COUNT} devices are windowed cards, last device by scroll, bounded DOM, no horizontal scroll`, async ({
       page,
     }, testInfo) => {
       const errors = trackConsoleErrors(page)
@@ -191,37 +192,64 @@ for (const theme of ['dark', 'light'] as const) {
       await openPilotage(page, theme)
 
       const list = page.getByTestId('pilotage-device-list')
+      const cards = list.locator('> li')
       await expect(list).toBeVisible()
       expect(await list.evaluate((el) => el.tagName)).toBe('UL')
-      await expect(list.locator('> li')).toHaveCount(20)
-      await expect(page.getByText(`20 sur ${DEVICE_COUNT}`)).toBeVisible()
-      await expect(page.getByTestId(`pilotage-device-${chipId(0)}`)).toHaveAttribute('data-testid', `pilotage-device-${chipId(0)}`)
+      await expect(list).toHaveAttribute('data-windowed', 'true')
+      await expect(page.getByTestId(`pilotage-device-${chipId(0)}`)).toBeVisible()
+      await expect(page.getByText(`${DEVICE_COUNT} sur ${DEVICE_COUNT}`)).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Afficher plus' })).toHaveCount(0)
+      const initial = await cards.count()
+      expect(initial).toBeGreaterThan(0)
+      expect(initial).toBeLessThan(60)
+      await expect(page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}`)).toHaveCount(0)
       await shot(page, `pilotage-virtualized-${theme}-390`)
 
       // Selection works on a card.
       await page.getByTestId(`pilotage-device-${chipId(2)}-select`).click()
       await expect(page.getByTestId(`pilotage-device-${chipId(2)}-select`)).toHaveAttribute('aria-pressed', 'true')
 
-      // Not virtualized: the last device is reached by paging ("Afficher plus" 249 times), which
-      // mounts all 5000 cards. Recorded, not asserted as a limit.
-      test.setTimeout(120_000)
-      const pagingMs = await page.evaluate(async (pages) => {
-        const start = performance.now()
-        for (let i = 0; i < pages; i++) {
-          const button = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Afficher plus')
-          if (!button) break
-          button.click()
-          await new Promise((r) => setTimeout(r, 0))
+      // Scroll the page (whichever ancestor scrolls) in steps to the end of the list, sampling the
+      // mounted-card count on the way: it stays bounded, the last device is reached by scrolling.
+      const scrolled = await list.evaluate(async (ul) => {
+        const scrollerOf = (el: HTMLElement): HTMLElement => {
+          for (let p = el.parentElement; p; p = p.parentElement) {
+            const oy = getComputedStyle(p).overflowY
+            if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p
+          }
+          return document.scrollingElement as HTMLElement
         }
-        return Math.round(performance.now() - start)
-      }, DEVICE_COUNT / 20)
-      testInfo.annotations.push({ type: 'mobile-paging-ms', description: `${pagingMs} ms for all pages` })
-      await expect(page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}`)).toHaveCount(1)
-      const total = await list.locator('> li').count()
-      testInfo.annotations.push({ type: 'mobile-dom-after-paging', description: `${total} cards` })
-      expect(total).toBe(DEVICE_COUNT)
-      await page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}`).scrollIntoViewIfNeeded()
+        const sc = scrollerOf(ul)
+        const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        let maxMounted = 0
+        const start = performance.now()
+        // Content follows the list (settings, transfer), so scroll to the list's end, not the page's.
+        const below = () => ul.getBoundingClientRect().bottom - window.innerHeight
+        for (let i = 0; i < 400 && below() > 0; i++) {
+          sc.scrollTop += Math.min(sc.clientHeight * 3, below())
+          await frame()
+          maxMounted = Math.max(maxMounted, ul.querySelectorAll(':scope > li').length)
+        }
+        // Settle at the end (the list height changes a little as cards are measured).
+        for (let i = 0; i < 5; i++) {
+          sc.scrollTop += below()
+          await frame()
+        }
+        maxMounted = Math.max(maxMounted, ul.querySelectorAll(':scope > li').length)
+        return { maxMounted, ms: Math.round(performance.now() - start) }
+      })
+      testInfo.annotations.push({ type: 'mobile-scroll', description: JSON.stringify(scrolled) })
+      const last = page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}`)
+      await expect(last).toBeVisible()
+      await expect(last).toBeInViewport()
+      expect(scrolled.maxMounted).toBeLessThan(60)
+      expect(await cards.count()).toBeLessThan(60)
+      await expect(page.getByTestId(`pilotage-device-${chipId(0)}`)).toHaveCount(0)
       await shot(page, `pilotage-virtualized-end-${theme}-390`)
+
+      // Selecting the last device works; the earlier selection moves (one device selected).
+      await page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}-select`).click()
+      await expect(page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}-select`)).toHaveAttribute('aria-pressed', 'true')
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
       expect(overflow).toBeLessThanOrEqual(0)

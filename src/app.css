@@ -1,0 +1,39 @@
+/*
+ * App-wide rules that are not part of the kit. `index.css` and `styles/tokens.css` are copies of
+ * the reference (`cpaltracker.ui-reference`) and stay identical to it, so the app's own global
+ * rules live here, imported after `index.css`. Plain, unlayered CSS on purpose: it outranks the
+ * kit's utilities layer.
+ */
+
+/*
+ * KAN-171 (FR11, NFR8): reduced motion app-wide. A user who asked their OS to reduce motion
+ * never sees a component-level transition or animation win over this rule.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * KAN-171 (FR9, FR11, NFR8): app-wide rules the kit's utilities (src/ui, not editable here) would
+ * otherwise win over.
+ * - Page titles shrink below the 768 px cutoff (desktop size stays the kit's).
+ * - Keyboard focus always shows a solid ring outline, on top of the kit's box-shadow ring. The
+ *   color is the `--ring` token, so a `bg-media` frame's `--ring-media` override applies too.
+ */
+@media (max-width: 767px) {
+  h1 {
+    font-size: var(--text-xl, 1.25rem);
+  }
+}
+:focus-visible {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--ring);
+}

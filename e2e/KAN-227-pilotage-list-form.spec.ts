@@ -122,7 +122,7 @@ test.describe('KAN-227 pilotage', () => {
     await expect(page.getByTestId('pilotage-device-CHIP-119')).toBeVisible()
   })
 
-  test('AC4 @SI-227-4 at 390 px the devices are the MobileList cards with a count and "Afficher plus"', async ({
+  test('AC4 @SI-227-4 at 390 px the devices are the MobileList cards with a count, all reachable without paging', async ({
     page,
   }) => {
     await mockWorkspace(page, 25)
@@ -131,10 +131,9 @@ test.describe('KAN-227 pilotage', () => {
     const list = page.getByTestId('pilotage-device-list')
     await expect(list).toBeVisible()
     expect(await list.evaluate((el) => el.tagName)).toBe('UL')
-    await expect(list.locator('> li')).toHaveCount(20)
-    await expect(page.getByText('20 sur 25')).toBeVisible()
-    await page.getByRole('button', { name: 'Afficher plus' }).click()
+    // KAN-217: the 20-card "Afficher plus" paging is gone; up to 50 devices every card is shown.
     await expect(list.locator('> li')).toHaveCount(25)
+    await expect(page.getByText('25 sur 25')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Afficher plus' })).toHaveCount(0)
     // No horizontal page scroll at 390 px (NFR3).
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)

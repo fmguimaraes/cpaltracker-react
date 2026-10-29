@@ -101,35 +101,25 @@
 .leaflet-tile-pane {
   filter: var(--map-tile-filter);
 }
-
-/*
- * KAN-171 (FR11, NFR8): reduced motion app-wide. A user who asked their OS to reduce motion
- * never sees a component-level transition or animation win over this rule.
- */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
+/* OSM attribution (required, kept visible): Leaflet's default is #0078A8 on 80 % white over the tiles
+   (3.2:1). An opaque card backdrop makes the text independent of whatever tile is underneath */
+.leaflet-container .leaflet-control-attribution {
+  @apply bg-card text-body;
+}
+.leaflet-container .leaflet-control-attribution a {
+  @apply text-primary-text;
 }
 
-/*
- * KAN-171 (FR9, FR11, NFR8): app-wide rules the kit's utilities (src/ui, not editable here) would
- * otherwise win over. Unlayered on purpose so they outrank the utilities layer.
- * - Page titles shrink below the 768 px cutoff (desktop size stays the kit's).
- * - Keyboard focus always shows a solid ring outline, on top of the kit's box-shadow ring.
- */
-@media (max-width: 767px) {
-  h1 {
-    font-size: var(--text-xl);
-  }
+/* Media frame (map): dark in both themes until light tiles paint over it, so focus uses its own ring */
+.bg-media {
+  --ring: var(--ring-media);
 }
-:focus-visible {
-  outline-style: solid;
-  outline-width: 2px;
-  outline-color: var(--color-ring);
+/* The map container is clipped by its rounded frame: draw its focus ring inside the edge */
+.leaflet-container:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Muted text fails on the orange tint (4.15 to 4.41:1): inside the primary soft fill it reads as body */
+.bg-primary-soft {
+  --muted-foreground: var(--body);
 }

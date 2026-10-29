@@ -1,9 +1,10 @@
-import { useMemo, useState, type ComponentProps } from 'react'
+import { useMemo, type ComponentProps } from 'react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { PackageOpenIcon } from 'lucide-react'
 import type { Position } from '../api/positions'
 import { Button } from '@/ui/button'
 import { DataTable, type DataTableColumn } from '@/ui/data-table'
+import { MobileList as KitMobileList } from '@/ui/mobile-list'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/ui/empty'
 import { cn } from '@/lib/utils'
 import { StatusDot, type DeviceStatus } from '@/ui/status'
@@ -34,7 +35,8 @@ import { formatUtcInstant } from '../history/timelineData'
  * kit virtualization above `VIRTUALIZE_THRESHOLD`, the row testid and the
  * selection accent through `rowProps`, the list testid through
  * `containerProps`) and, below `md`, as the reference `MobileList` (one card
- * per device, a count and "Afficher plus"). Exactly one variant is rendered
+ * per device and a count, windowed above `VIRTUALIZE_THRESHOLD` like the
+ * table; KAN-217 replaced the 20-card "Afficher plus" paging). Exactly one variant is rendered
  * (`useIsMobile`), so every testid sits on an element that is actually
  * displayed at the current width. Devices carry no health state in the API,
  * so the dot only says whether a position is known (offline grey when none).
@@ -118,42 +120,47 @@ function buildColumns(select: SelectProps): DataTableColumn<Position>[] {
   ]
 }
 
-/** Cards shown at once below `md`, then "Afficher plus" (reference `devices/MobileList.tsx`). */
-const MOBILE_PAGE = 20
+const mobileKey = (device: Position) => device.chipId
 
+/** French copy of the kit `MobileList` ("20 sur 5000"). */
+const MOBILE_LABELS = { count: (shown: number, total: number) => `${shown} sur ${total}`, showMore: 'Afficher plus' }
+
+/**
+ * Below `md`: the kit `MobileList`, one card per device. Up to `VIRTUALIZE_THRESHOLD` every card is
+ * rendered (the page size equals the threshold, so "Afficher plus" never appears); above it the
+ * list is windowed against the page scroll, like the desktop table, so every device is reachable
+ * by scrolling while only the cards around the viewport are mounted.
+ */
 function MobileList({ devices, ...select }: SelectProps & { devices: Position[] }) {
-  const [shown, setShown] = useState(MOBILE_PAGE)
   const { selectedChipId, onSelect } = select
   return (
     <div className="flex flex-col gap-3">
-      <ul data-testid="pilotage-device-list" aria-label="Devices" className="flex flex-col gap-2">
-        {devices.slice(0, shown).map((device) => (
-          <li
-            key={device.chipId}
-            data-testid={`pilotage-device-${device.chipId}`}
-            className={cn(
-              'flex flex-col gap-1 rounded-lg border border-border p-3',
-              selectedChipId === device.chipId && onSelect ? 'bg-accent' : 'bg-card',
-            )}
-          >
+      <KitMobileList<Position>
+        items={devices}
+        getKey={mobileKey}
+        label="Devices"
+        labels={MOBILE_LABELS}
+        pageSize={VIRTUALIZE_THRESHOLD}
+        windowThreshold={VIRTUALIZE_THRESHOLD}
+        estimateItemPx={MOBILE_CARD_PX}
+        listProps={{ 'data-testid': 'pilotage-device-list' } as ComponentProps<'ul'>}
+        itemProps={(device) => ({
+          'data-testid': `pilotage-device-${device.chipId}`,
+          className: cn(
+            'flex flex-col gap-1 rounded-lg border border-border p-3',
+            selectedChipId === device.chipId && onSelect ? 'bg-accent' : 'bg-card',
+          ),
+        } as ComponentProps<'li'>)}
+        renderItem={(device) => (
+          <>
             <div className="flex min-w-0 items-center gap-2">
               <DeviceStatusDot device={device} />
               <SelectButton device={device} {...select} />
             </div>
             <LastSeen device={device} className="text-xs" />
-          </li>
-        ))}
-      </ul>
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span aria-live="polite" className="tabular-nums">
-          {Math.min(shown, devices.length)} sur {devices.length}
-        </span>
-        {shown < devices.length && (
-          <Button variant="outline" size="sm" onClick={() => setShown((n) => n + MOBILE_PAGE)}>
-            Afficher plus
-          </Button>
+          </>
         )}
-      </div>
+      />
     </div>
   )
 }
@@ -214,3 +221,5 @@ function DeviceStatusDot({ device }: { device: Position }) {
 }
 
 const VIRTUALIZE_THRESHOLD = 50
+/** Measured card height at 390 px (status + id line, last-seen line); real heights are measured. */
+const MOBILE_CARD_PX = 66

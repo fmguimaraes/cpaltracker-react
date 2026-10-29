@@ -42,6 +42,31 @@ describe('DeviceList (KAN-159 FR5, FR6)', () => {
     expect(screen.getByTestId('pilotage-device-CHIP-001-last-seen')).toBeInTheDocument()
   })
 
+  it('at 390 px shows every card up to 50 devices with the count and no "Afficher plus" (KAN-217)', () => {
+    stubViewport(true)
+    const devices = Array.from({ length: 25 }, (_, i) => ({ ...device, chipId: `CHIP-${i}` }))
+    render(<DeviceList devices={devices} onSelect={() => undefined} />)
+
+    expect(screen.getByTestId('pilotage-device-list').querySelectorAll(':scope > li')).toHaveLength(25)
+    expect(screen.getByText('25 sur 25')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Afficher plus' })).toBeNull()
+  })
+
+  it('at 390 px windows a large device set: few cards mounted, the count shows the total (KAN-217)', () => {
+    stubViewport(true)
+    const devices = Array.from({ length: 5000 }, (_, i) => ({ ...device, chipId: `CHIP-${i}` }))
+    render(<DeviceList devices={devices} selectedChipId="CHIP-0" onSelect={() => undefined} />)
+
+    const list = screen.getByTestId('pilotage-device-list')
+    expect(list).toHaveAttribute('data-windowed', 'true')
+    const mounted = list.querySelectorAll(':scope > li').length
+    expect(mounted).toBeGreaterThan(0)
+    expect(mounted).toBeLessThan(100)
+    expect(screen.getByText('5000 sur 5000')).toBeInTheDocument()
+    expect(screen.getByTestId('pilotage-device-CHIP-0-select')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: 'Afficher plus' })).toBeNull()
+  })
+
   it('shows an explicit empty state for a contract with zero devices', () => {
     render(<DeviceList devices={[]} />)
 
