@@ -44,22 +44,22 @@ test('switches every color token to its dark-theme value via one data-theme chan
     page.evaluate(() => {
       const styles = getComputedStyle(document.documentElement)
       return {
-        bg: styles.getPropertyValue('--color-bg').trim(),
-        primary: styles.getPropertyValue('--color-primary').trim(),
-        primaryHover: styles.getPropertyValue('--color-primary-hover').trim(),
+        bg: styles.getPropertyValue('--background').trim(),
+        primary: styles.getPropertyValue('--primary').trim(),
+        primaryText: styles.getPropertyValue('--primary-text').trim(),
       }
     })
 
   const lightTokens = await readTokens()
   expect(lightTokens.bg).not.toBe('')
-  expect(lightTokens.primaryHover).not.toBe(lightTokens.primary)
+  expect(lightTokens.primaryText).not.toBe('')
 
   await page.getByTestId('theme-toggle').click()
 
   await expect.poll(async () => (await readTokens()).bg).not.toBe(lightTokens.bg)
   const darkTokens = await readTokens()
   expect(darkTokens.primary).not.toBe(lightTokens.primary)
-  expect(darkTokens.primaryHover).not.toBe(darkTokens.primary)
+  expect(darkTokens.primaryText).not.toBe(lightTokens.primaryText)
 })
 
 test('the reconciled breakpoint token set drives real max-sm/max-md cutoffs at 480px/768px in the built app (FR7)', async ({

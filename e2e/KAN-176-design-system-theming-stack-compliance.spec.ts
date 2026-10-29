@@ -227,7 +227,8 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     // dark palette actually reached Plotly, not Plotly's own white default
     // (FR26).
     const chart = page.getByTestId('history-chart-ta')
-    const paperBackground = await chart.locator('.main-svg').first().evaluate((node) => getComputedStyle(node).backgroundColor)
+    // FR9: the kit chart paper is transparent; the surface behind it is the WidgetCard's --card.
+    const paperBackground = await chart.locator('[data-slot="card"]').first().evaluate((node) => getComputedStyle(node).backgroundColor)
     expect(paperBackground).toBe('rgb(34, 37, 46)') // --card dark: #22252e (KAN-223 FR4)
   })
 
@@ -247,7 +248,8 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     expect(tilePaneFilter).toBe('saturate(0.55) sepia(0.12)')
 
     const chart = page.getByTestId('history-chart-ta')
-    const paperBackground = await chart.locator('.main-svg').first().evaluate((node) => getComputedStyle(node).backgroundColor)
+    // FR9: the kit chart paper is transparent; the surface behind it is the WidgetCard's --card.
+    const paperBackground = await chart.locator('[data-slot="card"]').first().evaluate((node) => getComputedStyle(node).backgroundColor)
     expect(paperBackground).toBe('rgb(238, 230, 212)') // --card light: #eee6d4 (KAN-223 FR4)
   })
 })

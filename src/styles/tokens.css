@@ -1,0 +1,169 @@
+/*
+ * c-PAL design tokens — the ONLY place a color, font, radius or shadow value is defined.
+ *
+ * Source: cpal.docs/ui/reference/brand.md ("App value" columns). Where a value
+ * differs from the brand value, the comment says why (WCAG 2.1 AA: 4.5:1 text,
+ * 3:1 large text, UI boundaries and graphical objects).
+ *
+ * Theme: one attribute on <html>: data-theme="dark" (default) | "light".
+ * "system" is resolved to one of the two by the theme provider.
+ * Everything else reads these through the Tailwind utilities mapped in
+ * src/index.css (@theme inline): bg-background, text-muted-foreground, …
+ */
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --background: #1a1d22; /* Fond principal */
+  --foreground: #f3f2ee; /* Titres / blanc cassé chaud — 15.1:1 */
+  --body: #aaacb2; /* Corps de texte — 7.5:1 on background, 6.7:1 on card */
+  --card: #22252e; /* Carte / panneau */
+  --card-foreground: #f3f2ee;
+  --popover: #22252e;
+  --popover-foreground: #f3f2ee;
+  --secondary: #2c2f38; /* Panneau latéral clair-sombre */
+  --secondary-foreground: #f3f2ee;
+  --muted: #24262c; /* Encadré citation / inset */
+  /* Brand #83858B is 4.15:1 on card, below 4.5:1: lightened to pass on every dark surface */
+  --muted-foreground: #96989d;
+  --accent: #2c2f38; /* hover / selected row surface */
+  --accent-foreground: #f3f2ee;
+  --media: #0e0f12; /* Fond d'image: map frame, screenshots */
+
+  /* Lines */
+  --border: #353841; /* Filets de séparation — decorative, no contrast requirement */
+  /* New role: the separator is 1.44:1, a form control boundary needs 3:1 (3.32 / 3.01) */
+  --input: #686e7f;
+  --ring: #dd8c3e; /* Focus ring: 5–6:1 on every dark surface */
+
+  /* Accent */
+  --primary: #dd8c3e; /* Orange principal — fills, active nav, key numbers */
+  /* White on the orange is 2.66:1 and fails for labels; charcoal is 6.35:1 */
+  --primary-foreground: #1a1d22;
+  --primary-text: #dd8c3e; /* orange used as text: 6.4:1 on background */
+
+  /* Status (D3): red alert, yellow warning (never the brand orange), green OK, grey not reporting.
+     New roles (not in the brand). Each ≥ 4.6:1 as text on background, card, secondary AND on its own
+     12 % soft fill over those surfaces (status chips), so a chip's label passes too. */
+  --danger: #f39083;
+  --warning: #e3c34f;
+  --success: #5dbe8a;
+  --offline: #a8abb0;
+  --info: #86afda;
+  --status-foreground: #1a1d22; /* text on a filled status chip: ≥ 5:1 on every status */
+  --destructive: var(--danger);
+
+  /* Charts (D4): orange first, then muted cool hues, each ≥ 3:1 on background and card */
+  --chart-1: #dd8c3e;
+  --chart-2: #6fa8c7;
+  --chart-3: #93b79c;
+  --chart-4: #b4a2d6;
+  /* Brand donut secondary #3C404A is 1.63:1: a data segment needs 3:1 → lightened (3.31 / 3.00) */
+  --chart-5: #676e80;
+  --chart-axis: #96989d; /* same fix as muted text: axis labels sit on cards */
+  --chart-grid: #2c2f38; /* decorative */
+
+  /* Sidebar */
+  --sidebar: #20232b; /* Bandeau latéral */
+  --sidebar-foreground: #aaacb2;
+  --sidebar-primary: #dd8c3e;
+  --sidebar-primary-foreground: #1a1d22;
+  --sidebar-accent: #2c2f38;
+  --sidebar-accent-foreground: #f3f2ee;
+  --sidebar-border: #353841;
+  --sidebar-ring: #dd8c3e;
+
+  /* Map basemap filter (D8): OSM raster tiles inverted toward the brand charcoal */
+  --map-tile-filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.35);
+
+  --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.45);
+  --shadow-media: 0 8px 24px rgb(0 0 0 / 0.5); /* "soft shadow" around product media */
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Derived from the deck's light half-slide ("demi-slide clair") */
+  --background: #f5f2ed;
+  --foreground: #1e2128; /* 14.4:1 */
+  --body: #55585f; /* 6.4:1 */
+  --card: #eee6d4; /* the public site's cream card (the deck has no light card) */
+  --card-foreground: #1e2128;
+  --popover: #fffdf8;
+  --popover-foreground: #1e2128;
+  /* #E6DFD1 left muted and primary-text at 4.33:1 on it: lightened to 4.66:1 */
+  --secondary: #ece7dd;
+  --secondary-foreground: #1e2128;
+  --muted: #ece6da;
+  /* New role: the dark grey darkened to ≥ 4.6:1 on background and card */
+  --muted-foreground: #64666b;
+  --accent: #ece7dd;
+  --accent-foreground: #1e2128;
+  --media: #1a1d22;
+
+  --border: #d9d3c9; /* decorative separators only (1.33:1) */
+  /* New role: separator hue darkened to 3:1 on background and card (3.34 / 3.00) */
+  --input: #938267;
+  /* #C57A30 is 2.73:1 on the cream card, below 3:1: reuse the primary-text orange */
+  --ring: #85511f;
+
+  --primary: #c57a30; /* fills: buttons, badges, active nav marker */
+  /* White on #C57A30 is 3.39:1 and fails for labels; charcoal is 4.99:1 */
+  --primary-foreground: #1a1d22;
+  /* Brand #C57A30 is 3.03:1 as text, large text only. Same hue darkened until it also passes on
+     its own soft fill (selected rows, markers): 5.9 / 5.3:1 plain, ≥ 4.7:1 over --primary-soft.
+     (#915923 passed plain but fell to 4.14:1 over the soft fill on cards.) */
+  --primary-text: #85511f;
+
+  /* Status: darkened variants, ≥ 4.6:1 as text on background, card and their 12 % soft fill */
+  --danger: #a23126;
+  --warning: #705800;
+  --success: #276742;
+  --offline: #585a60;
+  --info: #2b5c8a;
+  --status-foreground: #ffffff; /* white on every light status: ≥ 4.9:1 */
+  --destructive: var(--danger);
+
+  /* #C57A30 is 2.73:1 on the cream card; chart marks need 3:1 → darkened (3.99 / 3.58) */
+  --chart-1: #a8692a;
+  --chart-2: #3a6e8a;
+  --chart-3: #4a7456;
+  --chart-4: #6d5c99;
+  --chart-5: #5f656f;
+  --chart-axis: #64666b;
+  --chart-grid: #ddd5c6;
+
+  --sidebar: #efeae1;
+  --sidebar-foreground: #55585f;
+  --sidebar-primary: #c57a30;
+  --sidebar-primary-foreground: #1a1d22;
+  --sidebar-accent: #ece7dd;
+  --sidebar-accent-foreground: #1e2128;
+  --sidebar-border: #d9d3c9;
+  --sidebar-ring: #85511f;
+
+  --map-tile-filter: saturate(0.55) sepia(0.12);
+
+  --shadow-overlay: 0 12px 32px rgb(30 33 40 / 0.16);
+  --shadow-media: 0 8px 24px rgb(30 33 40 / 0.22);
+}
+
+:root {
+  /* Typography: brand sans (Arial) everywhere; Georgia ONLY for big numbers (D6) */
+  --font-sans: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --radius: 0.5rem;
+
+  /* Soft status fills for chips and row highlights, derived (never hand-picked). 12 %: the
+     status text on top keeps ≥ 4.6:1 in both themes */
+  --danger-soft: color-mix(in oklab, var(--danger) 12%, transparent);
+  --warning-soft: color-mix(in oklab, var(--warning) 12%, transparent);
+  --success-soft: color-mix(in oklab, var(--success) 12%, transparent);
+  --offline-soft: color-mix(in oklab, var(--offline) 12%, transparent);
+  --info-soft: color-mix(in oklab, var(--info) 12%, transparent);
+  --primary-soft: color-mix(in oklab, var(--primary) 12%, transparent);
+}
