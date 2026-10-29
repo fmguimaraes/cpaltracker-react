@@ -1,99 +1,52 @@
-import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { PageTitle } from '../chrome/PageTitle'
+import { Card, CardContent } from '@/ui/card'
+import { PageHeader } from '@/ui/patterns/page-header'
+import { Spinner } from '@/ui/spinner'
 
 export function HelloWorld() {
-  const { status, account, error, logout } = useAuth()
+  const { status, account, error } = useAuth()
   const baseUrl = import.meta.env.VITE_API_BASE_URL
-  const [loggingOut, setLoggingOut] = useState(false)
-
-  /**
-   * KAN-156 (FR10) — the explicit, authenticated action that triggers
-   * logout. `logout()` itself already always clears local auth state (its
-   * own `finally`, see AuthContext) even if the server call fails, so there
-   * is nothing further to do on a thrown `ApiError` here — it's swallowed
-   * rather than surfaced, since by the time it could throw the user is
-   * already signed out locally and `RequireAuth` is about to redirect them
-   * to `/login?notice=logged-out`.
-   *
-   * Review gate round 1: disabling the button while a logout is in flight
-   * avoids sending a second POST with an already-consumed token in the
-   * first place. `AuthContext`'s own token-identity guard (B1) narrows the
-   * blast radius of a duplicate call in the common response ordering, but
-   * does not make every ordering harmless on its own (round 2 review: a
-   * reversed-arrival double logout can still surface a 'session-expired'
-   * notice instead of 'logged-out', safely but incorrectly labeled) — the
-   * disabled button is what actually prevents the duplicate call from being
-   * sent at all.
-   */
-  async function handleLogout() {
-    setLoggingOut(true)
-    try {
-      await logout()
-    } catch {
-      // See doc comment above — intentionally ignored.
-    } finally {
-      setLoggingOut(false)
-    }
-  }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
-      <header className="flex items-center justify-between">
-        <PageTitle>cpaltracker-react</PageTitle>
-        <div className="flex items-center gap-2">
-          {status === 'authenticated' && (
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={loggingOut}
-              data-testid="logout-button"
-              className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
-              style={{
-                borderColor: 'var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-              }}
-            >
-              Sign out
-            </button>
-          )}
-        </div>
-      </header>
+    <div>
+      {/* Sign out (logout-button, KAN-156 FR10) lives once, in the shell user menu (KAN-224 FR6). */}
+      <PageHeader title="cpaltracker-react" />
 
-      <section
-        className="rounded-lg border p-4"
-        style={{
-          borderColor: 'var(--color-border)',
-          backgroundColor: 'var(--color-surface)',
-        }}
-        data-testid="connectivity-status"
-      >
-        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          /api/v1 target: <code>{baseUrl}</code>
-        </p>
+      <div className="mx-auto max-w-2xl p-4 md:p-6">
+        <Card data-testid="connectivity-status">
+          <CardContent className="flex flex-col gap-2">
+            <p className="text-sm text-muted-foreground">
+              /api/v1 target: <code>{baseUrl}</code>
+            </p>
 
-        {status === 'loading' && <p>Connecting to /api/v1…</p>}
+            {status === 'loading' && (
+              <p className="flex items-center gap-2">
+                <Spinner aria-hidden="true" />
+                Connecting to /api/v1…
+              </p>
+            )}
 
-        {status === 'authenticated' && account && (
-          <p data-testid="connected">
-            Connected to /api/v1 — signed in as <strong>{account.mail}</strong>.
-          </p>
-        )}
+            {status === 'authenticated' && account && (
+              <p data-testid="connected">
+                Connected to /api/v1 — signed in as <strong>{account.mail}</strong>.
+              </p>
+            )}
 
-        {status === 'anonymous' && !error && (
-          <p data-testid="connected">
-            Connected to /api/v1 — not signed in (401 as expected for an
-            anonymous request).
-          </p>
-        )}
+            {status === 'anonymous' && !error && (
+              <p data-testid="connected">
+                Connected to /api/v1 — not signed in (401 as expected for an
+                anonymous request).
+              </p>
+            )}
 
-        {status === 'anonymous' && error && (
-          <p data-testid="connection-error" style={{ color: 'var(--color-danger)' }}>
-            Could not reach /api/v1: {error}
-          </p>
-        )}
-      </section>
+            {status === 'anonymous' && error && (
+              <p data-testid="connection-error" className="text-danger">
+                Could not reach /api/v1: {error}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
