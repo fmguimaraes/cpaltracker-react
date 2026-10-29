@@ -1,13 +1,29 @@
-import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Card } from '../chrome/Card'
-import { PageTitle } from '../chrome/PageTitle'
-import { useAuth } from '../auth/AuthContext'
-import { getAuthOutcomeMessage } from '../auth/authOutcome'
-import { LOGIN_NOTICE_MESSAGES, parseLoginNotice } from '../auth/loginNotice'
-import { CHANGE_PASSWORD_PATH, FORGOT_PASSWORD_PATH, HOME_PATH } from '../auth/paths'
-import { sanitizeSuite } from '../auth/suite'
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/ui/form";
+import { Input } from "@/ui/input";
+import { AuthLayout } from "../auth/AuthLayout";
+import { AuthLink } from "../auth/AuthLink";
+import { PasswordInput } from "../auth/PasswordInput";
+import { useAuth } from "../auth/AuthContext";
+import { getAuthOutcomeMessage } from "../auth/authOutcome";
+import { LOGIN_NOTICE_MESSAGES, parseLoginNotice } from "../auth/loginNotice";
+import {
+  CHANGE_PASSWORD_PATH,
+  FORGOT_PASSWORD_PATH,
+  HOME_PATH,
+} from "../auth/paths";
+import { sanitizeSuite } from "../auth/suite";
 
 /**
  * KAN-145 — Login Screen & Credential Submission.
@@ -44,184 +60,153 @@ import { sanitizeSuite } from '../auth/suite'
  */
 
 interface LoginFormValues {
-  email: string
-  password: string
+  email: string;
+  password: string;
 }
 
 export function Login() {
-  const { login, status, account } = useAuth()
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const notice = parseLoginNotice(searchParams.get('notice'))
+  const { login, status, account } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const notice = parseLoginNotice(searchParams.get("notice"));
+  const form = useForm<LoginFormValues>({
+    mode: "onSubmit",
+    defaultValues: { email: "", password: "" },
+  });
   const {
-    register,
     handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({ mode: 'onSubmit' })
+    formState: { isSubmitting },
+  } = form;
 
   // FR2/FR3/FR14 — once a session is authenticated (bootstrap found one, or
   // a submit just succeeded), skip the form: send a MustChangePassword
   // account to the password-change route, otherwise to the validated
   // `suite` target, else home (replicates CB1).
   useEffect(() => {
-    if (status !== 'authenticated') return
+    if (status !== "authenticated") return;
     if (account?.mustChangePassword) {
-      navigate(CHANGE_PASSWORD_PATH, { replace: true })
-      return
+      navigate(CHANGE_PASSWORD_PATH, { replace: true });
+      return;
     }
-    const suite = sanitizeSuite(searchParams.get('suite'))
-    navigate(suite || HOME_PATH, { replace: true })
-  }, [status, account, searchParams, navigate])
+    const suite = sanitizeSuite(searchParams.get("suite"));
+    navigate(suite || HOME_PATH, { replace: true });
+  }, [status, account, searchParams, navigate]);
 
   const onSubmit = handleSubmit(async ({ email, password }) => {
-    setSubmitError(null)
+    setSubmitError(null);
     try {
-      await login(email, password)
+      await login(email.trim(), password);
     } catch (err) {
       // FR7/FR8/NFR9 — mapped, non-revealing copy only; never the raw
       // backend message (see authOutcome.ts for why).
-      setSubmitError(getAuthOutcomeMessage(err))
+      setSubmitError(getAuthOutcomeMessage(err));
     }
-  })
+  });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-      <PageTitle>Sign in</PageTitle>
-
-      {notice && (
-        <p
-          role="status"
-          aria-live="polite"
-          data-testid="login-notice"
-          className="text-sm"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          {LOGIN_NOTICE_MESSAGES[notice]}
-        </p>
-      )}
-
-      <Card>
-        <form
-          className="flex flex-col gap-4"
-          noValidate
-          onSubmit={onSubmit}
-          data-testid="login-form"
-        >
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="login-email"
-              className="text-sm font-medium"
-              style={{ color: 'var(--color-text)' }}
-            >
-              Email
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              autoComplete="username"
-              data-testid="login-email"
-              aria-invalid={errors.email ? 'true' : 'false'}
-              aria-describedby={errors.email ? 'login-email-error' : undefined}
-              className="rounded-md border px-3 py-2 text-sm"
-              style={{
-                borderColor: 'var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-              }}
-              {...register('email', {
-                required: 'Email is required.',
-                setValueAs: (value: string) => value.trim(),
-              })}
-            />
-            {errors.email && (
-              <p
-                id="login-email-error"
-                role="alert"
-                aria-live="assertive"
-                data-testid="login-email-error"
-                className="text-sm"
-                style={{ color: 'var(--color-danger)' }}
-              >
-                {errors.email.message}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="login-password"
-              className="text-sm font-medium"
-              style={{ color: 'var(--color-text)' }}
-            >
-              Password
-            </label>
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              data-testid="login-password"
-              aria-invalid={errors.password ? 'true' : 'false'}
-              aria-describedby={
-                errors.password ? 'login-password-error' : undefined
-              }
-              className="rounded-md border px-3 py-2 text-sm"
-              style={{
-                borderColor: 'var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-              }}
-              {...register('password', { required: 'Password is required.' })}
-            />
-            {errors.password && (
-              <p
-                id="login-password-error"
-                role="alert"
-                aria-live="assertive"
-                data-testid="login-password-error"
-                className="text-sm"
-                style={{ color: 'var(--color-danger)' }}
-              >
-                {errors.password.message}
-              </p>
-            )}
-          </div>
-
-          {submitError && (
-            <p
-              role="alert"
-              aria-live="assertive"
-              data-testid="login-error"
-              className="text-sm"
-              style={{ color: 'var(--color-danger)' }}
-            >
-              {submitError}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            data-testid="login-submit"
-            className="rounded-md px-3 py-2 text-sm font-semibold disabled:opacity-60"
-            style={{
-              backgroundColor: 'var(--color-primary)',
-              color: 'var(--color-primary-contrast)',
-            }}
+    <AuthLayout
+      title="Sign in"
+      themeLabels={{
+        toLight: "Switch to light theme",
+        toDark: "Switch to dark theme",
+      }}
+    >
+      <div className="flex flex-col gap-6">
+        {notice && (
+          <Alert
+            variant="info"
+            role="status"
+            aria-live="polite"
+            data-testid="login-notice"
           >
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
-          </button>
+            <AlertDescription>{LOGIN_NOTICE_MESSAGES[notice]}</AlertDescription>
+          </Alert>
+        )}
 
-          <Link
-            to={FORGOT_PASSWORD_PATH}
-            data-testid="login-forgot-password-link"
-            className="text-sm underline"
-            style={{ color: 'var(--color-text-muted)' }}
+        <Form {...form}>
+          <form
+            className="flex flex-col gap-4"
+            noValidate
+            onSubmit={onSubmit}
+            data-testid="login-form"
           >
-            Forgot password?
-          </Link>
-        </form>
-      </Card>
-    </main>
-  )
+            <FormField
+              control={form.control}
+              name="email"
+              rules={{
+                validate: (value) =>
+                  value.trim() !== "" || "Email is required.",
+              }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="email"
+                      autoComplete="username"
+                      data-testid="login-email"
+                    />
+                  </FormControl>
+                  <FormMessage
+                    aria-live="assertive"
+                    data-testid="login-email-error"
+                  />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              rules={{ required: "Password is required." }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <PasswordInput
+                    {...field}
+                    showLabel="Show characters"
+                    hideLabel="Hide characters"
+                    autoComplete="current-password"
+                    data-testid="login-password"
+                  />
+                  <FormMessage
+                    aria-live="assertive"
+                    data-testid="login-password-error"
+                  />
+                </FormItem>
+              )}
+            />
+
+            {submitError && (
+              <Alert
+                variant="danger"
+                aria-live="assertive"
+                data-testid="login-error"
+              >
+                <AlertDescription>{submitError}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              loading={isSubmitting}
+              data-testid="login-submit"
+            >
+              {isSubmitting ? "Signing in…" : "Sign in"}
+            </Button>
+
+            <AuthLink
+              to={FORGOT_PASSWORD_PATH}
+              data-testid="login-forgot-password-link"
+            >
+              Forgot password?
+            </AuthLink>
+          </form>
+        </Form>
+      </div>
+    </AuthLayout>
+  );
 }

@@ -1,12 +1,17 @@
-import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Card } from '../chrome/Card'
-import { PageTitle } from '../chrome/PageTitle'
-import { useAuth } from '../auth/AuthContext'
-import { HOME_PATH } from '../auth/paths'
-import { EmailForm } from './account/EmailForm'
-import { PasswordForm } from './account/PasswordForm'
-import { PhoneForm } from './account/PhoneForm'
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import { Separator } from "@/ui/separator";
+import { Toaster } from "@/ui/sonner";
+import { PageHeader } from "@/ui/patterns/page-header";
+import { useAuth } from "../auth/AuthContext";
+import { AuthLayout } from "../auth/AuthLayout";
+import { AuthLink } from "../auth/AuthLink";
+import { HOME_PATH } from "../auth/paths";
+import { EmailForm } from "./account/EmailForm";
+import { PasswordForm } from "./account/PasswordForm";
+import { PhoneForm } from "./account/PhoneForm";
 
 /**
  * KAN-152 — Account Self-Service (FR9, FR10).
@@ -22,12 +27,12 @@ import { PhoneForm } from './account/PhoneForm'
  * `$premiere` branch.
  */
 export function Account() {
-  const { account, logout } = useAuth()
-  const [searchParams] = useSearchParams()
-  const [loggingOut, setLoggingOut] = useState(false)
+  const { account, logout } = useAuth();
+  const [searchParams] = useSearchParams();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   if (!account) {
-    return null
+    return null;
   }
 
   // Mirrors HelloWorld.tsx's own logout handling (KAN-156 review gate):
@@ -37,65 +42,75 @@ export function Account() {
   // could throw the user is already signed out locally and RequireAuth is
   // about to redirect them away.
   async function handleLogout() {
-    setLoggingOut(true)
+    setLoggingOut(true);
     try {
-      await logout()
+      await logout();
     } catch {
       // intentionally ignored — see comment above
     } finally {
-      setLoggingOut(false)
+      setLoggingOut(false);
     }
   }
 
-  const firstConnection = account.mustChangePassword || searchParams.has('premiere')
+  const firstConnection =
+    account.mustChangePassword || searchParams.has("premiere");
 
-  return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-      <PageTitle>Mon compte</PageTitle>
-
-      <Card className="flex flex-col gap-8">
-        {firstConnection && (
-          <p
+  // First connection stays shell-less (PAT-AUTH column, password form only).
+  if (firstConnection) {
+    return (
+      <AuthLayout
+        title="Mon compte"
+        themeLabels={{
+          toLight: "Passer au thème clair",
+          toDark: "Passer au thème sombre",
+        }}
+      >
+        <div className="flex flex-col gap-6">
+          <Alert
+            variant="info"
+            role="note"
             data-testid="account-first-connection-notice"
-            className="text-sm"
-            style={{ color: 'var(--color-text-muted)' }}
           >
-            Choisissez votre mot de passe. Celui qui vous a été communiqué est
-            provisoire. Tant qu'il n'est pas remplacé, l'application reste
-            inaccessible.
-          </p>
-        )}
+            <AlertDescription>
+              Choisissez votre mot de passe. Celui qui vous a été communiqué est
+              provisoire. Tant qu'il n'est pas remplacé, l'application reste
+              inaccessible.
+            </AlertDescription>
+          </Alert>
+          <PasswordForm />
+        </div>
+        <Toaster />
+      </AuthLayout>
+    );
+  }
 
+  // Normal mode renders the page body only: the shell (sidebar, header) is the route's layout.
+  return (
+    <>
+      <PageHeader title="Mon compte" />
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 md:px-6">
         <PasswordForm />
-
-        {!firstConnection && (
-          <>
-            <PhoneForm account={account} />
-            <EmailForm account={account} />
-
-            <div className="flex items-center justify-between">
-              <Link
-                to={HOME_PATH}
-                data-testid="account-back-to-app"
-                className="text-sm underline"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                Retour à l'application
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={loggingOut}
-                data-testid="account-logout"
-                className="text-sm underline disabled:opacity-50"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                Se déconnecter
-              </button>
-            </div>
-          </>
-        )}
-      </Card>
-    </main>
-  )
+        <Separator />
+        <PhoneForm account={account} />
+        <Separator />
+        <EmailForm account={account} />
+        <Separator />
+        <div className="flex items-center justify-between">
+          <AuthLink to={HOME_PATH} data-testid="account-back-to-app">
+            Retour à l'application
+          </AuthLink>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleLogout}
+            loading={loggingOut}
+            data-testid="account-logout"
+          >
+            Se déconnecter
+          </Button>
+        </div>
+      </div>
+      <Toaster />
+    </>
+  );
 }

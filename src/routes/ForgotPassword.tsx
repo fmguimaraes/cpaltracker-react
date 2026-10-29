@@ -1,15 +1,25 @@
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { Link } from 'react-router-dom'
-import { apiClient } from '../api/client'
-import { Card } from '../chrome/Card'
-import { PageTitle } from '../chrome/PageTitle'
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { apiClient } from "../api/client";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/ui/form";
+import { Input } from "@/ui/input";
+import { AuthLayout } from "../auth/AuthLayout";
+import { AuthLink } from "../auth/AuthLink";
 import {
   FORGOT_PASSWORD_MESSAGES,
   mapForgotPasswordOutcome,
   type ForgotPasswordOutcome,
-} from '../auth/forgotPasswordOutcome'
-import { LOGIN_PATH } from '../auth/paths'
+} from "../auth/forgotPasswordOutcome";
+import { LOGIN_PATH } from "../auth/paths";
 
 /**
  * KAN-146 — Forgot Password Flow (FR1, FR2, FR3, NFR3).
@@ -35,138 +45,129 @@ import { LOGIN_PATH } from '../auth/paths'
  * exactly one post-submit screen layout, just with per-outcome copy.
  */
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface ForgotPasswordFormValues {
-  email: string
+  email: string;
 }
 
 export function ForgotPassword() {
-  const [outcome, setOutcome] = useState<ForgotPasswordOutcome | null>(null)
+  const [outcome, setOutcome] = useState<ForgotPasswordOutcome | null>(null);
+  const form = useForm<ForgotPasswordFormValues>({
+    mode: "onChange",
+    defaultValues: { email: "" },
+  });
   const {
-    register,
     handleSubmit,
-    formState: { errors, isSubmitting, isValid },
-  } = useForm<ForgotPasswordFormValues>({ mode: 'onChange' })
+    formState: { isSubmitting, isValid },
+  } = form;
 
   const onSubmit = handleSubmit(async ({ email }) => {
     try {
-      await apiClient.post('/auth/forgot-password.php', { email })
-      setOutcome('confirmed')
+      await apiClient.post("/auth/forgot-password.php", {
+        email: email.trim(),
+      });
+      setOutcome("confirmed");
     } catch (err) {
-      setOutcome(mapForgotPasswordOutcome(err))
+      setOutcome(mapForgotPasswordOutcome(err));
     }
-  })
+  });
+
+  const layoutProps = {
+    title: "Mot de passe oublié",
+    themeLabels: {
+      toLight: "Passer au thème clair",
+      toDark: "Passer au thème sombre",
+    },
+  };
 
   if (outcome) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-        <PageTitle>Mot de passe oublié</PageTitle>
-        <Card className="flex flex-col gap-6">
-          <p
+      <AuthLayout {...layoutProps}>
+        <div className="flex flex-col gap-6">
+          <Alert
+            variant="info"
             role="status"
             aria-live="polite"
             data-testid="forgot-password-confirmation"
-            style={{ color: 'var(--color-text)' }}
           >
-            {FORGOT_PASSWORD_MESSAGES[outcome]}
-          </p>
-          <Link
-            to={LOGIN_PATH}
-            data-testid="forgot-password-back-to-login"
-            className="text-sm underline"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
+            <AlertDescription>
+              {FORGOT_PASSWORD_MESSAGES[outcome]}
+            </AlertDescription>
+          </Alert>
+          <AuthLink to={LOGIN_PATH} data-testid="forgot-password-back-to-login">
             Retour à la connexion
-          </Link>
-        </Card>
-      </main>
-    )
+          </AuthLink>
+        </div>
+      </AuthLayout>
+    );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
-      <PageTitle>Mot de passe oublié</PageTitle>
-      <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-        Saisissez votre adresse e-mail et nous vous enverrons un lien de
-        réinitialisation.
-      </p>
+    <AuthLayout {...layoutProps}>
+      <div className="flex flex-col gap-6">
+        <p className="text-sm text-muted-foreground">
+          Saisissez votre adresse e-mail et nous vous enverrons un lien de
+          réinitialisation.
+        </p>
 
-      <Card>
-        <form
-          className="flex flex-col gap-4"
-          noValidate
-          onSubmit={onSubmit}
-          data-testid="forgot-password-form"
-        >
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="forgot-password-email"
-              className="text-sm font-medium"
-              style={{ color: 'var(--color-text)' }}
-            >
-              Adresse e-mail
-            </label>
-            <input
-              id="forgot-password-email"
-              type="email"
-              autoComplete="username"
-              data-testid="forgot-password-email"
-              aria-invalid={errors.email ? 'true' : 'false'}
-              aria-describedby={
-                errors.email ? 'forgot-password-email-error' : undefined
-              }
-              className="rounded-md border px-3 py-2 text-sm"
-              style={{
-                borderColor: 'var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-              }}
-              {...register('email', {
-                required: 'Adresse e-mail requise.',
-                setValueAs: (value: string) => value.trim(),
-                pattern: {
-                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                  message: 'Adresse e-mail invalide.',
+        <Form {...form}>
+          <form
+            className="flex flex-col gap-4"
+            noValidate
+            onSubmit={onSubmit}
+            data-testid="forgot-password-form"
+          >
+            <FormField
+              control={form.control}
+              name="email"
+              rules={{
+                validate: (value) => {
+                  const trimmed = value.trim();
+                  if (trimmed === "") return "Adresse e-mail requise.";
+                  return (
+                    EMAIL_PATTERN.test(trimmed) || "Adresse e-mail invalide."
+                  );
                 },
-              })}
+              }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Adresse e-mail</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="email"
+                      autoComplete="username"
+                      data-testid="forgot-password-email"
+                    />
+                  </FormControl>
+                  <FormMessage
+                    aria-live="assertive"
+                    data-testid="forgot-password-email-error"
+                  />
+                </FormItem>
+              )}
             />
-            {errors.email && (
-              <p
-                id="forgot-password-email-error"
-                role="alert"
-                aria-live="assertive"
-                data-testid="forgot-password-email-error"
-                className="text-sm"
-                style={{ color: 'var(--color-danger)' }}
-              >
-                {errors.email.message}
-              </p>
-            )}
-          </div>
 
-          <button
-            type="submit"
-            disabled={!isValid || isSubmitting}
-            data-testid="forgot-password-submit"
-            className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
-            style={{
-              borderColor: 'var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              color: 'var(--color-text)',
-            }}
-          >
-            Envoyer le lien de réinitialisation
-          </button>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!isValid}
+              loading={isSubmitting}
+              data-testid="forgot-password-submit"
+            >
+              Envoyer le lien de réinitialisation
+            </Button>
 
-          <Link
-            to={LOGIN_PATH}
-            data-testid="forgot-password-back-to-login"
-            className="text-sm underline"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            Retour à la connexion
-          </Link>
-        </form>
-      </Card>
-    </main>
-  )
+            <AuthLink
+              to={LOGIN_PATH}
+              data-testid="forgot-password-back-to-login"
+            >
+              Retour à la connexion
+            </AuthLink>
+          </form>
+        </Form>
+      </div>
+    </AuthLayout>
+  );
 }
