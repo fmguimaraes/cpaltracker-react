@@ -3,13 +3,24 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider, useAuth } from '../auth/AuthContext'
 import { setAuthToken } from '../api/client'
+import { ThemeProvider } from '@/app/theme'
 import { HelloWorld } from './HelloWorld'
 
 function renderHelloWorld() {
   return render(
-    <AuthProvider>
-      <HelloWorld />
-    </AuthProvider>,
+    <ThemeProvider>
+      <AuthProvider>
+        <HelloWorld />
+      </AuthProvider>
+    </ThemeProvider>,
+  )
+}
+
+/** jsdom has no matchMedia; ThemeProvider reads prefers-color-scheme through it. */
+function stubMatchMedia() {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }),
   )
 }
 
@@ -18,6 +29,7 @@ describe('HelloWorld', () => {
     document.documentElement.removeAttribute('data-theme')
     window.localStorage.clear()
     setAuthToken(null)
+    stubMatchMedia()
   })
 
   afterEach(() => {
@@ -74,23 +86,6 @@ describe('HelloWorld', () => {
         'demo@cpal.test',
       ),
     )
-  })
-
-  it('toggles the theme on click and persists it', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 401 })),
-    )
-    const user = userEvent.setup()
-    renderHelloWorld()
-
-    const toggle = screen.getByTestId('theme-toggle')
-    expect(toggle).toHaveTextContent('Switch to dark')
-
-    await user.click(toggle)
-
-    expect(toggle).toHaveTextContent('Switch to light')
-    expect(window.localStorage.getItem('cpaltracker:theme')).toBe('dark')
   })
 
   it('sends a bearer token and no cookies, never credentials: include', async () => {

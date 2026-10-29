@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { PageTitle } from '../chrome/PageTitle'
-import { useThemeStore } from '../store/themeStore'
 
 export function HelloWorld() {
   const { status, account, error, logout } = useAuth()
-  const { theme, toggleTheme } = useThemeStore()
   const baseUrl = import.meta.env.VITE_API_BASE_URL
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -40,23 +38,10 @@ export function HelloWorld() {
   }
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
       <header className="flex items-center justify-between">
         <PageTitle>cpaltracker-react</PageTitle>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            data-testid="theme-toggle"
-            className="rounded-md border px-3 py-1.5 text-sm"
-            style={{
-              borderColor: 'var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              color: 'var(--color-text)',
-            }}
-          >
-            {theme === 'light' ? 'Switch to dark' : 'Switch to light'}
-          </button>
           {status === 'authenticated' && (
             <button
               type="button"
@@ -109,6 +94,6 @@ export function HelloWorld() {
           </p>
         )}
       </section>
-    </main>
+    </div>
   )
 }
