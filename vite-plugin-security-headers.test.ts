@@ -99,4 +99,12 @@ describe('securityHeadersPlugin (KAN-177)', () => {
       }
     },
   )
+
+  it('allows exactly the OpenStreetMap tile host for img-src, nothing wider (KAN-222)', () => {
+    const csp = metaContent(runTransform({}), 'Content-Security-Policy')
+    const imgSrc = csp?.split('; ').find((d) => d.startsWith('img-src'))
+
+    expect(imgSrc).toBe("img-src 'self' data: blob: https://tile.openstreetmap.org")
+    expect(imgSrc).not.toContain('*')
+  })
 })

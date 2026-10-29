@@ -67,7 +67,7 @@ export function securityHeadersPlugin(): Plugin {
         "default-src 'self'",
         "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
+        "img-src 'self' data: blob: https://tile.openstreetmap.org",
         `connect-src ${connectSrc.join(' ')}`,
         "object-src 'none'",
         "base-uri 'self'",
