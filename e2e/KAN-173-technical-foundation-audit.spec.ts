@@ -86,6 +86,7 @@ test('the pilotage workspace re-themes with the rest of the app, from the live c
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   const deviceRow = page.getByTestId('pilotage-device-CHIP-000')
@@ -101,6 +102,7 @@ test('the pilotage workspace re-themes with the rest of the app, from the live c
   await page.goto('/')
   await page.getByTestId('theme-toggle').click()
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
   await expect(page.getByTestId('pilotage-device-CHIP-000')).toBeVisible()
 
@@ -114,6 +116,7 @@ test('virtualizes a large device list instead of rendering every row, keeping th
   await mockEligibleWorkspace(page, { positionsCount: 80 })
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('pilotage-device-list-scroll')).toBeVisible()
@@ -131,6 +134,7 @@ test('the settings form is fully keyboard-navigable, with every field reachable 
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('settings-form')).toBeVisible()

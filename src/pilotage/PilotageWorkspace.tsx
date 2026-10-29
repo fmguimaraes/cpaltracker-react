@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Position } from '../api/positions'
+import { Alert, AlertDescription } from '@/ui/alert'
+import { Skeleton } from '@/ui/skeleton'
 import type { TransferResult } from '../api/transfer'
 import { DeviceList } from './DeviceList'
 import { loadPilotageWorkspace } from './loadPilotageWorkspace'
@@ -100,17 +102,22 @@ export function PilotageWorkspace({
 
   if (state.phase === 'loading') {
     return (
-      <p data-testid="pilotage-loading" style={{ color: 'var(--color-text-muted)' }}>
-        Chargement du pilotage…
-      </p>
+      <div data-testid="pilotage-loading" role="status" aria-busy className="flex flex-col gap-2">
+        <span className="sr-only">Chargement du pilotage…</span>
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-full" />
+      </div>
     )
   }
 
   if (state.phase === 'error') {
     return (
-      <p data-testid="pilotage-error" role="alert" style={{ color: 'var(--color-danger)' }}>
-        Impossible de charger le pilotage de ce contrat. Réessayez plus tard.
-      </p>
+      <Alert variant="danger" data-testid="pilotage-error">
+        <AlertDescription>
+          Impossible de charger le pilotage de ce contrat. Réessayez plus tard.
+        </AlertDescription>
+      </Alert>
     )
   }
 
@@ -119,9 +126,9 @@ export function PilotageWorkspace({
     // intentional, designed-to-be-shown refusal text (pilotage_logic.php's
     // `cpal_pilotage_erreur_resolution()`), not raw error/stack-trace detail.
     return (
-      <p data-testid="pilotage-ineligible" role="alert" style={{ color: 'var(--color-danger)' }}>
-        {state.message}
-      </p>
+      <Alert variant="danger" data-testid="pilotage-ineligible">
+        <AlertDescription>{state.message}</AlertDescription>
+      </Alert>
     )
   }
 
@@ -129,24 +136,25 @@ export function PilotageWorkspace({
     return <DeviceList devices={[]} />
   }
 
+  // KAN-227 (FR10): list on top, settings as a one-column PAT-FORM section
+  // (<= 800 px), transfer as an inline two-column PAT-FORM card with its
+  // history beside it. Stacks below `md`.
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-6 md:flex-row">
-        <DeviceList
-          devices={state.devices}
-          selectedChipId={selectedChipId ?? undefined}
-          onSelect={setSelectedChipId}
-        />
-        {selectedChipId && <SettingsForm deviceId={selectedChipId} />}
-      </div>
+      <DeviceList
+        devices={state.devices}
+        selectedChipId={selectedChipId ?? undefined}
+        onSelect={setSelectedChipId}
+      />
+      {selectedChipId && <SettingsForm deviceId={selectedChipId} />}
 
       {selectedChipId && (
-        <section data-testid="pilotage-transfer-section" className="flex flex-col gap-6 md:flex-row">
+        <section data-testid="pilotage-transfer-section" className="flex flex-col gap-6">
           <TransferForm
             deviceId={selectedChipId}
             onTransferred={(result) => setTransferHistory((prev) => [...prev, result])}
           />
-          <div data-testid="pilotage-transfer-history" className="flex-1">
+          <div data-testid="pilotage-transfer-history">
             <TransferHistory entries={transferHistory} />
           </div>
         </section>

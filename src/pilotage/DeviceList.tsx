@@ -1,6 +1,13 @@
-import { useRef } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useMemo, useState, type ComponentProps } from 'react'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { PackageOpenIcon } from 'lucide-react'
 import type { Position } from '../api/positions'
+import { Button } from '@/ui/button'
+import { DataTable, type DataTableColumn } from '@/ui/data-table'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/ui/empty'
+import { cn } from '@/lib/utils'
+import { StatusDot, type DeviceStatus } from '@/ui/status'
+import { formatUtcInstant } from '../history/timelineData'
 
 /**
  * KAN-159 (FR5, FR6) — renders the device list for an eligible, resolved
@@ -22,6 +29,19 @@ import type { Position } from '../api/positions'
  * can pick which device's settings form (KAN-163's `SettingsForm`) to show
  * (FR7).
  *
+ * KAN-227 (FR10, F-33, F-36): rendered as the reference's PAT-LIST `DataTable`
+ * (status dot first, mono id, last-seen with its absolute UTC time in `title`,
+ * kit virtualization above `VIRTUALIZE_THRESHOLD`, the row testid and the
+ * selection accent through `rowProps`, the list testid through
+ * `containerProps`) and, below `md`, as the reference `MobileList` (one card
+ * per device, a count and "Afficher plus"). Exactly one variant is rendered
+ * (`useIsMobile`), so every testid sits on an element that is actually
+ * displayed at the current width. Devices carry no health state in the API,
+ * so the dot only says whether a position is known (offline grey when none).
+ * Pagination is replaced by one scrolling list through the kit's
+ * virtualization, which supersedes the former `@tanstack/react-virtual`
+ * windowing below.
+ *
  * KAN-173 (NFR5) addition: "device and history lists SHALL remain
  * responsive for a contract's full device set (virtualize if large)" —
  * beyond `VIRTUALIZE_THRESHOLD` rows are windowed with
@@ -32,117 +52,165 @@ import type { Position } from '../api/positions'
  * render directly, so this story's own and every prior KAN-159/163 test
  * keeps asserting the exact same markup.
  */
-export function DeviceList({
-  devices,
-  selectedChipId,
-  onSelect,
-}: {
-  devices: Position[]
-  selectedChipId?: string
-  onSelect?: (chipId: string) => void
-}) {
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const virtualizer = useVirtualizer({
-    count: devices.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT_PX,
-    enabled: devices.length > VIRTUALIZE_THRESHOLD,
-  })
+type SelectProps = { selectedChipId?: string; onSelect?: (chipId: string) => void }
 
-  if (devices.length === 0) {
-    return (
-      <p data-testid="pilotage-devices-empty" style={{ color: 'var(--color-text-muted)' }}>
-        Aucun device trouvé pour ce contrat.
-      </p>
-    )
-  }
+function lastSeenLabel(device: Position) {
+  return `Dernière position connue : ${device.timestamp}`
+}
 
-  function renderRow(device: Position) {
-    const content = (
-      <>
-        <span style={{ color: 'var(--color-text)' }}>{device.chipId}</span>
-        {device.timestamp && (
-          <span
-            data-testid={`pilotage-device-${device.chipId}-last-seen`}
-            className="ml-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            Dernière position connue : {device.timestamp}
-          </span>
-        )}
-      </>
-    )
+/** Absolute last-seen time for the `title`: UTC, as the monolith (`AAAA-MM-JJ HH:MM:SS UTC`). */
+function lastSeenTitle(timestamp: string) {
+  const ms = Date.parse(timestamp)
+  return Number.isNaN(ms) ? timestamp : formatUtcInstant(ms)
+}
 
-    return (
-      <li
-        key={device.chipId}
-        data-testid={`pilotage-device-${device.chipId}`}
-        className="rounded-md border px-3 py-2 text-sm"
-        style={{
-          borderColor:
-            onSelect && selectedChipId === device.chipId
-              ? 'var(--color-primary)'
-              : 'var(--color-border)',
-          backgroundColor: 'var(--color-surface)',
-        }}
-      >
-        {onSelect ? (
-          <button
-            type="button"
-            data-testid={`pilotage-device-${device.chipId}-select`}
-            aria-pressed={selectedChipId === device.chipId}
-            onClick={() => onSelect(device.chipId)}
-            className="w-full text-left"
-          >
-            {content}
-          </button>
-        ) : (
-          content
-        )}
-      </li>
-    )
-  }
-
-  if (devices.length > VIRTUALIZE_THRESHOLD) {
-    return (
-      <div
-        ref={scrollRef}
-        data-testid="pilotage-device-list-scroll"
-        className="w-full"
-        style={{ height: VIRTUALIZED_VIEWPORT_PX, overflow: 'auto' }}
-      >
-        <ul
-          data-testid="pilotage-device-list"
-          className="w-full"
-          style={{ height: virtualizer.getTotalSize(), position: 'relative' }}
-        >
-          {virtualizer.getVirtualItems().map((virtualRow) => (
-            <div
-              key={virtualRow.key}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: virtualRow.size,
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              {renderRow(devices[virtualRow.index])}
-            </div>
-          ))}
-        </ul>
-      </div>
-    )
-  }
-
+function SelectButton({ device, selectedChipId, onSelect }: SelectProps & { device: Position }) {
+  if (!onSelect) return <span className="font-mono">{device.chipId}</span>
   return (
-    <ul data-testid="pilotage-device-list" className="flex flex-col gap-2">
-      {devices.map((device) => renderRow(device))}
-    </ul>
+    <Button
+      variant="link"
+      data-testid={`pilotage-device-${device.chipId}-select`}
+      aria-pressed={selectedChipId === device.chipId}
+      onClick={() => onSelect(device.chipId)}
+      className="h-auto p-0 font-mono"
+    >
+      {device.chipId}
+    </Button>
   )
 }
 
+function LastSeen({ device, className }: { device: Position; className?: string }) {
+  if (!device.timestamp) return null
+  return (
+    <span
+      data-testid={`pilotage-device-${device.chipId}-last-seen`}
+      title={lastSeenTitle(device.timestamp)}
+      className={cn('text-muted-foreground', className)}
+    >
+      {lastSeenLabel(device)}
+    </span>
+  )
+}
+
+function buildColumns(select: SelectProps): DataTableColumn<Position>[] {
+  return [
+    { id: 'status', header: 'Statut', enableSorting: false, cell: ({ row }) => <DeviceStatusDot device={row.original} /> },
+    {
+      id: 'chipId',
+      accessorKey: 'chipId',
+      header: 'Device',
+      meta: { mono: true },
+      cell: ({ row }) => <SelectButton device={row.original} {...select} />,
+    },
+    {
+      id: 'lastSeen',
+      accessorFn: (d) => d.timestamp ?? '',
+      header: 'Dernière position',
+      cell: ({ row }) =>
+        row.original.timestamp ? (
+          <LastSeen device={row.original} className="whitespace-nowrap" />
+        ) : (
+          <span aria-hidden className="text-muted-foreground">
+            —
+          </span>
+        ),
+    },
+  ]
+}
+
+/** Cards shown at once below `md`, then "Afficher plus" (reference `devices/MobileList.tsx`). */
+const MOBILE_PAGE = 20
+
+function MobileList({ devices, ...select }: SelectProps & { devices: Position[] }) {
+  const [shown, setShown] = useState(MOBILE_PAGE)
+  const { selectedChipId, onSelect } = select
+  return (
+    <div className="flex flex-col gap-3">
+      <ul data-testid="pilotage-device-list" aria-label="Devices" className="flex flex-col gap-2">
+        {devices.slice(0, shown).map((device) => (
+          <li
+            key={device.chipId}
+            data-testid={`pilotage-device-${device.chipId}`}
+            className={cn(
+              'flex flex-col gap-1 rounded-lg border border-border p-3',
+              selectedChipId === device.chipId && onSelect ? 'bg-accent' : 'bg-card',
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <DeviceStatusDot device={device} />
+              <SelectButton device={device} {...select} />
+            </div>
+            <LastSeen device={device} className="text-xs" />
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span aria-live="polite" className="tabular-nums">
+          {Math.min(shown, devices.length)} sur {devices.length}
+        </span>
+        {shown < devices.length && (
+          <Button variant="outline" size="sm" onClick={() => setShown((n) => n + MOBILE_PAGE)}>
+            Afficher plus
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DesktopDeviceList({ devices, selectedChipId, onSelect }: SelectProps & { devices: Position[] }) {
+  const columns = useMemo(() => buildColumns({ selectedChipId, onSelect }), [selectedChipId, onSelect])
+  return (
+    <div data-testid={devices.length > VIRTUALIZE_THRESHOLD ? 'pilotage-device-list-scroll' : undefined}>
+      <DataTable<Position>
+        label="Devices"
+        columns={columns}
+        data={devices}
+        getRowId={(d) => d.chipId}
+        pageSize={VIRTUALIZE_THRESHOLD}
+        virtualizeThreshold={VIRTUALIZE_THRESHOLD}
+        emptyMessage="Aucun device trouvé pour ce contrat."
+        containerProps={{ 'data-testid': 'pilotage-device-list' } as ComponentProps<'div'>}
+        rowProps={(device) => {
+          const selected = Boolean(onSelect) && selectedChipId === device.chipId
+          return {
+            'data-testid': `pilotage-device-${device.chipId}`,
+            'aria-selected': onSelect ? selected : undefined,
+            className: selected ? 'bg-accent font-medium hover:bg-accent' : 'bg-card',
+          } as ComponentProps<'tr'>
+        }}
+      />
+    </div>
+  )
+}
+
+function EmptyDevices() {
+  return (
+    <Empty data-testid="pilotage-devices-empty">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <PackageOpenIcon aria-hidden />
+        </EmptyMedia>
+        <EmptyDescription>Aucun device trouvé pour ce contrat.</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  )
+}
+
+export function DeviceList({ devices, selectedChipId, onSelect }: SelectProps & { devices: Position[] }) {
+  const isMobile = useIsMobile()
+  if (devices.length === 0) return <EmptyDevices />
+  const List = isMobile ? MobileList : DesktopDeviceList
+  return (
+    <div className="min-w-0">
+      <List devices={devices} selectedChipId={selectedChipId} onSelect={onSelect} />
+    </div>
+  )
+}
+
+function DeviceStatusDot({ device }: { device: Position }) {
+  const status: DeviceStatus = device.timestamp ? 'ok' : 'offline'
+  return <StatusDot status={status} label={device.timestamp ? 'Position connue' : 'Aucune position'} />
+}
+
 const VIRTUALIZE_THRESHOLD = 50
-const ROW_HEIGHT_PX = 56
-const VIRTUALIZED_VIEWPORT_PX = 400

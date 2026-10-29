@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react'
 import { fetchContracts, type Contract } from '../api/contracts'
-import { PageTitle } from '../chrome/PageTitle'
+import { Alert, AlertDescription } from '@/ui/alert'
+import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
+import { PageHeader } from '@/ui/patterns/page-header'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
+import { Skeleton } from '@/ui/skeleton'
 import { PilotageWorkspace } from '../pilotage/PilotageWorkspace'
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
 /**
+ * KAN-227 (FR10): PAT-LIST page — `PageHeader` with the contract choice in its
+ * filter slot as the kit `Select` (trigger `pilotage-contract-selector`, one
+ * `SelectItem` per contract `pilotage-contract-option-{id}`), then the
+ * workspace in the page body. Copy and logic unchanged.
+ *
  * KAN-159 (FR1-FR6, NFR2, NFR4, NFR9, NFR10) — Device Pilotage's entry gate
  * and contract selector, mirroring Live Tracking's own (KAN-158
  * `LiveTracking.tsx`): FR1's auth gate is `RequireAuth` (`App.tsx` wraps
@@ -55,74 +64,71 @@ export function DevicePilotage() {
   }, [])
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
-      <header>
-        <PageTitle>Pilotage des devices</PageTitle>
-      </header>
-
-      {state === 'loading' && (
-        <p data-testid="pilotage-contracts-loading" style={{ color: 'var(--color-text-muted)' }}>
-          Chargement des contrats…
-        </p>
-      )}
-
-      {state === 'error' && (
-        <p
-          data-testid="pilotage-contracts-error"
-          role="alert"
-          style={{ color: 'var(--color-danger)' }}
-        >
-          Impossible de charger vos contrats. Réessayez plus tard.
-        </p>
-      )}
-
-      {state === 'loaded' && contracts.length === 0 && (
-        <p data-testid="pilotage-contracts-empty" style={{ color: 'var(--color-text-muted)' }}>
-          Aucun contrat n'est associé à votre compte.
-        </p>
-      )}
-
-      {state === 'loaded' && contracts.length > 0 && (
-        <div
-          role="radiogroup"
-          className="flex flex-col gap-2"
-          data-testid="pilotage-contract-selector"
-          aria-label="Sélection du contrat"
-        >
-          {contracts.map((contract) => (
-            <button
-              key={contract.contractId}
-              type="button"
-              role="radio"
-              data-testid={`pilotage-contract-option-${contract.contractId}`}
-              aria-checked={selectedId === contract.contractId}
-              onClick={() => selectContract(contract.contractId)}
-              className="rounded-md border px-3 py-2 text-left text-sm"
-              style={{
-                borderColor:
-                  selectedId === contract.contractId
-                    ? 'var(--color-primary)'
-                    : 'var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-              }}
+    <div className="flex flex-col">
+      <PageHeader title="Pilotage des devices">
+        {state === 'loaded' && contracts.length > 0 && (
+          <Select
+            value={selectedId === null ? '' : String(selectedId)}
+            onValueChange={(value) => {
+              if (value) selectContract(Number(value))
+            }}
+          >
+            <SelectTrigger
+              data-testid="pilotage-contract-selector"
+              aria-label="Sélection du contrat"
+              className="w-full sm:w-72"
             >
-              {contract.contractRef}
-              {contract.clientName ? ` (${contract.clientName})` : ''}
-            </button>
-          ))}
-        </div>
-      )}
+              <SelectValue placeholder="— Sélectionner —" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              {contracts.map((contract) => (
+                <SelectItem
+                  key={contract.contractId}
+                  value={String(contract.contractId)}
+                  data-testid={`pilotage-contract-option-${contract.contractId}`}
+                >
+                  {contract.contractRef}
+                  {contract.clientName ? ` (${contract.clientName})` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </PageHeader>
 
-      {accessError && (
-        <p data-testid="pilotage-contract-access-error" role="alert" style={{ color: 'var(--color-danger)' }}>
-          {accessError}
-        </p>
-      )}
+      <div className="flex flex-col gap-6 p-4 md:p-6">
+        {state === 'loading' && (
+          <div data-testid="pilotage-contracts-loading" role="status" aria-busy className="flex flex-col gap-2">
+            <span className="sr-only">Chargement des contrats…</span>
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        )}
 
-      {selectedId !== null && (
-        <PilotageWorkspace contractId={selectedId} onUnauthorized={handleUnauthorizedContract} />
-      )}
-    </main>
+        {state === 'error' && (
+          <Alert variant="danger" data-testid="pilotage-contracts-error">
+            <AlertDescription>Impossible de charger vos contrats. Réessayez plus tard.</AlertDescription>
+          </Alert>
+        )}
+
+        {state === 'loaded' && contracts.length === 0 && (
+          <Empty data-testid="pilotage-contracts-empty">
+            <EmptyHeader>
+              <EmptyDescription>Aucun contrat n'est associé à votre compte.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+
+        {accessError && (
+          <Alert variant="danger" data-testid="pilotage-contract-access-error">
+            <AlertDescription>{accessError}</AlertDescription>
+          </Alert>
+        )}
+
+        {selectedId !== null && (
+          <PilotageWorkspace contractId={selectedId} onUnauthorized={handleUnauthorizedContract} />
+        )}
+      </div>
+    </div>
   )
 }

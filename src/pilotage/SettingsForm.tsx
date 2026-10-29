@@ -9,6 +9,20 @@ import {
 import { isContractInactiveError } from './activeState'
 import { STORED_ONLY_FIELDS, TRANSMITTED_FIELDS, type SettingsFieldDef } from './settingsFields'
 import { validateSettingsField } from './settingsValidation'
+import { Alert, AlertDescription } from '@/ui/alert'
+import { Button } from '@/ui/button'
+import { Card, CardContent } from '@/ui/card'
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@/ui/field'
+import { Input } from '@/ui/input'
+import { Skeleton } from '@/ui/skeleton'
 
 type FormValues = Record<string, string>
 
@@ -20,6 +34,10 @@ type Phase =
   | { status: 'ready'; config: DeviceConfig['config'] }
 
 /**
+ * KAN-227 (FR10): restyled as the reference's one-column PAT-FORM section
+ * (<= 800 px, `Field*` + kit `Input`, `FieldError` under the field, action
+ * bar with the submit and the flash). Logic, testids and copy unchanged.
+ *
  * KAN-163 (FR7-FR10, FR12) — the pilotage settings form for one device.
  *
  * - FR7/CB8: current values are read via the shared `fetchDeviceConfig()`
@@ -120,17 +138,22 @@ export function SettingsForm({
 
   if (phase.status === 'loading') {
     return (
-      <p data-testid="settings-form-loading" style={{ color: 'var(--color-text-muted)' }}>
-        Chargement des réglages…
-      </p>
+      <div data-testid="settings-form-loading" role="status" aria-busy className="flex max-w-3xl flex-col gap-2">
+        <span className="sr-only">Chargement des réglages…</span>
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-full" />
+      </div>
     )
   }
 
   if (phase.status === 'error') {
     return (
-      <p data-testid="settings-form-error" role="alert" style={{ color: 'var(--color-danger)' }}>
-        Impossible de charger les réglages actuels de ce device. Réessayez plus tard.
-      </p>
+      <Alert variant="danger" data-testid="settings-form-error" className="max-w-3xl">
+        <AlertDescription>
+          Impossible de charger les réglages actuels de ce device. Réessayez plus tard.
+        </AlertDescription>
+      </Alert>
     )
   }
 
@@ -189,21 +212,14 @@ export function SettingsForm({
     const errorId = `settings-field-${def.name}-error`
 
     return (
-      <div key={def.name} className="flex flex-col gap-1">
-        <label
-          htmlFor={`settings-field-${def.name}`}
-          style={{ color: 'var(--color-text)' }}
-        >
-          {def.label}
-        </label>
-        <input
+      <Field key={def.name} data-invalid={fieldError ? true : undefined}>
+        <FieldLabel htmlFor={`settings-field-${def.name}`}>{def.label}</FieldLabel>
+        <Input
           id={`settings-field-${def.name}`}
           data-testid={`settings-field-${def.name}`}
           placeholder={currentValue ?? undefined}
           aria-describedby={fieldError ? `${hintId} ${errorId}` : hintId}
           aria-invalid={Boolean(fieldError)}
-          className="rounded-md border px-2 py-1 text-sm"
-          style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
           {...register(def.name, {
             validate: (value) => {
               const result = validateSettingsField(value ?? '', def)
@@ -211,61 +227,59 @@ export function SettingsForm({
             },
           })}
         />
-        <p id={hintId} data-testid={`settings-field-${def.name}-hint`} style={{ color: 'var(--color-text-muted)' }}>
+        <FieldDescription id={hintId} data-testid={`settings-field-${def.name}-hint`}>
           {def.hint} — laissez vide pour conserver la valeur actuelle
           {currentValue ? ` (${currentValue})` : ' (aucune valeur enregistrée)'}.
-        </p>
+        </FieldDescription>
         {fieldError && (
-          <p id={errorId} data-testid={errorId} role="alert" style={{ color: 'var(--color-danger)' }}>
+          <FieldError id={errorId} data-testid={errorId} role="alert">
             {String(fieldError.message)}
-          </p>
+          </FieldError>
         )}
-      </div>
+      </Field>
     )
   }
 
   return (
-    <form data-testid="settings-form" onSubmit={handleSubmit(onValid)} className="flex flex-col gap-4">
-      <fieldset data-testid="settings-group-transmitted" className="flex flex-col gap-3">
-        <legend style={{ color: 'var(--color-text)' }}>Transmises au device</legend>
-        {TRANSMITTED_FIELDS.map(renderField)}
-      </fieldset>
+    <Card className="max-w-3xl">
+      <CardContent>
+        <form data-testid="settings-form" onSubmit={handleSubmit(onValid)} className="flex flex-col gap-6">
+          <FieldSet data-testid="settings-group-transmitted">
+            <FieldLegend>Transmises au device</FieldLegend>
+            <FieldGroup>{TRANSMITTED_FIELDS.map(renderField)}</FieldGroup>
+          </FieldSet>
 
-      <fieldset data-testid="settings-group-stored-only" className="flex flex-col gap-3">
-        <legend style={{ color: 'var(--color-text)' }}>
-          Conservées uniquement — jamais envoyées au device
-        </legend>
-        {STORED_ONLY_FIELDS.map(renderField)}
-      </fieldset>
+          <FieldSet data-testid="settings-group-stored-only">
+            <FieldLegend>Conservées uniquement — jamais envoyées au device</FieldLegend>
+            <FieldGroup>{STORED_ONLY_FIELDS.map(renderField)}</FieldGroup>
+          </FieldSet>
 
-      <button
-        type="submit"
-        data-testid="settings-form-submit"
-        disabled={isSubmitting || contractInactive}
-        className="self-start rounded-md border px-3 py-1 text-sm"
-        style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-      >
-        Enregistrer
-      </button>
+          <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center">
+            <Button
+              type="submit"
+              data-testid="settings-form-submit"
+              disabled={isSubmitting || contractInactive}
+              loading={isSubmitting}
+              className="focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring focus-visible:ring-0"
+            >
+              Enregistrer
+            </Button>
 
-      {flash && (
-        <p
-          data-testid="settings-form-flash"
-          data-flash-kind={flash.kind}
-          role={flash.kind === 'error' ? 'alert' : 'status'}
-          style={{
-            color:
-              flash.kind === 'error'
-                ? 'var(--color-danger)'
-                : flash.kind === 'success'
-                  ? 'var(--color-success)'
-                  : 'var(--color-text)',
-          }}
-        >
-          {flash.message}
-        </p>
-      )}
-    </form>
+            {flash && (
+              <Alert
+                variant={flash.kind === 'error' ? 'danger' : flash.kind === 'success' ? 'success' : 'info'}
+                data-testid="settings-form-flash"
+                data-flash-kind={flash.kind}
+                role={flash.kind === 'error' ? 'alert' : 'status'}
+                className="flex-1"
+              >
+                <AlertDescription>{flash.message}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
 

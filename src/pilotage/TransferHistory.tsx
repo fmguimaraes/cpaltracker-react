@@ -1,4 +1,9 @@
 import type { TransferResult } from '../api/transfer'
+import { Badge } from '@/ui/badge'
+import { Card, CardContent } from '@/ui/card'
+import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
+import { ActivityTimeline, type ActivityItem } from '@/ui/timeline'
+import { formatUtc } from '../history/timelineData'
 
 /**
  * KAN-169 (FR18, CB29) — the transfer history panel.
@@ -16,52 +21,69 @@ import type { TransferResult } from '../api/transfer'
  * /contracts/{contractId}/transfer-history`-shaped endpoint would resolve
  * it) rather than worked around with fabricated rows.
  *
+ * KAN-227 (FR10): rendered as the kit `ActivityTimeline` (DAT-TIMELINE,
+ * vertical), one item per transfer (`testId` = `transfer-history-row-*`), the
+ * period as the API returned it in the item detail, its start as the item
+ * time (UTC, as the monolith's "(UTC)" fields), and a `Badge` for an ongoing
+ * transfer (`-ongoing`).
+ *
  * CB29's "en cours" marking is preserved exactly: `openEnded` (the API's
  * own flag, derived server-side from the `HIST_SENTINELLE` check — never
  * recomputed here) renders as "en cours", otherwise the real `endDate` is
  * shown.
  */
+/**
+ * The API returns the transfer bounds as UTC wall-clock text (`AAAA-MM-JJ HH:MM:SS`, or a bare
+ * `AAAA-MM-JJ`); turned into an ISO instant for the timeline's `<time dateTime>`.
+ */
+function utcTextToIso(text: string): string {
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text.replace(' ', 'T')
+  return /(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`
+}
+
+/** Item time: the transfer start, in UTC, to the minute. */
+function formatStart(at: Date): string {
+  return Number.isNaN(at.getTime()) ? '' : `${formatUtc(at.getTime()).slice(0, 16)} UTC`
+}
+
 export function TransferHistory({ entries }: { entries: TransferResult[] }) {
   if (entries.length === 0) {
     return (
-      <p data-testid="transfer-history-empty" style={{ color: 'var(--color-text-muted)' }}>
-        Aucun transfert enregistré pour l'instant dans cette session.
-      </p>
+      <Empty data-testid="transfer-history-empty">
+        <EmptyHeader>
+          <EmptyDescription>Aucun transfert enregistré pour l'instant dans cette session.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
 
+  const items: ActivityItem[] = entries.map((entry, index) => {
+    const rowId = `transfer-history-row-${entry.deviceId}-${index}`
+    return {
+      id: `${entry.deviceId}-${entry.startDate}-${index}`,
+      testId: rowId,
+      at: utcTextToIso(entry.startDate),
+      title: `${entry.deviceId} → contrat #${entry.targetContractId}`,
+      detail: entry.openEnded ? `${entry.startDate} –` : `${entry.startDate} – ${entry.endDate}`,
+      badge: entry.openEnded ? (
+        <Badge variant="neutral" data-testid={`${rowId}-ongoing`}>
+          en cours
+        </Badge>
+      ) : undefined,
+    }
+  })
+
   return (
-    <div className="flex flex-col gap-2">
-      <p style={{ color: 'var(--color-text-muted)' }}>
-        Historique des transferts enregistrés durant cette session — l'historique complet et
-        persistant n'est pas encore exposé par l'API.
-      </p>
-      <ul data-testid="transfer-history-list" className="flex flex-col gap-2">
-        {entries.map((entry, index) => (
-          <li
-            key={`${entry.deviceId}-${entry.startDate}-${index}`}
-            data-testid={`transfer-history-row-${entry.deviceId}-${index}`}
-            className="rounded-md border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-          >
-            <span style={{ color: 'var(--color-text)' }}>{entry.deviceId}</span>
-            {' → '}
-            <span style={{ color: 'var(--color-text)' }}>contrat #{entry.targetContractId}</span>
-            {' · '}
-            <span style={{ color: 'var(--color-text-muted)' }}>{entry.startDate} – </span>
-            {entry.openEnded ? (
-              <span
-                data-testid={`transfer-history-row-${entry.deviceId}-${index}-ongoing`}
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                en cours
-              </span>
-            ) : (
-              <span style={{ color: 'var(--color-text-muted)' }}>{entry.endDate}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Card>
+      <CardContent className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          Historique des transferts enregistrés durant cette session — l'historique complet et
+          persistant n'est pas encore exposé par l'API.
+        </p>
+        <div data-testid="transfer-history-list">
+          <ActivityTimeline items={items} formatTime={formatStart} label="Historique des transferts" />
+        </div>
+      </CardContent>
+    </Card>
   )
 }

@@ -1,4 +1,18 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+/**
+ * KAN-227 (FR10): the transfer dates are the kit `DateTimeField` (calendar popover + time input),
+ * as the monolith's datetime-local fields. The clock is fixed in June 2026 (`beforeEach`), so the
+ * calendar opens on that month; pick the day there.
+ */
+async function pickJune2026Day(page: Page, fieldTestId: string, day: number) {
+  await page.getByTestId(fieldTestId).getByRole('button').click()
+  await page.getByRole('button', { name: new RegExp(`June ${day}(st|nd|rd|th), 2026`) }).click()
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-06-01T12:00:00'))
+})
 
 /**
  * KAN-169 (epic KAN-140) — Transfer Form & Transfer History.
@@ -77,8 +91,10 @@ test('offers only the API-provided STD contracts as transfer targets, never a fr
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
+  await page.getByTestId('transfer-field-target').click()
   await expect(page.getByTestId('transfer-target-option-34')).toHaveText('REF-034-STD')
   await expect(page.getByTestId('transfer-field-target')).toBeVisible()
 })
@@ -104,10 +120,13 @@ test('submits an open-ended transfer and renders it as "en cours" in both the fl
   )
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
-  await page.getByTestId('transfer-field-target').selectOption('34')
-  await page.getByTestId('transfer-field-startDate').fill('2026-06-10')
+  await page.getByTestId('transfer-field-target').click()
+
+  await page.getByTestId('transfer-target-option-34').click()
+  await pickJune2026Day(page, 'transfer-field-startDate', 10)
   await page.getByTestId('transfer-form-submit').click()
 
   await expect(page.getByTestId('transfer-flash-ok')).toContainText('en cours')
@@ -126,11 +145,14 @@ test('rejects an end date that is not strictly after the start date, client-side
   })
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
-  await page.getByTestId('transfer-field-target').selectOption('34')
-  await page.getByTestId('transfer-field-startDate').fill('2026-06-10')
-  await page.getByTestId('transfer-field-endDate').fill('2026-06-01')
+  await page.getByTestId('transfer-field-target').click()
+
+  await page.getByTestId('transfer-target-option-34').click()
+  await pickJune2026Day(page, 'transfer-field-startDate', 10)
+  await pickJune2026Day(page, 'transfer-field-endDate', 1)
   await page.getByTestId('transfer-form-submit').click()
 
   await expect(page.getByTestId('transfer-field-endDate-error')).toContainText(
@@ -158,10 +180,13 @@ test("surfaces the API's own rejection (e.g. overlap) verbatim, never a client-g
   )
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
-  await page.getByTestId('transfer-field-target').selectOption('34')
-  await page.getByTestId('transfer-field-startDate').fill('2026-06-10')
+  await page.getByTestId('transfer-field-target').click()
+
+  await page.getByTestId('transfer-target-option-34').click()
+  await pickJune2026Day(page, 'transfer-field-startDate', 10)
   await page.getByTestId('transfer-form-submit').click()
 
   await expect(page.getByTestId('transfer-flash-ko')).toContainText(
@@ -184,10 +209,13 @@ test('disables the submit control after a 409 contract_inactive rejection (FR4/F
   )
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
-  await page.getByTestId('transfer-field-target').selectOption('34')
-  await page.getByTestId('transfer-field-startDate').fill('2026-06-10')
+  await page.getByTestId('transfer-field-target').click()
+
+  await page.getByTestId('transfer-target-option-34').click()
+  await pickJune2026Day(page, 'transfer-field-startDate', 10)
   await page.getByTestId('transfer-form-submit').click()
 
   await expect(page.getByTestId('transfer-contract-inactive')).toBeVisible()
@@ -202,6 +230,7 @@ test('shows an explicit empty state when the account has no visible STD contract
   })
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('transfer-targets-empty')).toBeVisible()

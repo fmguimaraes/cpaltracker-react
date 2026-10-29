@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import * as transferApi from '../api/transfer'
 import * as transferTargetsModule from './transferTargets'
@@ -11,8 +11,33 @@ const targets = [
   { contractId: 56, contractRef: 'REF-056-STD', contractType: 'STD' },
 ]
 
+type User = ReturnType<typeof userEvent.setup>
+
+/** KAN-227: the target is the kit `Select` (radix): open the trigger, then pick the item. */
+async function pickTarget(user: User, contractId: number) {
+  await user.click(screen.getByTestId('transfer-field-target'))
+  await user.click(await screen.findByTestId(`transfer-target-option-${contractId}`))
+}
+
+/** KAN-227: the dates are the kit `DateTimeField`: open its calendar (June 2026, the faked today) and pick the day. */
+async function pickJune2026Day(user: User, fieldTestId: string, day: number) {
+  await user.click(within(screen.getByTestId(fieldTestId)).getByRole('button'))
+  await user.click(await screen.findByRole('button', { name: new RegExp(`June ${day}(st|nd|rd|th), 2026`) }))
+}
+
 describe('TransferForm (KAN-169 FR14-FR17)', () => {
+  beforeEach(() => {
+    // Radix Select relies on pointer capture and scrollIntoView, which jsdom does not implement.
+    Element.prototype.hasPointerCapture ??= () => false
+    Element.prototype.releasePointerCapture ??= () => undefined
+    Element.prototype.scrollIntoView ??= () => undefined
+    // Only Date is faked, so the calendars open on June 2026 while timers and user-event stay real.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 5, 1, 12, 0))
+  })
+
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -26,7 +51,8 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
 
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
 
-    expect(screen.getByTestId('transfer-target-option-34')).toHaveTextContent('REF-034-STD')
+    await userEvent.setup().click(screen.getByTestId('transfer-field-target'))
+    expect(await screen.findByTestId('transfer-target-option-34')).toHaveTextContent('REF-034-STD')
     expect(screen.getByTestId('transfer-target-option-56')).toHaveTextContent('REF-056-STD')
   })
 
@@ -44,7 +70,7 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
 
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
 
-    await user.selectOptions(screen.getByTestId('transfer-field-target'), '34')
+    await pickTarget(user, 34)
     await user.click(screen.getByTestId('transfer-form-submit'))
 
     await waitFor(() =>
@@ -61,9 +87,9 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
 
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
 
-    await user.selectOptions(screen.getByTestId('transfer-field-target'), '34')
-    await user.type(screen.getByTestId('transfer-field-startDate'), '2026-06-10')
-    await user.type(screen.getByTestId('transfer-field-endDate'), '2026-06-10')
+    await pickTarget(user, 34)
+    await pickJune2026Day(user, 'transfer-field-startDate', 10)
+    await pickJune2026Day(user, 'transfer-field-endDate', 10)
     await user.click(screen.getByTestId('transfer-form-submit'))
 
     await waitFor(() =>
@@ -90,19 +116,52 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
 
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
 
-    await user.selectOptions(screen.getByTestId('transfer-field-target'), '34')
-    await user.type(screen.getByTestId('transfer-field-startDate'), '2026-06-10')
+    await pickTarget(user, 34)
+    await pickJune2026Day(user, 'transfer-field-startDate', 10)
     await user.click(screen.getByTestId('transfer-form-submit'))
 
     await waitFor(() =>
       expect(postSpy).toHaveBeenCalledWith('CHIP-001', {
         targetContractId: 34,
-        startDate: '2026-06-10',
+        startDate: '2026-06-10T00:00',
         endDate: null,
       }),
     )
     await waitFor(() => expect(screen.getByTestId('transfer-flash-ok')).toHaveTextContent('en cours'))
     expect(onTransferred).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends both dates with their time as AAAA-MM-JJTHH:MM, the monolith datetime-local shape (KAN-227, FR10)', async () => {
+    stubTargets()
+    const postSpy = vi.spyOn(transferApi, 'postDeviceTransfer').mockResolvedValue({
+      deviceId: 'CHIP-001',
+      contractId: 12,
+      targetContractId: 34,
+      targetClientId: 99,
+      startDate: '2026-06-10 08:30:00',
+      endDate: '2026-06-12 17:45:59',
+      openEnded: false,
+    })
+    const user = userEvent.setup()
+    render(<TransferForm deviceId="CHIP-001" />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+
+    await pickTarget(user, 34)
+    await pickJune2026Day(user, 'transfer-field-startDate', 10)
+    // jsdom's time input rejects per-key partial values: set the whole value at once.
+    fireEvent.change(screen.getByLabelText('Date de début (heure)'), { target: { value: '08:30' } })
+    await pickJune2026Day(user, 'transfer-field-endDate', 12)
+    fireEvent.change(screen.getByLabelText('Date de fin (heure)'), { target: { value: '17:45' } })
+    await user.click(screen.getByTestId('transfer-form-submit'))
+
+    await waitFor(() =>
+      expect(postSpy).toHaveBeenCalledWith('CHIP-001', {
+        targetContractId: 34,
+        startDate: '2026-06-10T08:30',
+        endDate: '2026-06-12T17:45',
+      }),
+    )
   })
 
   it("surfaces the API's own rejection message verbatim (FR17, e.g. overlap)", async () => {
@@ -115,8 +174,8 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
 
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
 
-    await user.selectOptions(screen.getByTestId('transfer-field-target'), '34')
-    await user.type(screen.getByTestId('transfer-field-startDate'), '2026-06-10')
+    await pickTarget(user, 34)
+    await pickJune2026Day(user, 'transfer-field-startDate', 10)
     await user.click(screen.getByTestId('transfer-form-submit'))
 
     await waitFor(() =>
@@ -136,8 +195,8 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
 
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
 
-    await user.selectOptions(screen.getByTestId('transfer-field-target'), '34')
-    await user.type(screen.getByTestId('transfer-field-startDate'), '2026-06-10')
+    await pickTarget(user, 34)
+    await pickJune2026Day(user, 'transfer-field-startDate', 10)
     await user.click(screen.getByTestId('transfer-form-submit'))
 
     await waitFor(() => expect(screen.getByTestId('transfer-contract-inactive')).toBeInTheDocument())
@@ -154,8 +213,8 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
 
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
 
-    await user.selectOptions(screen.getByTestId('transfer-field-target'), '34')
-    await user.type(screen.getByTestId('transfer-field-startDate'), '2026-06-10')
+    await pickTarget(user, 34)
+    await pickJune2026Day(user, 'transfer-field-startDate', 10)
     await user.click(screen.getByTestId('transfer-form-submit'))
 
     await waitFor(() => expect(screen.getByTestId('transfer-form-submit')).toBeDisabled())

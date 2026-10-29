@@ -49,6 +49,7 @@ test('lists every contract the account can see, in contract context (FR2)', asyn
 
   await page.goto('/pilotage')
 
+  await page.getByTestId('pilotage-contract-selector').click()
   await expect(page.getByTestId('pilotage-contract-option-12')).toHaveText('REF-012')
 })
 
@@ -100,6 +101,7 @@ test('shows the reserved-for-MAIN message and no device list when the API report
   )
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('pilotage-ineligible')).toHaveText(
@@ -170,6 +172,7 @@ test('shows the live device list for an eligible MAIN contract (FR5, FR6)', asyn
   )
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('pilotage-device-CHIP-001')).toBeVisible()
@@ -198,6 +201,7 @@ test('shows an explicit empty state for a contract with zero live devices (FR5)'
   )
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('pilotage-devices-empty')).toBeVisible()
@@ -227,9 +231,11 @@ test('clears the selection and shows a generic message on an unauthorized/nonexi
   )
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-99').click()
 
   await expect(page.getByTestId('pilotage-contract-access-error')).toBeVisible()
-  await expect(page.getByTestId('pilotage-contract-option-99')).toHaveAttribute('aria-checked', 'false')
+  await page.getByTestId('pilotage-contract-selector').click()
+  await expect(page.getByTestId('pilotage-contract-option-99')).toHaveAttribute('aria-selected', 'false')
   expect(await page.getByTestId('pilotage-contract-access-error').textContent()).not.toContain('99')
 })

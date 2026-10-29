@@ -1,8 +1,20 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Position } from '../api/positions'
 import { DeviceList } from './DeviceList'
+
+function stubViewport(mobile = false) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: () => ({ matches: mobile, addEventListener: () => undefined, removeEventListener: () => undefined }),
+  })
+  vi.stubGlobal('innerWidth', mobile ? 390 : 1440)
+}
+
+beforeEach(() => stubViewport())
+
 
 const device: Position = {
   contractId: 12,
@@ -18,6 +30,18 @@ const device: Position = {
 }
 
 describe('DeviceList (KAN-159 FR5, FR6)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('at 390 px renders one card list with the same testids on the visible elements (KAN-227, NFR3)', () => {
+    stubViewport(true)
+    render(<DeviceList devices={[device]} onSelect={() => undefined} />)
+
+    expect(screen.getByTestId('pilotage-device-list').tagName).toBe('UL')
+    expect(screen.getByTestId('pilotage-device-CHIP-001').tagName).toBe('LI')
+    expect(screen.getByTestId('pilotage-device-CHIP-001-select')).toBeInTheDocument()
+    expect(screen.getByTestId('pilotage-device-CHIP-001-last-seen')).toBeInTheDocument()
+  })
+
   it('shows an explicit empty state for a contract with zero devices', () => {
     render(<DeviceList devices={[]} />)
 

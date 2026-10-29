@@ -83,6 +83,7 @@ test('shows two visibly labeled field groups, 5 transmitted + 5 stored-only (FR8
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('settings-group-transmitted')).toContainText('Transmises au device')
@@ -105,6 +106,7 @@ test('never shows the binary WiFi credential fields (FR12)', async ({ page }) =>
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('settings-form')).toBeVisible()
@@ -118,6 +120,7 @@ test("shows the device's current value as a placeholder hint, never pre-filled (
   await mockEligibleWorkspace(page, { FREQ_MESURE_CL: '3' })
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   const input = page.getByTestId('settings-field-FREQ_MESURE_CL')
@@ -132,6 +135,7 @@ test('rejects an out-of-range value client-side before any submission (FR9, CB13
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('999')
@@ -146,6 +150,7 @@ test('normalizes a decimal comma to a dot for a float field (FR9, CB13)', async 
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
+  await page.getByTestId('pilotage-contract-selector').click()
   await page.getByTestId('pilotage-contract-option-12').click()
 
   await page.getByTestId('settings-field-Seuil_TEMPAMB_CL').fill('19,5')

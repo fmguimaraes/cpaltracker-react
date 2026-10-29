@@ -1,6 +1,19 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PilotageWorkspace } from './PilotageWorkspace'
+
+function stubViewport(mobile = false) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: () => ({ matches: mobile, addEventListener: () => undefined, removeEventListener: () => undefined }),
+  })
+  vi.stubGlobal('innerWidth', mobile ? 390 : 1440)
+}
+
+beforeEach(() => stubViewport())
+
 
 function stubFetch(responder: (url: string) => Response) {
   vi.stubGlobal(
@@ -159,7 +172,12 @@ describe('PilotageWorkspace (KAN-159 FR2-FR6, NFR2, NFR4)', () => {
     render(<PilotageWorkspace contractId={12} />)
 
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
-    await waitFor(() => expect(screen.getByTestId('transfer-target-option-34')).toBeInTheDocument())
+    // KAN-227: the target is the kit Select; its items exist once it is open.
+    Element.prototype.hasPointerCapture ??= () => false
+    Element.prototype.releasePointerCapture ??= () => undefined
+    Element.prototype.scrollIntoView ??= () => undefined
+    await userEvent.setup().click(screen.getByTestId('transfer-field-target'))
+    expect(await screen.findByTestId('transfer-target-option-34')).toBeInTheDocument()
     expect(screen.getByTestId('transfer-history-empty')).toBeInTheDocument()
   })
 

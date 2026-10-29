@@ -1,8 +1,31 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DevicePilotage } from './DevicePilotage'
+
+function stubViewport(mobile = false) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: () => ({ matches: mobile, addEventListener: () => undefined, removeEventListener: () => undefined }),
+  })
+  vi.stubGlobal('innerWidth', mobile ? 390 : 1440)
+}
+
+beforeEach(() => {
+  stubViewport()
+  // Radix Select (the header contract choice, KAN-227) relies on pointer capture and scrollIntoView.
+  Element.prototype.hasPointerCapture ??= () => false
+  Element.prototype.releasePointerCapture ??= () => undefined
+  Element.prototype.scrollIntoView ??= () => undefined
+})
+
+/** KAN-227: the contract choice is the kit Select; its options exist once it is open. */
+async function openContracts() {
+  await userEvent.click(await screen.findByTestId('pilotage-contract-selector'))
+}
+
 
 function stubFetch(
   contractsResponse: Response,
@@ -52,7 +75,8 @@ describe('DevicePilotage (KAN-159 FR1, FR2)', () => {
     renderDevicePilotage()
 
     await waitFor(() => expect(screen.getByTestId('pilotage-contract-selector')).toBeInTheDocument())
-    expect(screen.getByTestId('pilotage-contract-option-12')).toHaveTextContent('REF-012')
+    await openContracts()
+    expect(await screen.findByTestId('pilotage-contract-option-12')).toHaveTextContent('REF-012')
     expect(screen.getByTestId('pilotage-contract-option-34')).toHaveTextContent('REF-034')
   })
 
@@ -75,13 +99,16 @@ describe('DevicePilotage (KAN-159 FR1, FR2)', () => {
 
     renderDevicePilotage()
 
+    await openContracts()
     const option = await screen.findByTestId('pilotage-contract-option-12')
-    expect(option).toHaveAttribute('aria-checked', 'false')
+    expect(option).toHaveAttribute('aria-selected', 'false')
 
     await userEvent.click(option)
 
-    expect(option).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('pilotage-contract-selector')).toHaveTextContent('REF-012')
     await waitFor(() => expect(screen.getByTestId('pilotage-devices-empty')).toBeInTheDocument())
+    await openContracts()
+    expect(await screen.findByTestId('pilotage-contract-option-12')).toHaveAttribute('aria-selected', 'true')
   })
 
   it('shows a generic error state on a contract-list service failure, never raw backend text', async () => {
@@ -108,11 +135,12 @@ describe('DevicePilotage (KAN-159 FR1, FR2)', () => {
 
     renderDevicePilotage()
 
-    const option = await screen.findByTestId('pilotage-contract-option-12')
-    await userEvent.click(option)
+    await openContracts()
+    await userEvent.click(await screen.findByTestId('pilotage-contract-option-12'))
 
     await waitFor(() => expect(screen.getByTestId('pilotage-contract-access-error')).toBeInTheDocument())
-    expect(option).toHaveAttribute('aria-checked', 'false')
+    // The selection is cleared: the trigger is back to its placeholder.
+    expect(screen.getByTestId('pilotage-contract-selector')).toHaveTextContent('— Sélectionner —')
     expect(screen.queryByTestId('pilotage-error')).not.toBeInTheDocument()
     expect(screen.getByTestId('pilotage-contract-access-error')).not.toHaveTextContent('12')
   })
