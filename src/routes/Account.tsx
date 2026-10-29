@@ -12,6 +12,7 @@ import { HOME_PATH } from "../auth/paths";
 import { EmailForm } from "./account/EmailForm";
 import { PasswordForm } from "./account/PasswordForm";
 import { PhoneForm } from "./account/PhoneForm";
+import { isFirstConnection } from "./account/firstConnection";
 
 /**
  * KAN-152 — Account Self-Service (FR9, FR10).
@@ -52,10 +53,10 @@ export function Account() {
     }
   }
 
-  const firstConnection =
-    account.mustChangePassword || searchParams.has("premiere");
+  const firstConnection = isFirstConnection(account, searchParams);
 
-  // First connection stays shell-less (PAT-AUTH column, password form only).
+  // First connection stays shell-less (PAT-AUTH column, password form only); AccountLayout
+  // renders no shell around it in that mode.
   if (firstConnection) {
     return (
       <AuthLayout
@@ -84,7 +85,7 @@ export function Account() {
     );
   }
 
-  // Normal mode renders the page body only: the shell (sidebar, header) is the route's layout.
+  // Normal mode renders the page body only: AccountLayout wraps it in the shell (FR12).
   return (
     <>
       <PageHeader title="Mon compte" />

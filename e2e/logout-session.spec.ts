@@ -52,6 +52,8 @@ test('logout is an explicit POST action that clears AuthContext and redirects to
   })
 
   await page.goto('/')
+  // Sign out lives in the shell user menu (KAN-224 FR6): open it first.
+  await page.getByTestId('user-menu').click()
   await expect(page.getByTestId('logout-button')).toBeVisible()
 
   await page.getByTestId('logout-button').click()
@@ -117,6 +119,8 @@ test('a 401 unauthorized on an authenticated call (here, the logout POST itself)
     }),
   )
 
+  // Sign out lives in the shell user menu (KAN-224 FR6): open it first.
+  await page.getByTestId('user-menu').click()
   await page.getByTestId('logout-button').click()
 
   await expect(page).toHaveURL(/\/login\?suite=%2F&notice=session-expired$/)

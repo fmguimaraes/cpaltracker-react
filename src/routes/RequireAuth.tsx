@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { buildLoginRedirectPath } from '../auth/suite'
 import { CHANGE_PASSWORD_PATH } from '../auth/paths'
+import { Spinner } from '@/ui/spinner'
 
 interface RequireAuthProps {
   children: ReactNode
@@ -40,8 +41,9 @@ export function RequireAuth({
       <main className="flex min-h-screen items-center justify-center p-8">
         <p
           data-testid="auth-loading"
-          style={{ color: 'var(--color-text-muted)' }}
+          className="flex items-center gap-2 text-muted-foreground"
         >
+          <Spinner aria-hidden="true" />
           Checking session…
         </p>
       </main>
