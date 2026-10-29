@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HISTORY_DASHBOARD_PATH } from '../auth/paths'
+import { Button } from '@/ui/button'
+import { Field, FieldLabel } from '@/ui/field'
+import { Input } from '@/ui/input'
 
 /**
  * KAN-165 (FR14) — the "Open History Dashboard" link, carrying the
@@ -35,36 +38,32 @@ export function HistoryDashboardLink({ contractId }: { contractId: number }) {
   })
 
   return (
-    <div
-      className="flex flex-wrap items-end gap-3 text-sm"
-      data-testid="history-dashboard-panel"
-    >
-      <label className="flex flex-col gap-1" style={{ color: 'var(--color-text)' }}>
-        Du
-        <input
+    <div className="flex flex-wrap items-end gap-3 text-sm" data-testid="history-dashboard-panel">
+      <Field className="w-auto">
+        <FieldLabel htmlFor="history-date-from">Du</FieldLabel>
+        <Input
+          id="history-date-from"
           type="datetime-local"
           value={range.from}
           onChange={(event) => setRange((r) => ({ ...r, from: event.target.value }))}
           data-testid="history-date-from"
         />
-      </label>
-      <label className="flex flex-col gap-1" style={{ color: 'var(--color-text)' }}>
-        Au
-        <input
+      </Field>
+      <Field className="w-auto">
+        <FieldLabel htmlFor="history-date-to">Au</FieldLabel>
+        <Input
+          id="history-date-to"
           type="datetime-local"
           value={range.to}
           onChange={(event) => setRange((r) => ({ ...r, to: event.target.value }))}
           data-testid="history-date-to"
         />
-      </label>
-      <Link
-        to={`${HISTORY_DASHBOARD_PATH}?${params.toString()}`}
-        data-testid="history-dashboard-link"
-        className="rounded-md border px-3 py-2"
-        style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
-      >
-        Ouvrir le tableau de bord
-      </Link>
+      </Field>
+      <Button variant="outline" asChild>
+        <Link to={`${HISTORY_DASHBOARD_PATH}?${params.toString()}`} data-testid="history-dashboard-link">
+          Ouvrir le tableau de bord
+        </Link>
+      </Button>
     </div>
   )
 }

@@ -124,7 +124,7 @@ describe('ClientLogo (KAN-161 FR1-FR4, NFR6, NFR7)', () => {
 
     const img = await screen.findByTestId('client-logo')
     expect(img.className).toContain('max-h-20')
-    expect(img.className).toContain('max-w-[220px]')
+    expect(img.className).toContain('max-w-55')
     expect(img.className).toContain('object-contain')
   })
 })

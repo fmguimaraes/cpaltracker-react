@@ -75,8 +75,7 @@ export function ClientLogo() {
       <div
         data-testid="client-logo-placeholder"
         aria-hidden="true"
-        className="h-20 w-[220px] rounded-md"
-        style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+        className="h-20 w-55 rounded-md border border-border bg-card"
       />
     )
   }
@@ -86,7 +85,7 @@ export function ClientLogo() {
       src={logoUrl ?? undefined}
       alt="Logo du client"
       data-testid="client-logo"
-      className="max-h-20 max-w-[220px] object-contain"
+      className="max-h-20 max-w-55 object-contain"
     />
   )
 }

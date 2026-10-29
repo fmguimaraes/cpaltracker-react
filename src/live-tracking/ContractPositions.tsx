@@ -1,9 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { ApiError } from '../api/client'
 import { fetchPositions, type Position } from '../api/positions'
 import { DeviceFilter } from './DeviceFilter'
 import { useDeviceVisibilityStore } from './deviceVisibilityStore'
 import { PositionsMap } from './PositionsMap'
+import { FleetPanel } from './FleetPanel'
+import { massStatus } from './markerStyle'
+import { Alert } from '@/ui/alert'
+import { Button } from '@/ui/button'
+import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
+import { Skeleton } from '@/ui/skeleton'
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
@@ -47,9 +54,15 @@ function formatLastUpdated(date: Date): string {
 export function ContractPositions({
   contractId,
   onUnauthorized,
+  actionsSlot,
 }: {
   contractId: number
   onUnauthorized?: () => void
+  /**
+   * FR8: the page header's actions slot (last updated + refresh). `undefined`
+   * renders them inline above the map; `null` means the slot is not mounted yet.
+   */
+  actionsSlot?: HTMLElement | null
 }) {
   const [state, setState] = useState<LoadState>('loading')
   const [positions, setPositions] = useState<Position[]>([])
@@ -114,59 +127,79 @@ export function ContractPositions({
       })
   }
 
+  // Hooks stay above the early returns below.
+  const fleetStatuses = useMemo(() => positions.map((p) => massStatus(p.mass)), [positions])
+  const statusByChip = useMemo(
+    () => Object.fromEntries(positions.map((p) => [p.chipId, massStatus(p.mass)])),
+    [positions],
+  )
+
   if (state === 'loading') {
     return (
-      <p data-testid="positions-loading" style={{ color: 'var(--color-text-muted)' }}>
-        Chargement des positions…
-      </p>
+      <div data-testid="positions-loading" role="status" className="px-4 md:px-6">
+        <Skeleton className="h-96 w-full md:h-176" />
+        <span className="sr-only">Chargement des positions…</span>
+      </div>
     )
   }
 
   if (state === 'error') {
     return (
-      <p data-testid="positions-error" role="alert" style={{ color: 'var(--color-danger)' }}>
-        Impossible de charger les positions de ce contrat. Réessayez plus tard.
-      </p>
+      <div className="px-4 md:px-6">
+        <Alert variant="danger" data-testid="positions-error">
+          Impossible de charger les positions de ce contrat. Réessayez plus tard.
+        </Alert>
+      </div>
     )
   }
 
   const visiblePositions = positions.filter((p) => !hiddenChipIds.has(p.chipId))
 
+  const actions = (
+    <>
+      {lastUpdated && (
+        <span data-testid="positions-last-updated" className="text-sm text-muted-foreground tabular-nums">
+          Dernière mise à jour : {formatLastUpdated(lastUpdated)}
+        </span>
+      )}
+      <Button variant="outline" size="sm" onClick={refresh} disabled={refreshing} data-testid="positions-refresh">
+        {refreshing ? 'Rafraîchissement…' : 'Rafraîchir'}
+      </Button>
+    </>
+  )
+  let actionsNode: ReactNode = null
+  if (actionsSlot === undefined) actionsNode = <div className="flex items-center gap-3 px-4 md:px-6">{actions}</div>
+  else if (actionsSlot) actionsNode = createPortal(actions, actionsSlot)
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={refreshing}
-          data-testid="positions-refresh"
-          className="rounded-md border px-3 py-1 text-sm"
-          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
-        >
-          {refreshing ? 'Rafraîchissement…' : 'Rafraîchir'}
-        </button>
-        {lastUpdated && (
-          <span data-testid="positions-last-updated" style={{ color: 'var(--color-text-muted)' }}>
-            Dernière mise à jour : {formatLastUpdated(lastUpdated)}
-          </span>
-        )}
-      </div>
+    <div className="flex flex-col gap-4">
+      {actionsNode}
 
       {refreshError && (
-        <p data-testid="positions-refresh-error" role="alert" style={{ color: 'var(--color-danger)' }}>
-          {refreshError}
-        </p>
+        <div className="px-4 md:px-6">
+          <Alert variant="danger" data-testid="positions-refresh-error">
+            {refreshError}
+          </Alert>
+        </div>
       )}
 
       {positions.length === 0 ? (
-        <p data-testid="positions-empty" style={{ color: 'var(--color-text-muted)' }}>
-          Aucune position disponible pour ce contrat.
-        </p>
+        <div className="px-4 md:px-6">
+          <Empty data-testid="positions-empty">
+            <EmptyHeader>
+              <EmptyDescription>Aucune position disponible pour ce contrat.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </div>
       ) : (
-        <>
-          <DeviceFilter chipIds={positions.map((p) => p.chipId)} />
-          <PositionsMap positions={visiblePositions} />
-        </>
+        <div className="relative flex flex-col md:block md:h-176" data-testid="live-split">
+          <div className="h-96 md:h-full">
+            <PositionsMap positions={visiblePositions} />
+          </div>
+          <FleetPanel statuses={fleetStatuses}>
+            <DeviceFilter chipIds={positions.map((p) => p.chipId)} statuses={statusByChip} />
+          </FleetPanel>
+        </div>
       )}
     </div>
   )

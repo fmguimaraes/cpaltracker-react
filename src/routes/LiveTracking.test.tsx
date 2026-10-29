@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthContext'
 import { LiveTracking } from './LiveTracking'
 
@@ -16,6 +16,21 @@ const account = {
   lastLoginAt: null,
   mustChangePassword: false,
 }
+
+// FR8: the kit FleetMap observes its container; jsdom has no ResizeObserver,
+// and the fleet panel's DonutChart pulls Plotly (covered in a real browser).
+vi.mock('plotly.js-dist-min', () => ({ default: {} }))
+vi.mock('react-plotly.js/factory', () => ({ default: () => () => <div data-testid="mock-plot" /> }))
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+})
 
 function stubFetch(
   contractsResponse: Response | (() => Response),

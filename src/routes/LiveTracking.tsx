@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { fetchContracts, type Contract } from '../api/contracts'
-import { PageTitle } from '../chrome/PageTitle'
+import { Alert } from '@/ui/alert'
+import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
+import { PageHeader } from '@/ui/patterns/page-header'
+import { Skeleton } from '@/ui/skeleton'
+import { ToggleGroup, ToggleGroupItem } from '@/ui/toggle-group'
 import { ContractMessage } from '../live-tracking/ContractMessage'
 import { ContractPositions } from '../live-tracking/ContractPositions'
 import { GlobalMessage } from '../live-tracking/GlobalMessage'
@@ -27,8 +31,10 @@ type LoadState = 'loading' | 'loaded' | 'error'
  *
  * KAN-171 moved `ClientLogo` (previously mounted here) into the new shared
  * `AppChrome` (`App.tsx`), which now wraps this route — see `AppChrome`'s
- * own doc comment for why. The heading below uses the shared `PageTitle`
- * (FR9/FR10) instead of this route's own ad-hoc `<h1>` styling.
+ * own doc comment for why. The heading below uses the kit `PageHeader` (FR7/FR8)
+ * and the contract choice a `ToggleGroup` (single, radio semantics).
+ * FR8: PAT-SPLIT — the refresh action of `ContractPositions` is portalled into
+ * the header's actions slot.
  *
  * KAN-168 (FR15): the zero-contracts and empty-map states already existed
  * (`live-tracking-empty`, `positions-empty`); this component additionally
@@ -41,6 +47,7 @@ export function LiveTracking() {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [accessError, setAccessError] = useState<string | null>(null)
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null)
 
   // KAN-168 (FR15): a 404/403 on the selected contract means it's
   // unauthorized or doesn't exist for this account — the backend's
@@ -76,78 +83,86 @@ export function LiveTracking() {
   }, [])
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
-      <PageTitle>Suivi en direct</PageTitle>
+    <div className="flex flex-col gap-4 pb-6" data-testid="live-tracking">
+      <PageHeader
+        eyebrow="Flotte"
+        title="Suivi en direct"
+        actions={<div ref={setActionsSlot} className="flex flex-wrap items-center gap-3" />}
+      >
+        {state === 'loaded' && contracts.length > 0 && (
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={selectedId === null ? '' : String(selectedId)}
+            onValueChange={(value) => {
+              // Radix reports '' when the active item is clicked again: keep the selection.
+              if (value) selectContract(Number(value))
+            }}
+            role="radiogroup"
+            className="flex-wrap"
+            data-testid="contract-selector"
+            aria-label="Sélection du contrat"
+          >
+            {contracts.map((contract) => (
+              <ToggleGroupItem
+                key={contract.contractId}
+                value={String(contract.contractId)}
+                data-testid={`contract-option-${contract.contractId}`}
+              >
+                {contract.contractRef}
+                {contract.clientName ? ` (${contract.clientName})` : ''}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        )}
+      </PageHeader>
 
-      <GlobalMessage />
+      <div className="flex flex-col gap-4 px-4 md:px-6 empty:hidden">
+        <GlobalMessage />
 
-      {state === 'loading' && (
-        <p data-testid="live-tracking-loading" style={{ color: 'var(--color-text-muted)' }}>
-          Chargement des contrats…
-        </p>
-      )}
+        {state === 'loading' && (
+          <div data-testid="live-tracking-loading" role="status">
+            <Skeleton className="h-9 w-64" />
+            <span className="sr-only">Chargement des contrats…</span>
+          </div>
+        )}
 
-      {state === 'error' && (
-        <p
-          data-testid="live-tracking-error"
-          role="alert"
-          style={{ color: 'var(--color-danger)' }}
-        >
-          Impossible de charger vos contrats. Réessayez plus tard.
-        </p>
-      )}
+        {state === 'error' && (
+          <Alert variant="danger" data-testid="live-tracking-error">
+            Impossible de charger vos contrats. Réessayez plus tard.
+          </Alert>
+        )}
 
-      {state === 'loaded' && contracts.length === 0 && (
-        <p data-testid="live-tracking-empty" style={{ color: 'var(--color-text-muted)' }}>
-          Aucun contrat n'est associé à votre compte.
-        </p>
-      )}
+        {state === 'loaded' && contracts.length === 0 && (
+          <Empty data-testid="live-tracking-empty">
+            <EmptyHeader>
+              <EmptyDescription>Aucun contrat n'est associé à votre compte.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
 
-      {state === 'loaded' && contracts.length > 0 && (
-        <div
-          role="radiogroup"
-          className="flex flex-col gap-2"
-          data-testid="contract-selector"
-          aria-label="Sélection du contrat"
-        >
-          {contracts.map((contract) => (
-            <button
-              key={contract.contractId}
-              type="button"
-              role="radio"
-              data-testid={`contract-option-${contract.contractId}`}
-              aria-checked={selectedId === contract.contractId}
-              onClick={() => selectContract(contract.contractId)}
-              className="rounded-md border px-3 py-2 text-left text-sm"
-              style={{
-                borderColor:
-                  selectedId === contract.contractId
-                    ? 'var(--color-primary)'
-                    : 'var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-              }}
-            >
-              {contract.contractRef}
-              {contract.clientName ? ` (${contract.clientName})` : ''}
-            </button>
-          ))}
-        </div>
-      )}
+        {accessError && (
+          <Alert variant="danger" data-testid="contract-access-error">
+            {accessError}
+          </Alert>
+        )}
 
-      {accessError && (
-        <p data-testid="contract-access-error" role="alert" style={{ color: 'var(--color-danger)' }}>
-          {accessError}
-        </p>
-      )}
+        {selectedId !== null && <ContractMessage contractId={selectedId} />}
+      </div>
 
       {selectedId !== null && (
         <>
-          <ContractMessage contractId={selectedId} />
-          <ContractPositions contractId={selectedId} onUnauthorized={handleUnauthorizedContract} />
-          <HistoryDashboardLink contractId={selectedId} />
+          <ContractPositions
+            contractId={selectedId}
+            onUnauthorized={handleUnauthorizedContract}
+            actionsSlot={actionsSlot}
+          />
+          <div className="px-4 md:px-6">
+            <HistoryDashboardLink contractId={selectedId} />
+          </div>
         </>
       )}
-    </main>
+    </div>
   )
 }

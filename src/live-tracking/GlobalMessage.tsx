@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchGlobalMessage, type Message } from '../api/messages'
+import { Alert } from '@/ui/alert'
 import { formatMessageDate } from './messageFormat'
 
 /**
@@ -33,14 +34,9 @@ export function GlobalMessage() {
   if (!message) return null
 
   return (
-    <div
-      data-testid="global-message"
-      role="status"
-      className="rounded-md border p-3 text-sm"
-      style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
-    >
-      <p style={{ color: 'var(--color-text-muted)' }}>{formatMessageDate(message.date)}</p>
-      <p style={{ whiteSpace: 'pre-line' }}>{message.contenu}</p>
-    </div>
+    <Alert data-testid="global-message" role="status" className="gap-1">
+      <p className="text-muted-foreground">{formatMessageDate(message.date)}</p>
+      <p className="whitespace-pre-line">{message.contenu}</p>
+    </Alert>
   )
 }
