@@ -1,2 +1,136 @@
 @import 'tailwindcss';
-@import './theme/tokens.css';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import 'leaflet/dist/leaflet.css';
+@import './styles/tokens.css';
+@import './styles/legacy-aliases.css';
+
+/* Dark is the default theme (D7); the `dark:` variant follows data-theme, never a class */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Token → Tailwind utility mapping. No values here: every value lives in styles/tokens.css */
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-body: var(--body);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-media: var(--media);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-offline: var(--offline);
+  --color-offline-soft: var(--offline-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-status-foreground: var(--status-foreground);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-axis: var(--chart-axis);
+  --color-chart-grid: var(--chart-grid);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  --shadow-overlay: var(--shadow-overlay);
+  --shadow-media: var(--shadow-media);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-body antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply text-foreground;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+/* Leaflet bridge (D8): the basemap follows the theme through one token */
+.leaflet-container {
+  @apply bg-media font-sans;
+}
+.leaflet-tile-pane {
+  filter: var(--map-tile-filter);
+}
+
+/*
+ * KAN-171 (FR11, NFR8): reduced motion app-wide. A user who asked their OS to reduce motion
+ * never sees a component-level transition or animation win over this rule.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * KAN-171 (FR9, FR11, NFR8): app-wide rules the kit's utilities (src/ui, not editable here) would
+ * otherwise win over. Unlayered on purpose so they outrank the utilities layer.
+ * - Page titles shrink below the 768 px cutoff (desktop size stays the kit's).
+ * - Keyboard focus always shows a solid ring outline, on top of the kit's box-shadow ring.
+ */
+@media (max-width: 767px) {
+  h1 {
+    font-size: var(--font-size-lg);
+  }
+}
+:focus-visible {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--color-ring);
+}
