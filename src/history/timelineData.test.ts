@@ -6,10 +6,11 @@ import {
   buildDeviceSeries,
   computeSliderBounds,
   computeVisibleMarkers,
-  DEVICE_PALETTE,
   findLastIndexAtOrBefore,
+  formatUtc,
   formatUtcInstant,
-  massFillColor,
+  massStatus,
+  visibleDeviceOrder,
   replayStepMs,
   trailPositions,
 } from './timelineData'
@@ -32,14 +33,14 @@ function row(overrides: Partial<HistoryRow>): HistoryRow {
 }
 
 describe('buildDeviceSeries (CB19)', () => {
-  it('assigns one palette color per device in first-seen order, wrapping past 10', () => {
+  it('keeps one entry per device in first-seen order, without any colour', () => {
     const rows: HistoryRow[] = Array.from({ length: 11 }, (_, i) =>
       row({ c: `CHIP-${i}`, t: i * 1000 }),
     )
     const byDevice = buildDeviceSeries(rows)
-    expect(byDevice.get('CHIP-0')!.color).toBe(DEVICE_PALETTE[0])
-    expect(byDevice.get('CHIP-9')!.color).toBe(DEVICE_PALETTE[9])
-    expect(byDevice.get('CHIP-10')!.color).toBe(DEVICE_PALETTE[0]) // wraps
+    expect([...byDevice.keys()][0]).toBe('CHIP-0')
+    expect(byDevice.size).toBe(11)
+    expect(byDevice.get('CHIP-0')).not.toHaveProperty('color')
   })
 
   it('keeps only geolocated rows (p===1 and non-null la/lo) in a device series', () => {
@@ -116,14 +117,28 @@ describe('activeLotAt (CB22)', () => {
   })
 })
 
-describe('massFillColor (CB21)', () => {
-  it('thresholds at 200 and 500, grey for null/NaN', () => {
-    expect(massFillColor(null)).toBe('#9e9e9e')
-    expect(massFillColor(NaN)).toBe('#9e9e9e')
-    expect(massFillColor(199)).toBe('#c62828')
-    expect(massFillColor(200)).toBe('#ef6c00')
-    expect(massFillColor(499)).toBe('#ef6c00')
-    expect(massFillColor(500)).toBe('#2e7d32')
+describe('massStatus (CB21, F-22)', () => {
+  it('thresholds at 200 and 500 mapped to the D3 states, offline for null/NaN', () => {
+    expect(massStatus(null)).toBe('offline')
+    expect(massStatus(NaN)).toBe('offline')
+    expect(massStatus(199)).toBe('alert')
+    expect(massStatus(200)).toBe('warning')
+    expect(massStatus(499)).toBe('warning')
+    expect(massStatus(500)).toBe('ok')
+  })
+})
+
+describe('visibleDeviceOrder (K-7)', () => {
+  const rows: HistoryRow[] = [
+    row({ c: 'CHIP-A', t: 1000 }),
+    row({ c: 'CHIP-B', t: 2000 }),
+    row({ c: 'CHIP-C', t: 3000 }),
+  ]
+  it('lists every device in first-seen order when nothing is filtered', () => {
+    expect(visibleDeviceOrder(rows, null)).toEqual(['CHIP-A', 'CHIP-B', 'CHIP-C'])
+  })
+  it('keeps first-seen order among the visible devices only', () => {
+    expect(visibleDeviceOrder(rows, ['CHIP-C', 'CHIP-A'])).toEqual(['CHIP-A', 'CHIP-C'])
   })
 })
 
@@ -179,6 +194,12 @@ describe('replayStepMs (CB24)', () => {
   it('advances by max(1000, floor(span/200)) ms', () => {
     expect(replayStepMs(0, 400_000)).toBe(2000)
     expect(replayStepMs(0, 100)).toBe(1000)
+  })
+})
+
+describe('formatUtc', () => {
+  it('formats an instant in UTC as AAAA-MM-JJ HH:MM:SS with no suffix (monolith formatUTC)', () => {
+    expect(formatUtc(Date.UTC(2026, 11, 31, 23, 59, 7))).toBe('2026-12-31 23:59:07')
   })
 })
 

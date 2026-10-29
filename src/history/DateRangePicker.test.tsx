@@ -42,7 +42,7 @@ describe('DateRangePicker (KAN-170 FR5-FR8, NFR4)', () => {
     expect(screen.getByTestId('date-range-error')).toBeInTheDocument()
   })
 
-  it('rejects a malformed start date, naming the field, and does NOT call onApply (FR5, FR7)', () => {
+  it('rejects a malformed start date, naming the field, and does NOT call onApply (FR5, FR7)', async () => {
     const onApply = vi.fn()
     render(<DateRangePicker onApply={onApply} />)
 
@@ -50,11 +50,12 @@ describe('DateRangePicker (KAN-170 FR5-FR8, NFR4)', () => {
     fireEvent.click(screen.getByTestId('date-range-apply'))
 
     expect(onApply).not.toHaveBeenCalled()
-    expect(screen.getByTestId('date-range-start-error')).toBeInTheDocument()
+    // The kit's typed field renders the error; the test ids are stamped on its nodes right after.
+    expect(await screen.findByTestId('date-range-start-error')).toHaveTextContent('date de début')
     expect(screen.getByTestId('date-range-start')).toHaveAttribute('aria-invalid', 'true')
   })
 
-  it('rejects a malformed end date, naming the field, and does NOT call onApply (FR5, FR7)', () => {
+  it('rejects a malformed end date, naming the field, and does NOT call onApply (FR5, FR7)', async () => {
     const onApply = vi.fn()
     render(<DateRangePicker onApply={onApply} />)
 
@@ -62,7 +63,7 @@ describe('DateRangePicker (KAN-170 FR5-FR8, NFR4)', () => {
     fireEvent.click(screen.getByTestId('date-range-apply'))
 
     expect(onApply).not.toHaveBeenCalled()
-    expect(screen.getByTestId('date-range-end-error')).toBeInTheDocument()
+    expect(await screen.findByTestId('date-range-end-error')).toHaveTextContent('date de fin')
   })
 
   it('rejects an over-maximum span, stating the limit, and does NOT call onApply (FR5, FR8)', () => {

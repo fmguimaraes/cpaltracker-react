@@ -14,6 +14,10 @@
 
 export const MAX_SPAN_YEARS = 1
 
+/** The two field-level "invalid date" messages, shared by the validator and the typed date fields (K-5). */
+export const START_DATE_INVALID_MESSAGE = 'La date de début est invalide (AAAA-MM-JJ).'
+export const END_DATE_INVALID_MESSAGE = 'La date de fin est invalide (AAAA-MM-JJ).'
+
 export type DateRangeFieldError =
   | { field: 'start'; code: 'invalid_start'; message: string }
   | { field: 'end'; code: 'invalid_end'; message: string }
@@ -84,7 +88,7 @@ export function validateDateRangeInputs(startRaw: string, endRaw: string): DateR
   if (start === 'invalid') {
     return {
       ok: false,
-      error: { field: 'start', code: 'invalid_start', message: 'La date de début est invalide (AAAA-MM-JJ).' },
+      error: { field: 'start', code: 'invalid_start', message: START_DATE_INVALID_MESSAGE },
     }
   }
 
@@ -92,7 +96,7 @@ export function validateDateRangeInputs(startRaw: string, endRaw: string): DateR
   if (end === 'invalid') {
     return {
       ok: false,
-      error: { field: 'end', code: 'invalid_end', message: 'La date de fin est invalide (AAAA-MM-JJ).' },
+      error: { field: 'end', code: 'invalid_end', message: END_DATE_INVALID_MESSAGE },
     }
   }
 

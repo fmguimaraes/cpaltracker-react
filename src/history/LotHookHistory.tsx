@@ -1,4 +1,5 @@
 import type { HistoryHook } from '../api/history'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table'
 import { formatLotHookRows } from './lotHooks'
 
 /**
@@ -15,42 +16,42 @@ export function LotHookHistory({ hooks }: { hooks: HistoryHook[] }) {
 
   if (rows.length === 0) {
     return (
-      <p data-testid="lot-hook-history-empty" style={{ color: 'var(--color-text-muted)' }}>
+      <p data-testid="lot-hook-history-empty" className="text-sm text-muted-foreground">
         Aucun historique d'accrochage de lot sur cette période.
       </p>
     )
   }
 
   return (
-    <table data-testid="lot-hook-history" className="w-full text-sm" style={{ color: 'var(--color-text)' }}>
-      <thead>
-        <tr>
-          <th className="text-left">Appareil</th>
-          <th className="text-left">Lot cPAL</th>
-          <th className="text-left">Lot client</th>
-          <th className="text-left">Du</th>
-          <th className="text-left">Au</th>
-          <th className="text-left">Poids net</th>
-          <th className="text-left">Poids brut</th>
-          <th className="text-left">Quantité</th>
-          <th className="text-left">Péremption</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table data-testid="lot-hook-history" className="tabular-nums" containerClassName="overflow-x-auto">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Appareil</TableHead>
+          <TableHead>Lot cPAL</TableHead>
+          <TableHead>Lot client</TableHead>
+          <TableHead>Du</TableHead>
+          <TableHead>Au</TableHead>
+          <TableHead className="text-right">Poids net</TableHead>
+          <TableHead className="text-right">Poids brut</TableHead>
+          <TableHead className="text-right">Quantité</TableHead>
+          <TableHead>Péremption</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row, index) => (
-          <tr key={`${row.chipId}-${row.cpalLot}-${index}`} data-testid={`lot-hook-row-${index}`}>
-            <td>{row.chipId}</td>
-            <td>{row.cpalLot}</td>
-            <td>{row.clientLot}</td>
-            <td>{row.from}</td>
-            <td>{row.to}</td>
-            <td>{row.netWeight}</td>
-            <td>{row.grossWeight}</td>
-            <td>{row.quantity}</td>
-            <td>{row.expiry}</td>
-          </tr>
+          <TableRow key={`${row.chipId}-${row.cpalLot}-${index}`} data-testid={`lot-hook-row-${index}`}>
+            <TableCell className="font-mono">{row.chipId}</TableCell>
+            <TableCell>{row.cpalLot}</TableCell>
+            <TableCell>{row.clientLot}</TableCell>
+            <TableCell>{row.from}</TableCell>
+            <TableCell>{row.to}</TableCell>
+            <TableCell className="text-right">{row.netWeight}</TableCell>
+            <TableCell className="text-right">{row.grossWeight}</TableCell>
+            <TableCell className="text-right">{row.quantity}</TableCell>
+            <TableCell>{row.expiry}</TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   )
 }

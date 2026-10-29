@@ -1,3 +1,6 @@
+import { TriangleAlert } from 'lucide-react'
+import { Alert } from '@/ui/alert'
+
 /**
  * KAN-175 (FR22) — the downsampling warning banner, replicating CB10/CB11
  * exactly: shown only when the response is flagged `sampled: true`, naming
@@ -8,14 +11,12 @@ export function SamplingBanner({ sampled, count, total }: { sampled: boolean; co
   if (!sampled) return null
 
   return (
-    <p
-      data-testid="history-sampling-banner"
-      role="status"
-      className="rounded-md border p-2 text-sm"
-      style={{ borderColor: 'var(--color-warning)', color: 'var(--color-warning)' }}
-    >
-      Résultat échantillonné : affichage de {count} mesure(s) sur {total} au total. Réduisez la période pour plus
-      de précision.
-    </p>
+    <Alert variant="warning" role="status" data-testid="history-sampling-banner">
+      <TriangleAlert aria-hidden />
+      <div>
+        Résultat échantillonné : affichage de {count} mesure(s) sur {total} au total. Réduisez la période pour plus
+        de précision.
+      </div>
+    </Alert>
   )
 }

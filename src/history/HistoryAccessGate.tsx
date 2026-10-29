@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Alert } from '@/ui/alert'
+import { Button } from '@/ui/button'
 import { useDefaultDateRange, type DefaultDateRangeState } from './useDefaultDateRange'
 
 type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
@@ -50,6 +52,7 @@ export function HistoryAccessGate({
   contractId,
   onUnauthorized,
   children,
+  onStateChange,
 }: {
   contractId: number
   /**
@@ -60,12 +63,24 @@ export function HistoryAccessGate({
    */
   onUnauthorized?: () => void
   children: (resolved: ReadyState) => ReactNode
+  /**
+   * KAN-226 (FR9) — reports every state change of the gate to the page, so
+   * the page header's `TimePicker` can read the resolved range and apply a
+   * new one. Optional: the gate itself still renders only its own states.
+   */
+  onStateChange?: (state: DefaultDateRangeState) => void
 }) {
   const state = useDefaultDateRange(contractId)
 
   const onUnauthorizedRef = useRef(onUnauthorized)
   onUnauthorizedRef.current = onUnauthorized
   const notifiedRef = useRef(false)
+
+  const onStateChangeRef = useRef(onStateChange)
+  onStateChangeRef.current = onStateChange
+  useEffect(() => {
+    onStateChangeRef.current?.(state)
+  }, [state])
 
   useEffect(() => {
     if (state.status === 'unauthorized' && !notifiedRef.current) {
@@ -87,7 +102,7 @@ export function HistoryAccessGate({
 
   if (state.status === 'loading') {
     return (
-      <p data-testid="history-access-loading" style={{ color: 'var(--color-text-muted)' }}>
+      <p data-testid="history-access-loading" className="text-sm text-muted-foreground">
         Chargement de l'historique…
       </p>
     )
@@ -97,33 +112,28 @@ export function HistoryAccessGate({
     // FR25/NFR5 — identical message and markup for "doesn't exist" and
     // "exists but isn't yours"; never mentions the contract id.
     return (
-      <p data-testid="history-access-error" role="alert" style={{ color: 'var(--color-danger)' }}>
+      <Alert variant="danger" data-testid="history-access-error">
         Ce contrat n'est pas disponible. Sélectionnez-en un autre.
-      </p>
+      </Alert>
     )
   }
 
   if (state.status === 'error') {
     if (dismissed) return null
     return (
-      <p
-        data-testid="history-fetch-error"
-        role="alert"
-        className="flex items-center justify-between gap-3"
-        style={{ color: 'var(--color-danger)' }}
-      >
+      <Alert variant="danger" className="flex items-center justify-between gap-3" data-testid="history-fetch-error">
         <span>Impossible de charger l'historique de ce contrat. Réessayez plus tard.</span>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           data-testid="history-fetch-error-dismiss"
           aria-label="Fermer ce message"
           onClick={() => setDismissed(true)}
-          className="rounded-md border px-2 py-0.5 text-xs"
-          style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}
         >
           Fermer
-        </button>
-      </p>
+        </Button>
+      </Alert>
     )
   }
 

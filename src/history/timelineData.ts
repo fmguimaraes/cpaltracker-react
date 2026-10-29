@@ -1,4 +1,5 @@
 import type { HistoryHook, HistoryRow } from '../api/history'
+import type { DeviceStatus } from '@/ui/status'
 
 /**
  * KAN-174 (FR10-18, NFR1, NFR3) — pure, Leaflet-independent trail/replay
@@ -8,26 +9,8 @@ import type { HistoryHook, HistoryRow } from '../api/history'
  * synchronous and allocation-light per slider move).
  */
 
-/** CB19 — fixed 10-entry palette, assigned in first-seen device order,
- * wrapping past 10 distinct devices. Identical hex values to the legacy
- * `PALETTE` constant (`map_timeline.js`), not re-picked. */
-export const DEVICE_PALETTE = [
-  '#1A237E',
-  '#00838F',
-  '#AD1457',
-  '#4E342E',
-  '#33691E',
-  '#4527A0',
-  '#00695C',
-  '#BF360C',
-  '#37474F',
-  '#6A1B9A',
-] as const
-
 export interface DeviceSeries {
   chipId: string
-  /** CB19/CB21 — this device's stable palette color (marker border). */
-  color: string
   /** Only geolocated rows (`p === 1 && la !== null && lo !== null`),
    * sorted ascending by `t` (CB19). */
   positions: HistoryRow[]
@@ -43,13 +26,11 @@ export interface DeviceSeries {
 export function buildDeviceSeries(rows: HistoryRow[]): Map<string, DeviceSeries> {
   const sorted = rows.slice().sort((a, b) => a.t - b.t)
   const byDevice = new Map<string, DeviceSeries>()
-  let seen = 0
   for (const row of sorted) {
     let entry = byDevice.get(row.c)
     if (!entry) {
-      entry = { chipId: row.c, color: DEVICE_PALETTE[seen % DEVICE_PALETTE.length], positions: [] }
+      entry = { chipId: row.c, positions: [] }
       byDevice.set(row.c, entry)
-      seen++
     }
     if (row.p === 1 && row.la !== null && row.lo !== null) {
       entry.positions.push(row)
@@ -113,19 +94,36 @@ export function activeLotAt(hooks: HistoryHook[], chipId: string, instant: numbe
   return null
 }
 
-/** CB21 — marker fill color from measured mass; `null`/`NaN` is grey,
- * matching `couleurMasse`'s thresholds exactly (`< 200` red, `< 500`
- * orange, else green). */
-export function massFillColor(mass: number | null): string {
-  if (mass === null || Number.isNaN(mass)) return '#9e9e9e'
-  if (mass < 200) return '#c62828'
-  if (mass < 500) return '#ef6c00'
-  return '#2e7d32'
+/** CB21 — marker state from measured mass, same thresholds as `couleurMasse`
+ * (`< 200` red, `< 500` orange, else green) mapped to the four D3 states
+ * (F-22): alert, warning (yellow, never orange), ok; `null`/`NaN` is offline
+ * (grey). The kit marker turns the state into token classes. */
+export function massStatus(mass: number | null): DeviceStatus {
+  if (mass === null || Number.isNaN(mass)) return 'offline'
+  if (mass < 200) return 'alert'
+  if (mass < 500) return 'warning'
+  return 'ok'
+}
+
+/**
+ * K-7 — the ONE stable device index shared by the map markers and every
+ * chart: a device's position among the visible devices, in `byDevice`
+ * (first-seen) order. Markers (`MapDevice.series`) and chart series
+ * (`TimeSeriesChart` colours by array position) both read this, so a device
+ * has the same colour/dash/symbol everywhere, even when it has no value for
+ * a given chart field.
+ */
+export function visibleDeviceOrder(rows: HistoryRow[], visibleIds: string[] | null): string[] {
+  const order: string[] = []
+  for (const chipId of buildDeviceSeries(rows).keys()) {
+    if (visibleIds !== null && !visibleIds.includes(chipId)) continue
+    order.push(chipId)
+  }
+  return order
 }
 
 export interface VisibleMarker {
   chipId: string
-  color: string
   row: HistoryRow
   /** Index of `row` within `series` — needed by the trail (CB23), which
    * draws from series-start up to (and including) this index, never the
@@ -153,7 +151,7 @@ export function computeVisibleMarkers(
     if (entry.positions.length === 0) continue
     const idx = findLastIndexAtOrBefore(entry.positions, instant)
     if (idx < 0) continue
-    markers.push({ chipId: entry.chipId, color: entry.color, row: entry.positions[idx], idx, series: entry.positions })
+    markers.push({ chipId: entry.chipId, row: entry.positions[idx], idx, series: entry.positions })
   }
   return markers
 }
@@ -191,13 +189,20 @@ export function replayStepMs(min: number, max: number): number {
 /** CB24 — fixed 80ms wall-clock tick interval for the replay animation. */
 export const REPLAY_TICK_MS = 80
 
-/** Shared UTC formatter for the slider's instant label and the tooltip's
- * measurement date/time field (CB22's `formatUTC`): `AAAA-MM-JJ
- * HH:MM:SS UTC`. */
-export function formatUtcInstant(ms: number): string {
+/** CB22's `formatUTC` (map_timeline.js): an instant as `AAAA-MM-JJ HH:MM:SS` in UTC, no suffix.
+ * Also the history charts' x-axis values (dashboard.php formats its axis with the same UTC
+ * helper), so the charts and the timeline never disagree with the browser's time zone. */
+export function formatUtc(ms: number): string {
   const d = new Date(ms)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(
     d.getUTCMinutes(),
-  )}:${pad(d.getUTCSeconds())} UTC`
+  )}:${pad(d.getUTCSeconds())}`
+}
+
+/** Shared UTC formatter for the slider's instant label and the tooltip's
+ * measurement date/time field (CB22's `formatUTC(...) + ' UTC'`): `AAAA-MM-JJ
+ * HH:MM:SS UTC`. */
+export function formatUtcInstant(ms: number): string {
+  return `${formatUtc(ms)} UTC`
 }

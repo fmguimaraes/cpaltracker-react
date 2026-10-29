@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HistoryResponse } from '../api/history'
 import { HistoryReadyPanel } from './HistoryReadyPanel'
 
@@ -12,6 +12,18 @@ vi.mock('plotly.js-dist-min', () => ({ default: {} }))
 vi.mock('react-plotly.js/factory', () => ({
   default: () => () => <div data-testid="mock-plot" />,
 }))
+
+// The kit Slider (Radix) observes its thumb; jsdom has no ResizeObserver.
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+})
 
 function historyResponse(overrides: Partial<HistoryResponse> = {}): HistoryResponse {
   return {

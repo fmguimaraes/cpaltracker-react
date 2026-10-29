@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthContext'
 import { HistoryDashboard } from './HistoryDashboard'
 
@@ -15,6 +15,18 @@ vi.mock('plotly.js-dist-min', () => ({ default: {} }))
 vi.mock('react-plotly.js/factory', () => ({
   default: () => () => null,
 }))
+
+// The ready state mounts the kit Slider (Radix), which observes its thumb; jsdom has no ResizeObserver.
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+})
 
 const account = {
   userId: 1,
@@ -168,6 +180,12 @@ describe('HistoryDashboard (KAN-172 FR1, FR2, FR25, NFR5)', () => {
     expect(option).toHaveAttribute('aria-checked', 'true')
     await waitFor(() => expect(screen.getByTestId('history-dashboard-ready')).toBeInTheDocument())
     expect(screen.getByTestId('history-dashboard-ready')).toHaveTextContent('REF-12')
+    // FR9: the contract is a FilterBar chip, the TimePicker sits in the header, and the Stat row
+    // replaces the text summary (F-40).
+    expect(screen.getByTestId('filter-chip')).toHaveTextContent('Contrat = REF-012')
+    expect(within(screen.getByTestId('page-header')).getByTestId('time-picker')).toBeInTheDocument()
+    expect(screen.getByTestId('history-dashboard-ready')).not.toHaveTextContent(/appareil\(s\), \d+ mesure\(s\)/)
+    expect(screen.getByTestId('selection-summary')).toBeInTheDocument()
   })
 
   it('accepts a numeric contrat_id query param as the initial selection and loads it directly (FR2, deep link from Live Tracking)', async () => {

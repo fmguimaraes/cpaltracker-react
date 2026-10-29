@@ -1,16 +1,11 @@
-import Plotly from 'plotly.js-dist-min'
-import createPlotlyComponent from 'react-plotly.js/factory'
 import type { HistoryRow } from '../api/history'
-import { useThemeStore } from '../store/themeStore'
-import { CHART_COLORS } from '../theme/chartColors'
+import { TimeSeriesChart, type Series } from '@/ui/charts/time-series-chart'
+import { WidgetCard } from '@/ui/widget-card'
 import { buildChartTraces, CHART_FIELD_LABELS, type ChartField } from './chartData'
+import { formatUtc } from './timelineData'
 
-// NFR1 — bundled via the `./factory` entry point with `plotly.js-dist-min`
-// (the slimmer pre-built bundle, no CDN/`unpkg` fetch), instead of
-// `react-plotly.js`'s own default export, which imports the full
-// `plotly.js` package directly and cannot be redirected to a smaller
-// bundle.
-const Plot = createPlotlyComponent(Plotly)
+// FR9: the three charts are the kit's `TimeSeriesChart` (Plotly via the kit's `Plot`, themed by
+// `useChartTheme`), one `WidgetCard` per `ChartField`.
 
 /**
  * KAN-175 (FR19, FR20, NFR1) — the three Plotly charts (temperature,
@@ -22,8 +17,10 @@ const Plot = createPlotlyComponent(Plotly)
  * reuse from the map's own palette) lives in `chartData.ts`, kept pure so
  * it needs no chart library to unit-test (same split as
  * `TimelineMap.tsx`/`timelineData.ts`) — this component only maps that pure
- * data to Plotly's `data`/`layout` props. CB27: the x-axis is left at
- * Plotly's default `'linear'` type (never `'date'`), and no `range` is ever
+ * data to Plotly's `data`/`layout` props. CB27: the x-axis (FR9) is now date-typed:
+ * epoch-ms `t` is formatted in UTC to `yyyy-MM-dd HH:mm:ss` strings (`formatUtc`, the monolith's
+ * `formatUTC` as dashboard.php uses it for its axis; no " UTC" suffix on axis values), which
+ * Plotly types as dates without shifting them to the browser's time zone, and no `range` is ever
  * set on the y-axis — there is no fixed y-bound/clipping anywhere in this
  * file, matching the legacy chart's explicit "no clipping" behavior
  * (v2.1 changelog removing the 0–1500kg mass-axis limiter).
@@ -35,15 +32,11 @@ const Plot = createPlotlyComponent(Plotly)
  * component never calls `fetch`.
  *
  * KAN-176 (FR26) — Plotly draws its chart background/gridlines/text as SVG
- * presentation attributes, which (unlike a CSS `style` property) never
- * resolve `var(--token)`; passing a `var(...)` string straight into
- * `paper_bgcolor`/`font.color` is silently ignored and the chart stays
- * Plotly's own white/black default regardless of the app's theme — a real
- * dark-mode defect this story's review flagged. `CHART_COLORS` mirrors the
- * same tokens as plain hex (the `breakpoints.ts` pattern, same reasoning),
- * and the component re-subscribes to `useThemeStore` so flipping the theme
- * re-renders every chart with the matching palette with no reload (FR26,
- * NFR6 "single state change").
+ * presentation attributes, which never resolve `var(--token)`. KAN-223 (FR4):
+ * the kit's `useChartTheme` resolves the theme roles (`--card`,
+ * `--foreground`, `--chart-grid`) to concrete colors and re-reads them when
+ * `<html data-theme>` changes, so flipping the theme re-themes every chart
+ * with no reload (FR26, NFR6 "single state change").
  */
 export interface HistoryChartsProps {
   rows: HistoryRow[]
@@ -52,14 +45,17 @@ export interface HistoryChartsProps {
 
 const FIELDS: ChartField[] = ['ta', 'hr', 'm']
 
+/** Safe temperature band drawn on the temperature chart (FR9). */
+const TEMPERATURE_THRESHOLD = { min: 2, max: 8 }
+
+const FIELD_UNITS: Record<ChartField, string> = { ta: '°C', hr: '%', m: 'kg' }
+
 export function HistoryCharts({ rows, visibleDeviceIds = null }: HistoryChartsProps) {
-  const theme = useThemeStore((state) => state.theme)
-  const colors = CHART_COLORS[theme]
   const hasRows = rows.length > 0
 
   if (!hasRows) {
     return (
-      <p data-testid="history-charts-empty" style={{ color: 'var(--color-text-muted)' }}>
+      <p data-testid="history-charts-empty" className="text-sm text-muted-foreground">
         Aucune mesure à représenter.
       </p>
     )
@@ -69,51 +65,28 @@ export function HistoryCharts({ rows, visibleDeviceIds = null }: HistoryChartsPr
     <div className="flex flex-col gap-4" data-testid="history-charts">
       {FIELDS.map((field) => {
         const traces = buildChartTraces(rows, visibleDeviceIds, field)
+        // `TimeSeriesChart` styles series by position (palette cycle + dash/symbol overflow rule):
+        // `buildChartTraces` keeps one slot per visible device, so positions match the map (K-7).
+        const series: Series[] = traces.map((trace) => ({
+          name: trace.chipId,
+          x: trace.x.map(formatUtc),
+          y: trace.y,
+        }))
+        const hasPoints = traces.some((trace) => trace.x.length > 0)
         return (
           <div key={field} data-testid={`history-chart-${field}`}>
-            <Plot
-              // `'scatter'` (SVG), not `'scattergl'`: the server already
-              // caps any single response at `MAX_POINTS = 25000` total
-              // across ALL devices (CB10), so SVG rendering stays
-              // responsive at this scale without needing a WebGL context —
-              // which also keeps this chart portable to headless/CI
-              // browsers with no GPU.
-              data={traces.map((trace) => ({
-                x: trace.x,
-                y: trace.y,
-                type: 'scatter',
-                mode: 'lines+markers',
-                name: trace.chipId,
-                line: { color: trace.color },
-                marker: { color: trace.color, size: 4 },
-              }))}
-              layout={{
-                title: { text: CHART_FIELD_LABELS[field], font: { color: colors.text } },
-                autosize: true,
-                height: 260,
-                margin: { l: 50, r: 20, t: 40, b: 40 },
-                paper_bgcolor: colors.paper,
-                plot_bgcolor: colors.plot,
-                font: { color: colors.text },
-                xaxis: {
-                  title: { text: 'Horodatage (époque, ms)' },
-                  color: colors.text,
-                  gridcolor: colors.grid,
-                  linecolor: colors.grid,
-                },
-                yaxis: {
-                  title: { text: CHART_FIELD_LABELS[field] },
-                  color: colors.text,
-                  gridcolor: colors.grid,
-                  linecolor: colors.grid,
-                },
-                showlegend: true,
-                legend: { font: { color: colors.text } },
-              }}
-              style={{ width: '100%' }}
-              useResizeHandler
-              config={{ responsive: true, displaylogo: false }}
-            />
+            <WidgetCard
+              title={CHART_FIELD_LABELS[field]}
+              empty={hasPoints ? undefined : { title: 'Aucune mesure à représenter.' }}
+            >
+              <TimeSeriesChart
+                className="h-72 w-full"
+                series={series}
+                unit={FIELD_UNITS[field]}
+                threshold={field === 'ta' ? TEMPERATURE_THRESHOLD : undefined}
+                label={CHART_FIELD_LABELS[field]}
+              />
+            </WidgetCard>
           </div>
         )
       })}

@@ -1,18 +1,29 @@
-import L from 'leaflet'
+import type L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leaflet'
+import { Pause, Play, Maximize2, TriangleAlert } from 'lucide-react'
 import type { HistoryHook, HistoryRow } from '../api/history'
+import { Alert } from '@/ui/alert'
+import { Button } from '@/ui/button'
+import { ButtonGroup } from '@/ui/button-group'
+import { Label } from '@/ui/label'
+import { Slider } from '@/ui/slider'
+import { Switch } from '@/ui/switch'
+import { WidgetCard } from '@/ui/widget-card'
+import { useChartTheme } from '@/ui/charts/use-chart-theme'
+import { deviceIcon, type MapDevice } from '@/ui/map'
 import {
   allPositionsForFit,
   buildDeviceSeries,
   computeSliderBounds,
   computeVisibleMarkers,
   formatUtcInstant,
-  massFillColor,
+  massStatus,
   REPLAY_TICK_MS,
   replayStepMs,
   trailPositions,
+  visibleDeviceOrder,
 } from './timelineData'
 import { formatTimelineTooltip } from './timelineTooltip'
 
@@ -42,19 +53,9 @@ export interface TimelineMapProps {
   visibleDeviceIds?: string[] | null
 }
 
-/** Marker visuals mirror `map_timeline.js`'s `.tl-pin` divIcon: fill =
- * mass threshold color (CB21), border = the device's stable palette color
- * — never an image asset, so there is no bundler-relative marker icon
- * path to resolve (same reasoning as Live Tracking's `PositionsMap`,
- * KAN-160). */
-function markerIcon(fillColor: string, borderColor: string): L.DivIcon {
-  return L.divIcon({
-    className: '',
-    html: `<div style="width:20px;height:20px;border-radius:50%;background:${fillColor};border:3px solid ${borderColor};box-shadow:0 0 0 1px rgba(0,0,0,0.35);"></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  })
-}
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+/** Same rule as the kit's `FleetMap`: no tile ever loaded and at least 3 errors. */
+const TILE_ERROR_THRESHOLD = 3
 
 // `map_timeline.js`'s own hardcoded initial view (a c-PAL facility near
 // Marseille) — kept identical rather than re-centered, since the auto-fit
@@ -62,6 +63,13 @@ function markerIcon(fillColor: string, borderColor: string): L.DivIcon {
 // for the empty/pre-data frame.
 const INITIAL_CENTER: [number, number] = [43.4938, 5.3539]
 const INITIAL_ZOOM = 11
+/** French status words for the marker's sr-only text (the kit default is English). */
+const STATUS_TEXT_FR: Record<MapDevice['status'], string> = {
+  ok: 'OK',
+  warning: 'Attention',
+  alert: 'Alerte',
+  offline: 'Ne remonte pas',
+}
 const FIT_OPTIONS = { padding: [50, 50] as [number, number], maxZoom: 15 }
 
 export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMapProps) {
@@ -69,6 +77,22 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
   const firstRenderPendingRef = useRef(true)
 
   const byDevice = useMemo(() => buildDeviceSeries(rows), [rows])
+  const chartTheme = useChartTheme()
+  // K-7: one stable index per visible device (`visibleDeviceOrder`), shared with the charts. The kit marker
+  // swatch and the trail colour both come from it; no colour literal lives here.
+  const deviceIndex = useMemo(() => {
+    const out = new Map<string, number>()
+    visibleDeviceOrder(rows, visibleDeviceIds).forEach((chipId, i) => out.set(chipId, i))
+    return out
+  }, [rows, visibleDeviceIds])
+  // The kit Slider puts no role on its root and the slider role on the thumb: keep the original
+  // `timeline-slider` testid on the role=slider element (same element role as the monolith's input).
+  const sliderBoxRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    sliderBoxRef.current?.querySelector('[role="slider"]')?.setAttribute('data-testid', 'timeline-slider')
+  })
+  const [tiles, setTiles] = useState({ ok: 0, err: 0 })
+  const tileError = tiles.ok === 0 && tiles.err >= TILE_ERROR_THRESHOLD
   const bounds = useMemo(() => computeSliderBounds(rows), [rows])
 
   const [instant, setInstant] = useState(bounds.max)
@@ -123,9 +147,9 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
     return () => clearInterval(interval)
   }, [playing, bounds.min, bounds.max])
 
-  function handleSliderChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleSliderChange([value]: number[]) {
     setPlaying(false)
-    setInstant(Number(event.target.value))
+    setInstant(value)
   }
 
   function handleTogglePlay() {
@@ -151,102 +175,130 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
   const hasRows = rows.length > 0
 
   return (
-    <div className="flex flex-col gap-3" data-testid="timeline-map">
-      {/*
-       * KAN-176 (FR26) — `var(--color-surface)` shows through at the map's
-       * edges/corners (and briefly while tiles are still loading) instead
-       * of Leaflet's own hardcoded light-grey default, which otherwise
-       * stayed a light rectangle in dark mode even with the tile-pane
-       * invert filter below (`tokens.css`'s `.leaflet-tile-pane` rule,
-       * scoped so it never touches markers/trail/tooltips).
-       */}
-      <div style={{ height: 480, width: '100%', backgroundColor: 'var(--color-surface)' }}>
-        <MapContainer
-          ref={mapRef}
-          center={INITIAL_CENTER}
-          zoom={INITIAL_ZOOM}
-          style={{ height: '100%', width: '100%' }}
-          className="timeline-map"
-        >
-          <TileLayer
-            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-          {trailEnabled &&
-            markers
-              .filter((marker) => marker.idx > 0)
-              .map((marker) => (
-                <Polyline
-                  key={`trail-${marker.chipId}`}
-                  positions={trailPositions(marker.series, marker.idx)}
-                  pathOptions={{ color: marker.color, weight: 2.5, opacity: 0.55 }}
-                />
-              ))}
-          {markers.map((marker) => (
-            <Marker
-              key={marker.chipId}
-              position={[marker.row.la as number, marker.row.lo as number]}
-              icon={markerIcon(massFillColor(marker.row.m), marker.color)}
-            >
-              <Tooltip data-testid={`timeline-tooltip-${marker.chipId}`}>
-                <ul className="m-0 list-none p-0 text-xs">
-                  {formatTimelineTooltip(marker.row, hooks).map((field) => (
-                    <li key={field.label}>
-                      <strong>{field.label}:</strong> {field.value}
-                    </li>
-                  ))}
-                </ul>
-              </Tooltip>
-            </Marker>
-          ))}
-        </MapContainer>
-      </div>
+    <WidgetCard title="Chronologie" className="min-w-0" data-testid="timeline-map">
+      <div className="flex flex-col gap-3">
+        {/*
+         * KAN-176 (FR26) — `bg-media` shows through at the map's edges/corners
+         * (and while tiles load) instead of Leaflet's light-grey default; the
+         * dark tile filter is `tokens.css`'s `.leaflet-tile-pane` rule, scoped
+         * so it never touches markers/trail/tooltips.
+         */}
+        <div className="h-120 w-full overflow-hidden rounded-lg bg-media">
+          <MapContainer
+            ref={mapRef}
+            center={INITIAL_CENTER}
+            zoom={INITIAL_ZOOM}
+            className="timeline-map size-full"
+          >
+            <TileLayer
+              url={TILE_URL}
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              eventHandlers={{
+                tileerror: () => setTiles((t) => ({ ...t, err: t.err + 1 })),
+                tileload: () => setTiles((t) => (t.ok ? t : { ...t, ok: 1 })),
+              }}
+            />
+            {trailEnabled &&
+              markers
+                .filter((marker) => marker.idx > 0)
+                .map((marker) => {
+                  const index = deviceIndex.get(marker.chipId) ?? 0
+                  return (
+                    <Polyline
+                      key={`trail-${marker.chipId}`}
+                      positions={trailPositions(marker.series, marker.idx)}
+                      pathOptions={{
+                        color: chartTheme.colors[chartTheme.seriesStyle(index).colorIndex],
+                        weight: 2.5,
+                        opacity: 0.55,
+                      }}
+                    />
+                  )
+                })}
+            {markers.map((marker) => {
+              const device: MapDevice = {
+                id: marker.chipId,
+                name: marker.chipId,
+                status: massStatus(marker.row.m),
+                lat: marker.row.la as number,
+                lng: marker.row.lo as number,
+                series: deviceIndex.get(marker.chipId),
+              }
+              return (
+                <Marker
+                  key={`${device.id}:${device.status}:${device.series ?? ''}`}
+                  position={[device.lat, device.lng]}
+                  icon={deviceIcon(device, false, STATUS_TEXT_FR[device.status])}
+                >
+                  <Tooltip data-testid={`timeline-tooltip-${marker.chipId}`}>
+                    <ul className="m-0 list-none p-0 text-xs">
+                      {formatTimelineTooltip(marker.row, hooks).map((field) => (
+                        <li key={field.label}>
+                          <strong>{field.label}:</strong> {field.value}
+                        </li>
+                      ))}
+                    </ul>
+                  </Tooltip>
+                </Marker>
+              )
+            })}
+          </MapContainer>
+        </div>
 
-      <div className="flex flex-wrap items-center gap-3" data-testid="timeline-controls">
-        <input
-          type="range"
-          data-testid="timeline-slider"
-          aria-label="Instant sélectionné"
-          min={bounds.min}
-          max={bounds.max}
-          step={bounds.step}
-          value={instant}
-          disabled={!hasRows}
-          onChange={handleSliderChange}
-        />
-        <span data-testid="timeline-instant-label" style={{ color: 'var(--color-text)' }}>
-          {hasRows ? formatUtcInstant(instant) : '—'}
-        </span>
-        <button
-          type="button"
-          data-testid="timeline-play-toggle"
-          onClick={handleTogglePlay}
-          disabled={!hasRows}
-          className="rounded-md border px-3 py-1 text-sm"
-          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+        {tileError && (
+          <Alert variant="warning" role="status" data-testid="timeline-tile-notice">
+            <TriangleAlert aria-hidden />
+            <div>Les tuiles de la carte n'ont pas pu être chargées. Les marqueurs restent exacts.</div>
+          </Alert>
+        )}
+
+        <div
+          className="flex flex-col gap-3 sm:flex-row sm:items-center"
+          role="group"
+          aria-label="Lecture de la chronologie"
+          data-testid="timeline-controls"
         >
-          {playing ? 'Pause' : 'Rejouer'}
-        </button>
-        <label className="flex items-center gap-1 text-sm" style={{ color: 'var(--color-text)' }}>
-          <input
-            type="checkbox"
-            data-testid="timeline-trail-toggle"
-            checked={trailEnabled}
-            onChange={(event) => setTrailEnabled(event.target.checked)}
-          />
-          Afficher la trace
-        </label>
-        <button
-          type="button"
-          data-testid="timeline-fit"
-          onClick={handleFit}
-          disabled={!hasRows}
-          className="rounded-md border px-3 py-1 text-sm"
-          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
-        >
-          Ajuster
-        </button>
+          <ButtonGroup>
+            <Button
+              type="button"
+              data-testid="timeline-play-toggle"
+              onClick={handleTogglePlay}
+              disabled={!hasRows}
+              className="sm:w-28"
+            >
+              {playing ? <Pause /> : <Play />}
+              {playing ? 'Pause' : 'Rejouer'}
+            </Button>
+            <Button type="button" variant="outline" data-testid="timeline-fit" onClick={handleFit} disabled={!hasRows}>
+              <Maximize2 />
+              Ajuster
+            </Button>
+          </ButtonGroup>
+          <div ref={sliderBoxRef} className="flex min-w-0 flex-1 items-center gap-3">
+            <Slider
+              aria-label="Instant sélectionné"
+              min={bounds.min}
+              max={bounds.max}
+              step={bounds.step}
+              value={[instant]}
+              disabled={!hasRows}
+              onValueChange={handleSliderChange}
+            />
+            <span data-testid="timeline-instant-label" className="shrink-0 text-sm tabular-nums text-body">
+              {hasRows ? formatUtcInstant(instant) : '—'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="timeline-trail-toggle"
+              data-testid="timeline-trail-toggle"
+              checked={trailEnabled}
+              onCheckedChange={setTrailEnabled}
+            />
+            <Label htmlFor="timeline-trail-toggle">Afficher la trace</Label>
+          </div>
+        </div>
       </div>
-    </div>
+    </WidgetCard>
   )
 }

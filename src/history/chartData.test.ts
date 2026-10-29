@@ -46,9 +46,9 @@ describe('buildChartTraces (KAN-175 FR19, FR20, CB26, CB27)', () => {
     expect(traces[0].y).toEqual([20, 22])
   })
 
-  it('omits a device entirely when it has no non-null reading for the field', () => {
+  it('keeps an empty trace for a device with no non-null reading for the field (its slot is stable)', () => {
     const rows = [row({ c: 'CHIP-A', t: 1000, ta: null })]
-    expect(buildChartTraces(rows, null, 'ta')).toEqual([])
+    expect(buildChartTraces(rows, null, 'ta')).toEqual([{ chipId: 'CHIP-A', x: [], y: [] }])
   })
 
   it('respects visibleIds, excluding devices not in the selection', () => {
@@ -57,13 +57,12 @@ describe('buildChartTraces (KAN-175 FR19, FR20, CB26, CB27)', () => {
     expect(traces.map((t) => t.chipId)).toEqual(['CHIP-A'])
   })
 
-  it('assigns the same color a device gets on the map (palette, first-seen order)', () => {
-    const rows = [row({ c: 'CHIP-A', t: 1000, ta: 20, m: 100 }), row({ c: 'CHIP-B', t: 1000, hr: 50, m: 100 })]
-    const tempTraces = buildChartTraces(rows, null, 'ta')
-    const massTraces = buildChartTraces(rows, null, 'm')
-    const chipAColorInTemp = tempTraces.find((t) => t.chipId === 'CHIP-A')!.color
-    const chipAColorInMass = massTraces.find((t) => t.chipId === 'CHIP-A')!.color
-    expect(chipAColorInTemp).toBe(chipAColorInMass)
+  it('gives a device the same slot on every chart, even when an earlier device lacks that field (K-7)', () => {
+    const rows = [row({ c: 'CHIP-A', t: 1000, ta: 20, m: null }), row({ c: 'CHIP-B', t: 1000, ta: 21, m: 100 })]
+    const ids = (field: 'ta' | 'hr' | 'm') => buildChartTraces(rows, null, field).map((t) => t.chipId)
+    expect(ids('ta')).toEqual(['CHIP-A', 'CHIP-B'])
+    expect(ids('hr')).toEqual(['CHIP-A', 'CHIP-B'])
+    expect(ids('m')).toEqual(['CHIP-A', 'CHIP-B'])
   })
 
   it('sorts points ascending by t even if rows arrive out of order', () => {

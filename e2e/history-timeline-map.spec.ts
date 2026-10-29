@@ -87,8 +87,9 @@ test('renders one marker per device at the slider default (series end), colored 
   // CHIP-B's mass (520) is >= 500 -> green fill (CB21).
   const icons = page.locator('.leaflet-marker-icon > div')
   await expect(icons).toHaveCount(2)
-  const backgrounds = await icons.evaluateAll((nodes) => nodes.map((n) => (n as HTMLElement).style.background))
-  expect(backgrounds.some((bg) => bg.includes('46, 125, 50') || bg === 'rgb(46, 125, 50)')).toBe(true)
+  // F-22: state comes from kit token classes (ring-success = ok), never an inline colour.
+  const classes = await icons.evaluateAll((nodes) => nodes.map((n) => (n as HTMLElement).className))
+  expect(classes.some((cls) => cls.includes('ring-success'))).toBe(true)
 })
 
 test('scrubbing the slider to the first instant shows only the device with a reading that early (FR12, CB20)', async ({
@@ -96,8 +97,10 @@ test('scrubbing the slider to the first instant shows only the device with a rea
 }) => {
   await mockToReadyState(page)
 
-  const slider = page.getByTestId('timeline-slider')
-  await slider.fill(String(T0))
+  // The kit Slider is not an <input>: drive it from the keyboard (Home = first instant).
+  const thumb = page.getByTestId('timeline-slider')
+  await thumb.focus()
+  await page.keyboard.press('Home')
   await expect(page.locator('.leaflet-marker-icon')).toHaveCount(1)
   await expect(page.getByTestId('timeline-instant-label')).toContainText('2026-10-01')
 })
@@ -105,7 +108,8 @@ test('scrubbing the slider to the first instant shows only the device with a rea
 test('hovering a marker shows its tooltip with the measurement fields (FR13)', async ({ page }) => {
   await mockToReadyState(page)
 
-  await page.locator('.leaflet-marker-icon').first().hover()
+  // The kit marker is a zero-size anchor with its pill inside: hover what the user sees.
+  await page.locator('.leaflet-marker-icon > div').first().hover()
   await expect(page.locator('.leaflet-tooltip')).toContainText('Température amb.')
   await expect(page.locator('.leaflet-tooltip')).toContainText('Masse')
 })
@@ -158,7 +162,7 @@ test('"Rejouer" animates the slider to the end and the button reverts to "Rejoue
   await playButton.click()
   await expect(playButton).toHaveText('Pause')
   await expect(playButton).toHaveText('Rejouer', { timeout: 5000 })
-  await expect(page.getByTestId('timeline-slider')).toHaveValue(String(shortT1))
+  await expect(page.getByTestId('timeline-slider')).toHaveAttribute('aria-valuenow', String(shortT1))
 })
 
 test('"Ajuster" re-fits the map without erroring and without a refetch (FR15, NFR3)', async ({ page }) => {

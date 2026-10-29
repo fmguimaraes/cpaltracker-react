@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HistoryHook, HistoryRow } from '../api/history'
 import { TimelineMap } from './TimelineMap'
 
@@ -22,9 +22,26 @@ function row(overrides: Partial<HistoryRow>): HistoryRow {
 
 const hooks: HistoryHook[] = []
 
+// The kit Slider (Radix) observes its thumb; jsdom has no ResizeObserver.
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+})
+
+function sliderThumb() {
+  return screen.getByTestId('timeline-slider')
+}
+
 describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
   })
 
   it('renders one marker per visible device at the slider max (series end) on initial load', async () => {
@@ -37,6 +54,13 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(2))
   })
 
+  it('gives each marker a French sr-only status, never the kit English default', async () => {
+    render(<TimelineMap rows={[row({ c: 'CHIP-1', t: 1000, la: 1, lo: 1, m: 300 })]} hooks={hooks} />)
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
+    const text = document.querySelector('.leaflet-marker-icon .sr-only')?.textContent
+    expect(text).toBe(', Attention')
+  })
+
   it('omits a device with no reading yet at the current instant (FR12/CB20)', async () => {
     const rows: HistoryRow[] = [
       row({ c: 'CHIP-1', t: 1000, la: 1, lo: 1 }),
@@ -46,29 +70,27 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(2))
 
     // Scrub to the very first instant: CHIP-2 has no reading yet.
-    const slider = screen.getByTestId('timeline-slider') as HTMLInputElement
-    fireEvent.change(slider, { target: { value: '1000' } })
+    fireEvent.keyDown(sliderThumb(), { key: 'Home' })
 
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
   })
 
   it('re-renders the marker (same device, new position) as the slider scrubs, with no network call', async () => {
     const rows: HistoryRow[] = [
-      row({ c: 'CHIP-1', t: 1000, la: 1, lo: 1, m: 100 }), // red fill (<200)
-      row({ c: 'CHIP-1', t: 2000, la: 2, lo: 2, m: 600 }), // green fill (>=500)
+      row({ c: 'CHIP-1', t: 1000, la: 1, lo: 1, m: 100 }), // alert (<200)
+      row({ c: 'CHIP-1', t: 2000, la: 2, lo: 2, m: 600 }), // ok (>=500)
     ]
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
 
     render(<TimelineMap rows={rows} hooks={hooks} />)
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
-    expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('#2e7d32')
+    expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('ring-success')
 
-    fireEvent.change(screen.getByTestId('timeline-slider'), { target: { value: '1000' } })
+    fireEvent.keyDown(sliderThumb(), { key: 'Home' })
 
-    await waitFor(() => expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('#c62828'))
+    await waitFor(() => expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('ring-danger'))
     expect(fetchSpy).not.toHaveBeenCalled()
-    vi.unstubAllGlobals()
   })
 
   // CB23's actual `<Polyline>` rendering is deliberately NOT exercised by
@@ -110,12 +132,12 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
     })
 
     expect(playButton).toHaveTextContent('Rejouer')
-    expect((screen.getByTestId('timeline-slider') as HTMLInputElement).value).toBe('1000')
+    expect(sliderThumb()).toHaveAttribute('aria-valuenow', '1000')
   })
 
   it('disables the slider and play button, and shows a dash label, when there are no rows', () => {
     render(<TimelineMap rows={[]} hooks={hooks} />)
-    expect(screen.getByTestId('timeline-slider')).toBeDisabled()
+    expect(screen.getByTestId('timeline-slider')).toHaveAttribute('data-disabled')
     expect(screen.getByTestId('timeline-play-toggle')).toBeDisabled()
     expect(screen.getByTestId('timeline-instant-label')).toHaveTextContent('—')
   })
@@ -129,7 +151,16 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
     rerender(<TimelineMap rows={second} hooks={hooks} />)
 
     await waitFor(() =>
-      expect((screen.getByTestId('timeline-slider') as HTMLInputElement).value).toBe('9000'),
+      expect(sliderThumb()).toHaveAttribute('aria-valuenow', '9000'),
     )
+  })
+
+  it('maps the mass thresholds to the four kit states, never a colour literal (F-22)', async () => {
+    const rows: HistoryRow[] = [row({ c: 'CHIP-1', t: 1000, la: 1, lo: 1, m: 300 })]
+    render(<TimelineMap rows={rows} hooks={hooks} />)
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
+    const html = document.querySelector('.leaflet-marker-icon')?.innerHTML ?? ''
+    expect(html).toContain('ring-warning')
+    expect(html).not.toMatch(/style=|#[0-9a-f]{6}/i)
   })
 })

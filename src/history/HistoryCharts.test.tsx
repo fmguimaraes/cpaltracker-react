@@ -1,8 +1,6 @@
-import { act, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import type { HistoryRow } from '../api/history'
-import { useThemeStore } from '../store/themeStore'
-import { CHART_COLORS } from '../theme/chartColors'
 import { HistoryCharts } from './HistoryCharts'
 
 /**
@@ -21,17 +19,17 @@ vi.mock('plotly.js-dist-min', () => ({ default: {} }))
 vi.mock('react-plotly.js/factory', () => ({
   default: () =>
     (props: {
-      data: Array<{ name: string }>
-      layout: { title: { text: string }; paper_bgcolor: string; plot_bgcolor: string }
+      data: Array<{ name: string; x: string[]; mode: string; hovertemplate: string }>
+      layout: { shapes?: unknown[]; yaxis?: { ticksuffix?: string } }
     }) => (
       <div
         data-testid="mock-plot"
         data-trace-names={props.data.map((trace) => trace.name).join(',')}
-        data-paper-bgcolor={props.layout.paper_bgcolor}
-        data-plot-bgcolor={props.layout.plot_bgcolor}
-      >
-        {props.layout.title.text}
-      </div>
+        data-x={props.data[0]?.x.join('|')}
+        data-modes={props.data.map((trace) => trace.mode).join(',')}
+        data-shapes={String(props.layout.shapes?.length ?? 0)}
+        data-suffix={props.layout.yaxis?.ticksuffix}
+      />
     ),
 }))
 
@@ -53,10 +51,6 @@ function row(overrides: Partial<HistoryRow>): HistoryRow {
 }
 
 describe('HistoryCharts (KAN-175 FR19, FR20)', () => {
-  afterEach(() => {
-    act(() => useThemeStore.getState().setTheme('light'))
-  })
-
   it('shows an empty-state message instead of charts when there are no rows', () => {
     render(<HistoryCharts rows={[]} />)
     expect(screen.getByTestId('history-charts-empty')).toBeInTheDocument()
@@ -86,17 +80,38 @@ describe('HistoryCharts (KAN-175 FR19, FR20)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('passes the light-theme Plotly colors by default, and the dark-theme ones once the theme store flips (FR26)', () => {
-    const rows = [row({ c: 'CHIP-A', t: 1000, ta: 20 })]
+  it('draws the 2-8 \u00b0C band on the temperature chart only, with a per-field unit (FR9)', () => {
+    const rows = [row({ c: 'CHIP-A', t: 1000, ta: 5, hr: 50, m: 300 })]
+    render(<HistoryCharts rows={rows} />)
+
+    const plotOf = (field: string) =>
+      screen.getByTestId(`history-chart-${field}`).querySelector('[data-testid="mock-plot"]')
+    expect(plotOf('ta')?.getAttribute('data-shapes')).toBe('4')
+    expect(plotOf('hr')?.getAttribute('data-shapes')).toBe('0')
+    expect(plotOf('ta')?.getAttribute('data-suffix')).toBe(' \u00b0C')
+    expect(plotOf('hr')?.getAttribute('data-suffix')).toBe(' %')
+    expect(plotOf('m')?.getAttribute('data-suffix')).toBe(' kg')
+  })
+
+  it('feeds the x-axis UTC date strings, as the monolith formatUTC, not epoch numbers nor local time (FR9)', () => {
+    // 23:30 UTC is already the next day in any zone east of UTC, so a local-time format would differ.
+    const rows = [row({ c: 'CHIP-A', t: Date.UTC(2026, 9, 1, 23, 30, 5), ta: 5 })]
     render(<HistoryCharts rows={rows} />)
 
     const plot = screen.getByTestId('history-chart-ta').querySelector('[data-testid="mock-plot"]')
-    expect(plot?.getAttribute('data-paper-bgcolor')).toBe(CHART_COLORS.light.paper)
+    expect(plot?.getAttribute('data-x')).toBe('2026-10-01 23:30:05')
+  })
 
-    act(() => useThemeStore.getState().setTheme('dark'))
+  it('adds markers from the second palette pass on (more than 5 devices)', () => {
+    const rows = Array.from({ length: 6 }, (_, i) => row({ c: `CHIP-${i}`, t: 1000 + i, ta: 5 }))
+    render(<HistoryCharts rows={rows} />)
 
-    const plotAfter = screen.getByTestId('history-chart-ta').querySelector('[data-testid="mock-plot"]')
-    expect(plotAfter?.getAttribute('data-paper-bgcolor')).toBe(CHART_COLORS.dark.paper)
-    expect(plotAfter?.getAttribute('data-plot-bgcolor')).toBe(CHART_COLORS.dark.plot)
+    const modes = screen
+      .getByTestId('history-chart-ta')
+      .querySelector('[data-testid="mock-plot"]')
+      ?.getAttribute('data-modes')
+      ?.split(',')
+    expect(modes?.slice(0, 5)).toEqual(Array(5).fill('lines'))
+    expect(modes?.[5]).toBe('lines+markers')
   })
 })

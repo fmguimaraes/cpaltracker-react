@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { fetchContracts, type Contract } from '../api/contracts'
-import { PageTitle } from '../chrome/PageTitle'
+import { Alert } from '@/ui/alert'
+import { Button } from '@/ui/button'
+import { FilterBar } from '@/ui/patterns/filter-bar'
+import { PageHeader } from '@/ui/patterns/page-header'
+import { TimePicker, type TimeRangeValue } from '@/ui/patterns/time-picker'
 import { DateRangePicker } from '../history/DateRangePicker'
 import { HistoryAccessGate } from '../history/HistoryAccessGate'
-import { formatIsoDate } from '../history/dateRange'
+import { formatIsoDate, validateDateRangeInputs } from '../history/dateRange'
 import { HistoryReadyPanel } from '../history/HistoryReadyPanel'
+import { dayRangeFromTimePicker, isoDays, timePickerValueFromDays } from '../history/timeRange'
+import type { DefaultDateRangeState } from '../history/useDefaultDateRange'
+
+type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
@@ -44,7 +52,8 @@ type LoadState = 'loading' | 'loaded' | 'error'
  */
 export function HistoryDashboard() {
   const [searchParams] = useSearchParams()
-  const [state, setState] = useState<LoadState>('loading')
+  const [loadState, setLoadState] = useState<LoadState>('loading')
+  const [timeRangeError, setTimeRangeError] = useState<string | null>(null)
   const [contracts, setContracts] = useState<Contract[]>([])
   const [accessError, setAccessError] = useState<string | null>(null)
 
@@ -70,135 +79,183 @@ export function HistoryDashboard() {
 
   useEffect(() => {
     let cancelled = false
-    setState('loading')
+    setLoadState('loading')
     fetchContracts()
       .then((result) => {
         if (cancelled) return
         setContracts(result)
-        setState('loaded')
+        setLoadState('loaded')
       })
       .catch(() => {
         if (cancelled) return
-        setState('error')
+        setLoadState('error')
       })
     return () => {
       cancelled = true
     }
   }, [])
 
+  function selectContractByReference(reference: string) {
+    const wanted = reference.trim().toLowerCase()
+    const match = contracts.find((contract) => contract.contractRef.toLowerCase() === wanted)
+    if (match) selectContract(match.contractId)
+  }
+
+  // FR9: the header `TimePicker` (presets + calendar) maps onto the day-granular range through the same
+  // validation as the typed entry (FR5-FR8): an invalid pick never reaches the fetch.
+  function applyTimePickerValue(resolved: ReadyState, value: TimeRangeValue) {
+    const days = isoDays(dayRangeFromTimePicker(value))
+    const result = validateDateRangeInputs(days.start, days.end)
+    if (!result.ok) {
+      setTimeRangeError(result.error.message)
+      return
+    }
+    setTimeRangeError(null)
+    resolved.applyRange({ start: result.start, end: result.end })
+  }
+
+  const [gateState, setGateState] = useState<DefaultDateRangeState | null>(null)
+  const state = selectedId === null ? null : gateState
+
+  const selectedContract = contracts.find((contract) => contract.contractId === selectedId)
+
+  function renderContractSection() {
+    return (
+      <>
+        {loadState === 'loading' && (
+          <p data-testid="history-dashboard-loading" className="text-sm text-muted-foreground">
+            Chargement des contrats…
+          </p>
+        )}
+
+        {loadState === 'error' && (
+          <Alert variant="danger" data-testid="history-dashboard-error">
+            Impossible de charger vos contrats. Réessayez plus tard.
+          </Alert>
+        )}
+
+        {loadState === 'loaded' && contracts.length === 0 && (
+          <p data-testid="history-dashboard-empty" className="text-sm text-muted-foreground">
+            Aucun contrat n'est associé à votre compte.
+          </p>
+        )}
+
+        {loadState === 'loaded' && contracts.length > 0 && (
+          <div
+            role="radiogroup"
+            className="flex flex-wrap gap-2"
+            data-testid="history-contract-selector"
+            aria-label="Sélection du contrat"
+          >
+            {contracts.map((contract) => (
+              <Button
+                key={contract.contractId}
+                type="button"
+                variant="outline"
+                role="radio"
+                data-testid={`history-contract-option-${contract.contractId}`}
+                aria-checked={selectedId === contract.contractId}
+                onClick={() => selectContract(contract.contractId)}
+                className="aria-checked:border-primary aria-checked:bg-muted"
+              >
+                {contract.contractRef}
+                {contract.clientName ? ` (${contract.clientName})` : ''}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {accessError && (
+          <Alert variant="danger" data-testid="history-access-error-banner">
+            {accessError}
+          </Alert>
+        )}
+
+        {selectedId === null && !accessError && loadState === 'loaded' && contracts.length > 0 && (
+          <p data-testid="history-dashboard-no-selection" className="text-sm text-muted-foreground">
+            Sélectionnez un contrat pour afficher son historique.
+          </p>
+        )}
+      </>
+    )
+  }
+
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
-      <header>
-        <PageTitle>Historique</PageTitle>
-      </header>
+    <div className="flex flex-col" data-testid="history-page">
+      <PageHeader
+        title="Historique"
+        actions={
+          state?.status === 'ready' ? (
+            <TimePicker
+              value={timePickerValueFromDays(state.start, state.end)}
+              onChange={(value) => applyTimePickerValue(state, value)}
+            />
+          ) : undefined
+        }
+      >
+        {state?.status === 'ready' && timeRangeError && (
+          <Alert variant="danger" data-testid="history-time-range-error">
+            {timeRangeError}
+          </Alert>
+        )}
+        <FilterBar
+          attributes={['Contrat']}
+          filters={
+            selectedContract
+              ? [
+                  {
+                    id: 'contract',
+                    attribute: 'Contrat',
+                    value: `${selectedContract.contractRef}${selectedContract.clientName ? ` (${selectedContract.clientName})` : ''}`,
+                  },
+                ]
+              : []
+          }
+          onRemove={() => {
+            setAccessError(null)
+            setTimeRangeError(null)
+            setSelectedId(null)
+          }}
+          onAdd={({ value }) => selectContractByReference(value)}
+        />
+      </PageHeader>
 
-      {state === 'loading' && (
-        <p data-testid="history-dashboard-loading" style={{ color: 'var(--color-text-muted)' }}>
-          Chargement des contrats…
-        </p>
-      )}
-
-      {state === 'error' && (
-        <p
-          data-testid="history-dashboard-error"
-          role="alert"
-          style={{ color: 'var(--color-danger)' }}
-        >
-          Impossible de charger vos contrats. Réessayez plus tard.
-        </p>
-      )}
-
-      {state === 'loaded' && contracts.length === 0 && (
-        <p data-testid="history-dashboard-empty" style={{ color: 'var(--color-text-muted)' }}>
-          Aucun contrat n'est associé à votre compte.
-        </p>
-      )}
-
-      {state === 'loaded' && contracts.length > 0 && (
-        <div
-          role="radiogroup"
-          className="flex flex-col gap-2"
-          data-testid="history-contract-selector"
-          aria-label="Sélection du contrat"
-        >
-          {contracts.map((contract) => (
-            <button
-              key={contract.contractId}
-              type="button"
-              role="radio"
-              data-testid={`history-contract-option-${contract.contractId}`}
-              aria-checked={selectedId === contract.contractId}
-              onClick={() => selectContract(contract.contractId)}
-              className="rounded-md border px-3 py-2 text-left text-sm"
-              style={{
-                borderColor:
-                  selectedId === contract.contractId
-                    ? 'var(--color-primary)'
-                    : 'var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-text)',
-              }}
-            >
-              {contract.contractRef}
-              {contract.clientName ? ` (${contract.clientName})` : ''}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {accessError && (
-        <p data-testid="history-access-error-banner" role="alert" style={{ color: 'var(--color-danger)' }}>
-          {accessError}
-        </p>
-      )}
-
-      {selectedId === null && !accessError && state === 'loaded' && contracts.length > 0 && (
-        <p data-testid="history-dashboard-no-selection" style={{ color: 'var(--color-text-muted)' }}>
-          Sélectionnez un contrat pour afficher son historique.
-        </p>
-      )}
-
-      {selectedId !== null && (
-        <HistoryAccessGate contractId={selectedId} onUnauthorized={handleUnauthorizedContract}>
-          {(resolved) => (
-            // KAN-175 (FR4, FR9, FR19-FR24) owns everything inside
-            // `HistoryReadyPanel` — the device checklist (driving
-            // `TimelineMap`'s `visibleDeviceIds`), the map itself
-            // (KAN-174), the three charts, lot-hook history, sampling
-            // banner and selection summary.
-            <section data-testid="history-dashboard-ready" className="flex flex-col gap-2">
-              <p style={{ color: 'var(--color-text)' }}>
-                Contrat {resolved.history.contract.ContratRef} — période du{' '}
-                {resolved.start ? formatIsoDate(resolved.start) : '…'} au{' '}
-                {resolved.end ? formatIsoDate(resolved.end) : '…'}.
-              </p>
-              <p style={{ color: 'var(--color-text-muted)' }}>
-                {resolved.history.devices.length} appareil(s), {resolved.history.count} mesure(s).
-              </p>
-              {/*
-               * KAN-176 (FR5-FR8, NFR8) — `DateRangePicker` (KAN-170) was
-               * built, validated and unit-tested from the start but never
-               * had a mount point: this is it. `resolved.applyRange` is
-               * `useDefaultDateRange`'s explicit-range re-fetch (same
-               * state machine as the FR3 default load, see its own doc
-               * comment), so applying a new range here goes through the
-               * exact same ready/unauthorized/error handling as the
-               * initial load — a rejected range (reversed/malformed/
-               * over-span) is caught by `DateRangePicker`'s own
-               * `validateDateRangeInputs` call before `onApply`/
-               * `applyRange` are ever reached (FR5: no request while
-               * invalid).
-               */}
-              <DateRangePicker
-                initialStart={resolved.start}
-                initialEnd={resolved.end}
-                onApply={resolved.applyRange}
-              />
-              <HistoryReadyPanel history={resolved.history} />
-            </section>
-          )}
-        </HistoryAccessGate>
-      )}
-    </main>
+      <div className="flex flex-col gap-4 p-4 md:p-6">
+        {renderContractSection()}
+        {selectedId !== null && (
+          <HistoryAccessGate
+            contractId={selectedId}
+            onUnauthorized={handleUnauthorizedContract}
+            onStateChange={setGateState}
+          >
+            {(resolved) => (
+              // KAN-175 (FR4, FR9, FR19-FR24) owns everything inside `HistoryReadyPanel` — the device checklist
+              // (driving `TimelineMap`'s `visibleDeviceIds`), the map itself (KAN-174), the three charts,
+              // lot-hook history, sampling banner and the Stat row (selection summary).
+              <section data-testid="history-dashboard-ready" className="flex flex-col gap-4">
+                <p className="text-sm text-foreground">
+                  Contrat {resolved.history.contract.ContratRef} — période du{' '}
+                  {resolved.start ? formatIsoDate(resolved.start) : '…'} au{' '}
+                  {resolved.end ? formatIsoDate(resolved.end) : '…'}.
+                </p>
+                {/*
+                 * KAN-176 (FR5-FR8, NFR8) — the typed date entry next to the header `TimePicker`.
+                 * `resolved.applyRange` is `useDefaultDateRange`'s explicit-range re-fetch, so applying a range
+                 * goes through the exact same ready/unauthorized/error handling as the initial load; a rejected
+                 * range is caught by `DateRangePicker`'s own `validateDateRangeInputs` call before `onApply` is
+                 * reached (FR5: no request while invalid).
+                 */}
+                <DateRangePicker
+                  initialStart={resolved.start}
+                  initialEnd={resolved.end}
+                  onApply={resolved.applyRange}
+                />
+                <HistoryReadyPanel history={resolved.history} />
+              </section>
+            )}
+          </HistoryAccessGate>
+        )}
+      </div>
+    </div>
   )
 }
