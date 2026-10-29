@@ -4,44 +4,17 @@
  * to unit-test (NFR8).
  */
 
-/** A fixed, colour-blind-friendlier palette (NFR7: colour is never the
- * only state signal — the tooltip always carries the raw numeric value
- * too — but distinct hues still need to stay tellable apart). */
-const BORDER_PALETTE = [
-  '#1d4ed8', // blue
-  '#b45309', // amber
-  '#7c3aed', // violet
-  '#0f766e', // teal
-  '#be123c', // rose
-  '#4d7c0f', // olive
-  '#0369a1', // sky
-  '#9333ea', // purple
-] as const
+import type { DeviceStatus } from '@/ui/status'
 
 /**
- * FR5 — fill colour from the device's latest mass. `null`/`NaN` (no
- * reading, or a non-numeric value that slipped through) is grey, never
- * silently treated as any particular threshold bucket.
+ * FR8 — the mass thresholds of FR5 mapped to the four device states of the
+ * kit (D3): no reading -> offline, < 200 -> alert, < 500 -> warning, else ok.
+ * Expressed as a state so the kit
+ * (marker ring, badge, donut) owns every colour.
  */
-export function massFillColor(mass: number | null): string {
-  if (mass === null || Number.isNaN(mass)) return '#9aa1a9'
-  if (mass < 200) return '#dc2626'
-  if (mass < 500) return '#f59e0b'
-  return '#16a34a'
-}
-
-/**
- * FR6 — stable per-device border colour. Deterministic by `chipId` (a
- * simple string hash into the fixed palette) rather than first-seen
- * insertion order, so it is stable across refreshes AND across sessions —
- * stricter than the AC's "stable across refreshes" actually requires, and
- * avoids any module-level mutable cache that would otherwise need to be
- * reset when the selected contract changes.
- */
-export function deviceBorderColor(chipId: string): string {
-  let hash = 0
-  for (let i = 0; i < chipId.length; i++) {
-    hash = (hash * 31 + chipId.charCodeAt(i)) >>> 0
-  }
-  return BORDER_PALETTE[hash % BORDER_PALETTE.length]
+export function massStatus(mass: number | null): DeviceStatus {
+  if (mass === null || Number.isNaN(mass)) return 'offline'
+  if (mass < 200) return 'alert'
+  if (mass < 500) return 'warning'
+  return 'ok'
 }

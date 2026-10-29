@@ -1,7 +1,35 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContractPositions } from './ContractPositions'
 import { useDeviceVisibilityStore } from './deviceVisibilityStore'
+
+// FR8: the kit FleetMap observes its container; jsdom has no ResizeObserver,
+// and the fleet panel's DonutChart pulls Plotly (covered in a real browser).
+vi.mock('plotly.js-dist-min', () => ({ default: {} }))
+vi.mock('react-plotly.js/factory', () => ({ default: () => () => <div data-testid="mock-plot" /> }))
+// jsdom has no layout, so the real clustered map never mounts markers; this
+// stand-in renders one `.leaflet-marker-icon` per device handed to the kit map
+// (the real markers/clusters are covered by e2e/live-tracking.spec.ts).
+vi.mock('@/ui/map', () => ({
+  FleetMap: ({ devices, labels }: { devices: Array<{ id: string; name: string; status: string }>; labels: { region: string } }) => (
+    <div role="region" aria-label={labels.region}>
+      {devices.map((d) => (
+        <span key={d.id} className="leaflet-marker-icon" data-marker-id={d.id} title={`${d.id} – ${d.name} (${d.status})`} />
+      ))}
+    </div>
+  ),
+}))
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+})
 
 const onePosition = {
   contractId: 12,
