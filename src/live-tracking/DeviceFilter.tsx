@@ -34,7 +34,8 @@ export function DeviceFilter({
       <Button type="button" variant="outline" size="sm" onClick={showAll} data-testid="device-filter-show-all" className="self-start">
         Tout afficher
       </Button>
-      <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+      {/* ~10 rows visible (each row ~38px): beyond that the list scrolls instead of growing the panel. */}
+      <ul className="flex max-h-96 flex-col divide-y divide-border overflow-y-auto rounded-lg border border-border">
         {chipIds.map((chipId) => {
           const status = statuses?.[chipId]
           return (

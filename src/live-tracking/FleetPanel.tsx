@@ -32,9 +32,9 @@ export function FleetPanel({ statuses, children }: { statuses: DeviceStatus[]; c
       data-testid="fleet-panel"
       size="sm"
       className={cn(
-        'z-1000 gap-0 py-0 shadow-overlay md:absolute md:top-3 md:left-3 md:w-80',
-        // Collapsed: drop the bottom inset so the card shrinks to its header row instead of keeping the map height.
-        open && 'md:bottom-3',
+        // Shrink-to-fit: the card never stretches to the map's full height, only grows with its
+        // content, capped so it can't overflow past the map's edges (same 0.75rem inset as top-3).
+        'z-1000 gap-0 py-0 shadow-overlay md:absolute md:top-3 md:left-3 md:w-80 md:max-h-[calc(100%-1.5rem)]',
       )}
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -56,20 +56,29 @@ export function FleetPanel({ statuses, children }: { statuses: DeviceStatus[]; c
           {open ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
         </Button>
       </div>
-      <div id={bodyId} className={cn('min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4', open ? 'flex' : 'max-md:flex md:hidden')}>
-        <section aria-label="Répartition par état">
-          <DonutChart
-            className="h-56 w-full"
-            label={`Répartition des ${total} appareils par état`}
-            centerLabel={`${inRange}%`}
-            slices={STATES.map((s) => ({ label: `${STATE_LABEL[s]} · ${counts[s]}`, value: counts[s], color: SLICE_COLOR[s] }))}
-          />
-        </section>
-        <div className="grid grid-cols-2 gap-3 border-y border-border py-3">
-          <Stat label="Dans la plage" value={inRange} unit="%" accent />
-          <Stat label="À traiter" value={toHandle} />
+      {/* Animate expand/collapse with the grid-rows trick (0fr/1fr) so the body's auto height can
+          still transition smoothly; `min-h-0` on the grid track lets it collapse past its content size. */}
+      <div
+        className={cn(
+          'grid transition-[grid-template-rows] duration-300 ease-in-out md:min-h-0',
+          open ? 'md:grid-rows-[1fr]' : 'max-md:grid-rows-[1fr] md:grid-rows-[0fr]',
+        )}
+      >
+        <div id={bodyId} className="flex min-h-0 flex-col gap-4 overflow-y-auto p-4">
+          <section aria-label="Répartition par état">
+            <DonutChart
+              className="h-56 w-full"
+              label={`Répartition des ${total} appareils par état`}
+              centerLabel={`${inRange}%`}
+              slices={STATES.map((s) => ({ label: `${STATE_LABEL[s]} · ${counts[s]}`, value: counts[s], color: SLICE_COLOR[s] }))}
+            />
+          </section>
+          <div className="grid grid-cols-2 gap-3 border-y border-border py-3">
+            <Stat label="Dans la plage" value={inRange} unit="%" accent />
+            <Stat label="À traiter" value={toHandle} />
+          </div>
+          {children}
         </div>
-        {children}
       </div>
     </Card>
   )
