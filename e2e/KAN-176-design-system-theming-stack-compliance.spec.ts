@@ -1,20 +1,18 @@
 import { test, expect } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-176 (FR26, NFR2, NFR6-9) — the History Dashboard epic's closing audit
  * story. Two concrete things this file exists to prove, neither of which any
  * prior History Dashboard spec in this repo covers:
  *
- * 1. **US3's three date-rejection paths (FR5-FR8) are actually reachable
- *    through the real app.** `DateRangePicker` (KAN-170, FR5-FR8) shipped
- *    fully unit-tested from day one but was never mounted anywhere —
- *    KAN-175's reviewer flagged this explicitly. This story wires it into
- *    `HistoryDashboard`'s ready panel (`resolved.applyRange`); this file is
- *    the first E2E coverage of the reversed-range/malformed-date/over-span
- *    rejections and of a valid explicit-range re-fetch, closing the NFR8 gap
- *    "Playwright E2E tests cover US1-US5, including all three date-rejection
- *    paths" — none of `history-dashboard.spec.ts`/`history-charts.spec.ts`/
- *    `history-timeline-map.spec.ts` (KAN-172/174/175) touch this at all.
+ * 1. **US3's explicit-range path (FR5, FR8) is reachable through the real
+ *    app.** Originally proven through the typed `DateRangePicker`; since the
+ *    operator decision of 2026-10-29 the header `TimePicker` is the only
+ *    period control, so the over-span rejection and the valid explicit-range
+ *    re-fetch are driven through it (`resolved.applyRange`). The reversed-range
+ *    and malformed-date paths (FR6, FR7) can no longer be produced from the UI
+ *    and stay covered at unit level (`src/history/dateRange.test.ts`).
  * 2. **FR26 dark-mode correctness for the map and charts.** CSS tokens alone
  *    re-theme everything built on plain `var(--token)` styles for free, but
  *    Leaflet's raster tiles and Plotly's SVG canvas do not — this file
@@ -74,131 +72,74 @@ async function mockToReadyState(page: import('@playwright/test').Page) {
   )
 
   await page.goto('/history')
-  await page.getByTestId('history-contract-option-12').click()
+  await pickContract(page, 12)
   await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
-  await expect(page.getByTestId('date-range-picker')).toBeVisible()
 }
 
-test.describe('DateRangePicker wiring (FR5-FR8, NFR8 — US3)', () => {
-  test('a reversed range is rejected inline with no request issued (FR6)', async ({ page }) => {
-    let historyRequests = 0
-    await page.route('**/account.php', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
-    )
-    await page.route('**/contracts/list.php', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts }) }),
-    )
-    await page.route('**/contracts/history.php/**', (route) => {
-      historyRequests++
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(historyBody()) })
-    })
-
-    await page.goto('/history')
-    await page.getByTestId('history-contract-option-12').click()
-    await expect(page.getByTestId('date-range-picker')).toBeVisible()
-
-    const requestsAfterLoad = historyRequests
-    await page.getByTestId('date-range-start').fill('2026-10-20')
-    await page.getByTestId('date-range-end').fill('2026-10-01')
-    await page.getByTestId('date-range-apply').click()
-
-    await expect(page.getByTestId('date-range-error')).toBeVisible()
-    await expect(page.getByTestId('date-range-error')).toContainText('ne peut pas précéder')
-    expect(historyRequests).toBe(requestsAfterLoad)
+// Operator decision 2026-10-29: the typed Du/Au entry (`DateRangePicker`) was removed as a duplicate of the
+// header `TimePicker`, which is now the page's only period control. Its calendar normalises a range (start is
+// always <= end) and only yields real dates, so the reversed-range (FR6) and malformed-date (FR7) paths are no
+// longer reachable from the UI — they stay covered by `src/history/dateRange.test.ts`. The over-span (FR8)
+// rejection and the explicit-range re-fetch (FR5) are still reachable and are driven through the TimePicker.
+async function mockHistoryCounting(page: import('@playwright/test').Page, requestedRanges: string[]) {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts }) }),
+  )
+  await page.route('**/contracts/history.php/**', (route) => {
+    requestedRanges.push(new URL(route.request().url()).search)
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(historyBody()) })
   })
 
-  test('a malformed date is rejected inline, naming the offending field, with no request issued (FR7)', async ({
+  await page.goto('/history')
+  await pickContract(page, 12)
+  await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
+  await expect(page.getByTestId('page-header').getByTestId('time-picker')).toBeVisible()
+}
+
+test.describe('Header TimePicker range wiring (FR5, FR8, NFR8 — US3)', () => {
+  test('a span over the 1-year maximum picked in the calendar is rejected inline, stating the limit, with no request issued (FR8)', async ({
     page,
   }) => {
-    let historyRequests = 0
-    await page.route('**/account.php', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
-    )
-    await page.route('**/contracts/list.php', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts }) }),
-    )
-    await page.route('**/contracts/history.php/**', (route) => {
-      historyRequests++
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(historyBody()) })
-    })
+    const requestedRanges: string[] = []
+    await mockHistoryCounting(page, requestedRanges)
+    const requestsAfterLoad = requestedRanges.length
 
-    await page.goto('/history')
-    await page.getByTestId('history-contract-option-12').click()
-    await expect(page.getByTestId('date-range-picker')).toBeVisible()
+    await page.getByTestId('time-custom').click()
+    const popover = page.locator('[data-slot="popover-content"]')
+    // Move the range start 14 months back: the end stays, so the span exceeds 1 year.
+    for (let i = 0; i < 14; i++) await popover.locator('.rdp-button_previous').click()
+    await popover.locator('.rdp-day:not(.rdp-outside) button').first().click()
+    await popover.getByRole('button', { name: 'Appliquer' }).click()
 
-    const requestsAfterLoad = historyRequests
-    await page.getByTestId('date-range-start').fill('not-a-date')
-    await page.getByTestId('date-range-apply').click()
-
-    await expect(page.getByTestId('date-range-start-error')).toBeVisible()
-    await expect(page.getByTestId('date-range-start-error')).toContainText('date de début')
-    expect(historyRequests).toBe(requestsAfterLoad)
-  })
-
-  test('a span over the 1-year maximum is rejected inline, stating the limit, with no request issued (FR8)', async ({
-    page,
-  }) => {
-    let historyRequests = 0
-    await page.route('**/account.php', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
-    )
-    await page.route('**/contracts/list.php', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts }) }),
-    )
-    await page.route('**/contracts/history.php/**', (route) => {
-      historyRequests++
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(historyBody()) })
-    })
-
-    await page.goto('/history')
-    await page.getByTestId('history-contract-option-12').click()
-    await expect(page.getByTestId('date-range-picker')).toBeVisible()
-
-    const requestsAfterLoad = historyRequests
-    await page.getByTestId('date-range-start').fill('2024-01-01')
-    await page.getByTestId('date-range-end').fill('2026-06-01')
-    await page.getByTestId('date-range-apply').click()
-
-    await expect(page.getByTestId('date-range-error')).toBeVisible()
-    await expect(page.getByTestId('date-range-error')).toContainText('1 an')
-    expect(historyRequests).toBe(requestsAfterLoad)
+    await expect(page.getByTestId('history-time-range-error')).toBeVisible()
+    await expect(page.getByTestId('history-time-range-error')).toContainText('1 an')
+    expect(requestedRanges.length).toBe(requestsAfterLoad)
   })
 
   test('a valid explicit range re-fetches and updates the displayed period (FR5, US3 happy path)', async ({
     page,
   }) => {
-    let historyRequests = 0
     const requestedRanges: string[] = []
-    await page.route('**/account.php', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
-    )
-    await page.route('**/contracts/list.php', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts }) }),
-    )
-    await page.route('**/contracts/history.php/**', (route) => {
-      historyRequests++
-      requestedRanges.push(new URL(route.request().url()).search)
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(historyBody({ ContratRef: 'REF-012' })),
-      })
-    })
+    await mockHistoryCounting(page, requestedRanges)
+    const requestsAfterLoad = requestedRanges.length
 
-    await page.goto('/history')
-    await page.getByTestId('history-contract-option-12').click()
-    await expect(page.getByTestId('date-range-picker')).toBeVisible()
+    await page.getByTestId('time-7d').click()
 
-    const requestsAfterLoad = historyRequests
-    await page.getByTestId('date-range-start').fill('2026-09-01')
-    await page.getByTestId('date-range-end').fill('2026-09-30')
-    await page.getByTestId('date-range-apply').click()
-
-    await expect.poll(() => historyRequests).toBe(requestsAfterLoad + 1)
-    expect(requestedRanges[requestedRanges.length - 1]).toContain('start=2026-09-01')
-    expect(requestedRanges[requestedRanges.length - 1]).toContain('end=2026-09-30')
-    await expect(page.getByTestId('history-dashboard-ready')).toContainText('2026-09-01')
-    await expect(page.getByTestId('history-dashboard-ready')).toContainText('2026-09-30')
+    await expect.poll(() => requestedRanges.length).toBe(requestsAfterLoad + 1)
+    const last = new URLSearchParams(requestedRanges[requestedRanges.length - 1])
+    const start = last.get('start') ?? ''
+    const end = last.get('end') ?? ''
+    expect(start).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(end).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect((Date.parse(end) - Date.parse(start)) / 86_400_000).toBe(7)
+    // The applied day range is what the header picker now shows (dd/MM 00:00 → dd/MM 23:59).
+    const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+    await expect(page.getByTestId('time-custom')).toContainText(`${ddmm(start)} 00:00`)
+    await expect(page.getByTestId('time-custom')).toContainText(`${ddmm(end)} 23:59`)
+    await expect(page.getByTestId('history-time-range-error')).toHaveCount(0)
   })
 })
 

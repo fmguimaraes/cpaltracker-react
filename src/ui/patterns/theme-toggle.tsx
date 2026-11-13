@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import { useTheme } from '@/app/theme'
 import { Button } from '@/ui/button'
 
@@ -10,21 +10,18 @@ export interface ThemeToggleLabels {
   toLight: string
   /** aria-label of the main button while the resolved theme is light. */
   toDark: string
-  /** aria-label of the "follow the system" button. */
-  system: string
 }
 
 export const DEFAULT_THEME_LABELS: ThemeToggleLabels = {
   group: 'Thème',
   toLight: 'Passer au thème clair',
   toDark: 'Passer au thème sombre',
-  system: 'Thème du système',
 }
 
 /**
  * Global theme control. The main button (data-testid="theme-toggle") flips the resolved theme
- * light <-> dark in a single click (and stores that explicit choice); the companion button
- * (data-testid="theme-system") returns to "follow the system" and shows it with aria-pressed.
+ * light <-> dark in a single click (and stores that explicit choice). It is the only theme control:
+ * there is no "system" button (a stored "system" value still resolves through the provider).
  * `labels` overrides the aria-labels (partial).
  */
 export function ThemeToggle({ labels }: { labels?: Partial<ThemeToggleLabels> }) {
@@ -42,16 +39,6 @@ export function ThemeToggle({ labels }: { labels?: Partial<ThemeToggleLabels> })
         onClick={() => setTheme(next)}
       >
         {resolved === 'dark' ? <Sun /> : <Moon />}
-      </Button>
-      <Button
-        variant={theme === 'system' ? 'secondary' : 'ghost'}
-        size="icon-sm"
-        aria-label={l.system}
-        aria-pressed={theme === 'system'}
-        data-testid="theme-system"
-        onClick={() => setTheme('system')}
-      >
-        <Monitor />
       </Button>
     </div>
   )

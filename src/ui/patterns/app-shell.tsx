@@ -1,4 +1,4 @@
-import { ChevronsUpDown, LogOut, Settings, type LucideIcon } from 'lucide-react'
+import { EllipsisVertical, LogOut, Settings, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTheme } from '@/app/theme'
@@ -18,7 +18,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -29,9 +28,8 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/ui/sidebar'
-import { Separator } from '@/ui/separator'
 import { ThemeToggle, type ThemeToggleLabels } from '@/ui/patterns/theme-toggle'
-import { MOBILE_FRAME_WIDTH, useViewport, ViewportToggle } from '@/ui/patterns/viewport-toggle'
+import { MOBILE_FRAME_WIDTH, useViewport } from '@/ui/patterns/viewport-toggle'
 
 /** One sidebar link. `testId` is rendered as data-testid on the link. */
 export interface ShellNavItem {
@@ -70,8 +68,18 @@ export interface AppShellProps {
   /** Sidebar navigation (paths and testIds belong to the app). */
   sections: ShellNavSection[]
   userMenu: ShellUserMenu
-  /** Client-logo slot, rendered in the sidebar header (link, image, name: all up to the app). */
+  /**
+   * Brand slot of the sidebar header: a fixed 48 px row aligned with the top bar, visible in the
+   * expanded AND the collapsed (icon) sidebar, so keep it compact (about 28 px high).
+   */
   logo: ReactNode
+  /** Optional second logo (e.g. the client's), shown above the user menu and hidden when collapsed. */
+  clientLogo?: ReactNode
+  /**
+   * Optional slot at the top of the sidebar content, above the nav sections (e.g. a global contract
+   * selector). Rendered inside the sidebar, so it can call `useSidebar()` to adapt to the collapsed rail.
+   */
+  sidebarTop?: ReactNode
   /** Label of the skip-to-content link (shown on focus). */
   skipToContentLabel?: string
   /** aria-label of the sidebar landmark. */
@@ -128,7 +136,7 @@ function UserMenu({ menu }: { menu: ShellUserMenu }) {
             <span className="truncate font-medium">{menu.name}</span>
             <span className="truncate text-xs text-muted-foreground">{menu.caption}</span>
           </span>
-          <ChevronsUpDown className="ml-auto" />
+          <EllipsisVertical className="ml-auto" />
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={isMobile ? 'top' : 'right'} align="end" className="w-56">
@@ -158,13 +166,15 @@ function UserMenu({ menu }: { menu: ShellUserMenu }) {
 
 type AppSidebarProps = Pick<
   AppShellProps,
-  'sections' | 'userMenu' | 'logo' | 'navigationLabel' | 'sidebarTestId' | 'navTestId'
+  'sections' | 'userMenu' | 'logo' | 'clientLogo' | 'sidebarTop' | 'navigationLabel' | 'sidebarTestId' | 'navTestId'
 >
 
 function AppSidebar({
   sections,
   userMenu,
   logo,
+  clientLogo,
+  sidebarTop,
   navigationLabel,
   sidebarTestId = 'app-sidebar',
   navTestId = 'app-nav',
@@ -174,13 +184,13 @@ function AppSidebar({
   const { setOpenMobile } = useSidebar()
   return (
     <Sidebar collapsible="icon" aria-label={navigationLabel} data-testid={sidebarTestId}>
-      <SidebarHeader>
+      <SidebarHeader className="h-12 flex-row items-center justify-start gap-0 border-b border-sidebar-border px-2 py-0">
         {logo}
       </SidebarHeader>
       <SidebarContent data-testid={navTestId}>
+        {sidebarTop}
         {sections.map((section) => (
-          <SidebarGroup key={section.title}>
-            <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
+          <SidebarGroup key={section.title} role="group" aria-label={section.title}>
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((item) => {
@@ -212,6 +222,7 @@ function AppSidebar({
         ))}
       </SidebarContent>
       <SidebarFooter>
+        {clientLogo && <div className="flex justify-center px-1 pb-1 group-data-[collapsible=icon]:hidden">{clientLogo}</div>}
         <UserMenu menu={userMenu} />
       </SidebarFooter>
       <SidebarRail />
@@ -241,7 +252,7 @@ function MobileFrame() {
 }
 
 /**
- * The one app shell: collapsible sidebar (sheet on mobile), top bar with theme + viewport toggles,
+ * The one app shell: collapsible sidebar (sheet on mobile), top bar with the theme toggle,
  * and the routed page. Navigation, user menu and logo come from the app via props; the single
  * <main> is the skip-link target. `?view=mobile` frames the page in a 390 px iframe; `?frame=1` (inside it)
  * hides the toolbar's toggles and keeps only the menu trigger.
@@ -250,6 +261,8 @@ export function AppShell({
   sections,
   userMenu,
   logo,
+  clientLogo,
+  sidebarTop,
   skipToContentLabel = 'Aller au contenu',
   navigationLabel = 'Navigation principale',
   sidebarTestId,
@@ -267,6 +280,8 @@ export function AppShell({
         sections={sections}
         userMenu={userMenu}
         logo={logo}
+        clientLogo={clientLogo}
+        sidebarTop={sidebarTop}
         navigationLabel={navigationLabel}
         sidebarTestId={sidebarTestId}
         navTestId={navTestId}
@@ -276,13 +291,11 @@ export function AppShell({
         tabIndex={-1}
         className="min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <div className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-3" data-testid="shell-toolbar">
+        <div className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background pl-3 pr-4 md:pr-6" data-testid="shell-toolbar">
           <SidebarTrigger aria-label={sidebarTriggerLabel} />
           {!isFrame && (
             <>
-              <Separator orientation="vertical" className="h-5" />
               <div className="ml-auto flex items-center gap-2">
-                <ViewportToggle />
                 <ThemeToggle labels={themeLabels} />
               </div>
             </>

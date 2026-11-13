@@ -26,7 +26,7 @@ describe('SelectionSummaryPanel (KAN-175 FR24)', () => {
     render(<SelectionSummaryPanel rows={rows} />)
     expect(screen.getByTestId('selection-summary-count')).toHaveTextContent('2 mesure(s)')
     expect(screen.getByTestId('selection-summary-device-count')).toHaveTextContent('2 appareil(s)')
-    expect(screen.getByTestId('selection-summary-temp-range')).toHaveTextContent('10.0°C – 20.0°C')
+    expect(screen.getByTestId('selection-summary-temp-range')).toHaveTextContent('10.0° – 20.0°Celsius')
   })
 
   it('shows a no-temperature message instead of a range when no selected row has ambient temp', () => {
@@ -40,6 +40,6 @@ describe('SelectionSummaryPanel (KAN-175 FR24)', () => {
     const rows = [row({ c: 'A', ta: 10 }), row({ c: 'B', ta: 999 })]
     render(<SelectionSummaryPanel rows={rows} visibleDeviceIds={['A']} />)
     expect(screen.getByTestId('selection-summary-count')).toHaveTextContent('1 mesure(s)')
-    expect(screen.getByTestId('selection-summary-temp-range')).toHaveTextContent('10.0°C – 10.0°C')
+    expect(screen.getByTestId('selection-summary-temp-range')).toHaveTextContent('10.0° – 10.0°Celsius')
   })
 })

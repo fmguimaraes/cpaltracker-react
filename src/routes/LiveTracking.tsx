@@ -1,16 +1,13 @@
-import { useEffect, useState } from 'react'
-import { fetchContracts, type Contract } from '../api/contracts'
+import { useState } from 'react'
 import { Alert } from '@/ui/alert'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { PageHeader } from '@/ui/patterns/page-header'
 import { Skeleton } from '@/ui/skeleton'
-import { ToggleGroup, ToggleGroupItem } from '@/ui/toggle-group'
+import { TimePicker, type TimeRangeValue } from '@/ui/patterns/time-picker'
+import { useContracts } from '../contracts/ContractContext'
 import { ContractMessage } from '../live-tracking/ContractMessage'
 import { ContractPositions } from '../live-tracking/ContractPositions'
-import { GlobalMessage } from '../live-tracking/GlobalMessage'
-import { HistoryDashboardLink } from '../live-tracking/HistoryDashboardLink'
-
-type LoadState = 'loading' | 'loaded' | 'error'
+import { DEFAULT_LIVE_PERIOD } from '../live-tracking/lastReportFilter'
 
 /**
  * KAN-158 (FR1/FR2) — Live Tracking's entry gate and contract selector.
@@ -25,14 +22,15 @@ type LoadState = 'loading' | 'loaded' | 'error'
  *
  * Map rendering itself (FR3-FR7) is `ContractPositions`/`PositionsMap`
  * (KAN-160) — this component only tracks which contract is selected and
- * mounts that child, `ContractMessage`, and `HistoryDashboardLink` when it
- * is. `GlobalMessage` (KAN-165, FR13) isn't gated on a selection — it's
- * shown for the whole visit.
+ * mounts that child, and `ContractMessage` when it
+ * is. The KAN-165 History handoff link is withdrawn (operator decision 2026-10-29). The global announcement (KAN-165 FR11/FR13) is withdrawn by operator
+ * decision 2026-10-29.
  *
  * KAN-171 moved `ClientLogo` (previously mounted here) into the new shared
  * `AppChrome` (`App.tsx`), which now wraps this route — see `AppChrome`'s
  * own doc comment for why. The heading below uses the kit `PageHeader` (FR7/FR8)
- * and the contract choice a `ToggleGroup` (single, radio semantics).
+ * and the contract choice is global: `ContractProvider` + the sidebar
+ * `ContractSelect` (operator decision 2026-10-29).
  * FR8: PAT-SPLIT — the refresh action of `ContractPositions` is portalled into
  * the header's actions slot.
  *
@@ -43,84 +41,34 @@ type LoadState = 'loading' | 'loaded' | 'error'
  * or nonexistent (`onUnauthorized`), never revealing which contracts exist.
  */
 export function LiveTracking() {
-  const [state, setState] = useState<LoadState>('loading')
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [accessError, setAccessError] = useState<string | null>(null)
+  // Operator decision 2026-10-29: the contract list/selection is global (`ContractProvider`, picker in the sidebar).
+  const { contracts, loadState: state, selectedId, accessError, rejectContract } = useContracts()
+  const [period, setPeriod] = useState<TimeRangeValue>(DEFAULT_LIVE_PERIOD)
   const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null)
 
-  // KAN-168 (FR15): a 404/403 on the selected contract means it's
-  // unauthorized or doesn't exist for this account — the backend's
-  // uniform-404 convention means those are indistinguishable by design, so
-  // the UI never tries to tell them apart either. Clear the selection and
-  // show a generic message, revealing nothing about which contracts exist.
-  function handleUnauthorizedContract() {
-    setSelectedId(null)
-    setAccessError("Ce contrat n'est pas disponible. Sélectionnez-en un autre.")
-  }
-
-  function selectContract(contractId: number) {
-    setAccessError(null)
-    setSelectedId(contractId)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    setState('loading')
-    fetchContracts()
-      .then((result) => {
-        if (cancelled) return
-        setContracts(result)
-        setState('loaded')
-      })
-      .catch(() => {
-        if (cancelled) return
-        setState('error')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  // KAN-168 (FR15): a 404/403 on the selected contract means it's unauthorized or doesn't exist for this
+  // account — indistinguishable by design. The provider clears the selection and the remembered value and
+  // exposes one generic message, revealing nothing about which contracts exist.
+  const handleUnauthorizedContract = rejectContract
 
   return (
-    <div className="flex flex-col gap-4 pb-6" data-testid="live-tracking">
+    <div // md+: the page fills the viewport under the 48 px shell toolbar, the map taking all the height left
+      // below the header (no blank band); below md the page stacks and scrolls.
+      className="flex flex-col page-fill-height max-md:pb-6"
+      data-testid="live-tracking">
       <PageHeader
-        eyebrow="Flotte"
+        // Operator decision 2026-10-29: no visible title/eyebrow (like History) — the h1 stays sr-only.
         title="Suivi en direct"
-        actions={<div ref={setActionsSlot} className="flex flex-wrap items-center gap-3" />}
-      >
-        {state === 'loaded' && contracts.length > 0 && (
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            value={selectedId === null ? '' : String(selectedId)}
-            onValueChange={(value) => {
-              // Radix reports '' when the active item is clicked again: keep the selection.
-              if (value) selectContract(Number(value))
-            }}
-            role="radiogroup"
-            className="flex-wrap"
-            data-testid="contract-selector"
-            aria-label="Sélection du contrat"
-          >
-            {contracts.map((contract) => (
-              <ToggleGroupItem
-                key={contract.contractId}
-                value={String(contract.contractId)}
-                data-testid={`contract-option-${contract.contractId}`}
-              >
-                {contract.contractRef}
-                {contract.clientName ? ` (${contract.clientName})` : ''}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        )}
-      </PageHeader>
+        className="shrink-0 [&_h1]:sr-only"
+        actions={
+          <>
+            {state === 'loaded' && contracts.length > 0 && <TimePicker value={period} onChange={setPeriod} />}
+            <div ref={setActionsSlot} className="flex flex-wrap items-center gap-3" />
+          </>
+        }
+      />
 
-      <div className="flex flex-col gap-4 px-4 md:px-6 empty:hidden">
-        <GlobalMessage />
-
+      <div className="flex flex-col gap-4 shrink-0 px-4 py-4 md:px-6 empty:hidden">
         {state === 'loading' && (
           <div data-testid="live-tracking-loading" role="status">
             <Skeleton className="h-9 w-64" />
@@ -157,10 +105,8 @@ export function LiveTracking() {
             contractId={selectedId}
             onUnauthorized={handleUnauthorizedContract}
             actionsSlot={actionsSlot}
+            period={period}
           />
-          <div className="px-4 md:px-6">
-            <HistoryDashboardLink contractId={selectedId} />
-          </div>
         </>
       )}
     </div>

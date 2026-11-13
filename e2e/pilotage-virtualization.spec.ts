@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-227 (epic KAN-217) - pilotage list at fleet scale (F-33, NFR5): a contract with 5000 devices
@@ -77,8 +78,7 @@ async function openPilotage(page: Page, theme: 'dark' | 'light') {
   await page.addInitScript((t) => localStorage.setItem('cpaltracker:theme', t), theme)
   await mockWorkspace(page)
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 }
 
 const rowSelector = 'tr[data-testid^="pilotage-device-CHIP-"]'

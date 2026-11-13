@@ -3,14 +3,14 @@ import { fetchClientLogoObjectUrl } from '../api/clientLogo'
 import { useAuth } from '../auth/AuthContext'
 import { Skeleton } from '@/ui/skeleton'
 
-type LogoState = 'loading' | 'logo' | 'placeholder'
+type LogoState = 'loading' | 'logo' | 'none'
 
 /**
  * The client logo slot of the app shell: compact, a Skeleton while the logo loads and nothing
  * at all for an admin or a user without a `ClientID` (FR2: no request is sent for them).
  *
- * Same behavior as `live-tracking/ClientLogo` (one request, every failure collapses into one
- * neutral placeholder, FR3/NFR7), restyled with kit tokens. Test ids are unchanged.
+ * Every failure (no logo, forbidden, network) renders nothing, the same way for each cause
+ * (NFR7: the outcome never reveals why the logo is missing).
  */
 export function ShellClientLogo() {
   const { account, isAdmin } = useAuth()
@@ -38,7 +38,7 @@ export function ShellClientLogo() {
         setState('logo')
       })
       .catch(() => {
-        if (!cancelled) setState('placeholder')
+        if (!cancelled) setState('none')
       })
 
     return () => {
@@ -47,7 +47,7 @@ export function ShellClientLogo() {
     }
   }, [skip, clientId])
 
-  if (skip) return null
+  if (skip || state === 'none') return null
 
   if (state === 'loading') {
     return (
@@ -55,16 +55,6 @@ export function ShellClientLogo() {
         data-testid="client-logo-skeleton"
         aria-hidden="true"
         className="h-10 w-28"
-      />
-    )
-  }
-
-  if (state === 'placeholder') {
-    return (
-      <div
-        data-testid="client-logo-placeholder"
-        aria-hidden="true"
-        className="h-10 w-28 rounded-md border border-border bg-muted"
       />
     )
   }

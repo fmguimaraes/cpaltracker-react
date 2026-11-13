@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-226 (epic KAN-217) - /history on the reference History page (FR9, FR13-FR15 for these files).
@@ -55,12 +56,12 @@ async function openReady(page: Page, body: Record<string, unknown> = {}, onHisto
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(historyBody(body)) })
   })
   await page.goto('/history')
-  await page.getByTestId('history-contract-option-12').click()
+  await pickContract(page, 12)
   await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
 }
 
 test.describe('KAN-226 history on the reference page', () => {
-  test('TimePicker in the header applies a preset as a day range; the typed entry sits next to it @SI-226-1', async ({
+  test('TimePicker in the header applies a preset as a day range; it is the only period control @SI-226-1', async ({
     page,
   }) => {
     const urls: string[] = []
@@ -68,8 +69,10 @@ test.describe('KAN-226 history on the reference page', () => {
 
     const header = page.getByTestId('page-header')
     await expect(header.getByTestId('time-picker')).toBeVisible()
-    await expect(page.getByTestId('date-range-start')).toBeVisible()
-    await expect(page.getByTestId('date-range-start')).toHaveAttribute('placeholder', 'AAAA-MM-JJ')
+    // Operator decision 2026-10-29: no duplicate typed Du/Au entry and no period sentence below the header.
+    await expect(page.getByTestId('date-range-picker')).toHaveCount(0)
+    await expect(page.getByTestId('date-range-start')).toHaveCount(0)
+    await expect(page.getByTestId('history-dashboard-ready')).not.toContainText('période du')
 
     const before = urls.length
     await header.getByTestId('time-7d').click()
@@ -78,49 +81,63 @@ test.describe('KAN-226 history on the reference page', () => {
     expect(urls[urls.length - 1]).toMatch(/start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}/)
   })
 
-  test('typed entry keeps its French validation: a malformed date is rejected with no request @SI-226-1', async ({
+  // Operator decision 2026-10-29: one header row — sr-only title, contract Select, device FilterBar right of it,
+  // TimePicker on the far right. The contract is no longer a FilterBar chip (it is the Select).
+  test('the header row holds the device FilterBar and the TimePicker on its right (the contract Select now lives in the sidebar) @SI-226-2', async ({
     page,
   }) => {
-    const urls: string[] = []
-    await openReady(page, {}, (url) => urls.push(url))
-    const before = urls.length
-    await page.getByTestId('date-range-start').fill('not-a-date')
-    await page.getByTestId('date-range-apply').click()
-    await expect(page.getByTestId('date-range-start-error')).toContainText('date de début')
-    expect(urls.length).toBe(before)
-  })
-
-  test('FilterBar shows the contract and the device selection as chips @SI-226-2', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
     await openReady(page)
 
-    await expect(page.getByTestId('filter-chip')).toHaveText(/Contrat = REF-012/)
-    await page.getByTestId('device-checklist-item-CHIP-A').click()
-    await expect(page.getByTestId('filter-chip')).toHaveCount(2)
-    await expect(page.getByTestId('filter-chip').nth(1)).toContainText('Appareils = 1 sur 2')
-    await page.getByRole('button', { name: /Retirer le filtre Appareils/ }).click()
-    await expect(page.getByTestId('filter-chip')).toHaveCount(1)
+    const header = page.getByTestId('page-header')
+    await expect(header.getByRole('heading', { level: 1, name: 'Historique' })).toHaveCSS('position', 'absolute')
+    const bar = await header.getByTestId('filter-bar').boundingBox()
+    const picker = await header.getByTestId('time-picker').boundingBox()
+    expect(bar && picker).toBeTruthy()
+    expect(picker!.x).toBeGreaterThan(bar!.x + bar!.width - 1)
+    await expect(page.getByTestId('history-ready-panel').getByTestId('filter-bar')).toHaveCount(0)
+  })
 
-    await page.getByRole('button', { name: /Retirer le filtre Contrat/ }).click()
-    await expect(page.getByTestId('history-dashboard-ready')).toHaveCount(0)
-    await expect(page.getByTestId('history-dashboard-no-selection')).toBeVisible()
+  test('the header row wraps cleanly at 390 px with no horizontal overflow @SI-226-2', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openReady(page)
+
+    const header = page.getByTestId('page-header')
+    await expect(header.getByTestId('filter-bar')).toBeVisible()
+    await expect(header.getByTestId('time-picker')).toBeVisible()
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    expect(overflow).toBeLessThanOrEqual(0)
+  })
+
+  test('the header device FilterBar mirrors the checklist selection as a chip @SI-226-2', async ({ page }) => {
+    await openReady(page)
+
+    const header = page.getByTestId('page-header')
+    await expect(header.getByTestId('filter-chip')).toHaveCount(0)
+    await page.getByTestId('device-checklist-item-CHIP-A').click()
+    await expect(header.getByTestId('filter-chip')).toHaveCount(1)
+    await expect(header.getByTestId('filter-chip')).toContainText('Appareils = 1 sur 2')
+    await header.getByRole('button', { name: /Retirer le filtre Appareils/ }).click()
+    await expect(header.getByTestId('filter-chip')).toHaveCount(0)
+    await expect(page.getByTestId('device-checklist-item-CHIP-A')).toBeChecked()
   })
 
   test('the Stat row replaces the text summary @SI-226-3', async ({ page }) => {
     await openReady(page)
     await expect(page.getByTestId('selection-summary-count')).toContainText('3')
     await expect(page.getByTestId('selection-summary-device-count')).toContainText('2')
-    await expect(page.getByTestId('selection-summary-temp-range')).toContainText('5.0°C – 7.0°C')
+    await expect(page.getByTestId('selection-summary-temp-range')).toContainText('5.0° – 7.0°')
+    await expect(page.getByTestId('selection-summary-temp-range')).toContainText('Celsius')
     await expect(page.getByTestId('history-dashboard-ready')).not.toContainText(/appareil\(s\), \d+ mesure\(s\)/)
   })
 
-  test('the map sits in a WidgetCard, keeps .timeline-map and plays back with the kit controls @SI-226-4', async ({
+  test('the map sits in a Card, keeps .timeline-map and plays back with the kit controls @SI-226-4', async ({
     page,
   }) => {
     await openReady(page)
 
     const card = page.getByTestId('timeline-map')
     await expect(card).toHaveAttribute('data-slot', 'card')
-    await expect(card.getByText('Chronologie', { exact: true })).toBeVisible()
     await expect(page.locator('.timeline-map')).toBeVisible()
 
     const thumb = page.getByTestId('timeline-slider')
@@ -134,7 +151,7 @@ test.describe('KAN-226 history on the reference page', () => {
     await page.getByTestId('timeline-trail-toggle').click()
     await expect(page.getByTestId('timeline-trail-toggle')).toBeChecked()
     await page.getByTestId('timeline-play-toggle').click()
-    await expect(page.getByTestId('timeline-play-toggle')).toHaveText('Pause')
+    await expect(page.getByTestId('timeline-play-toggle')).toHaveAccessibleName('Pause')
   })
 
   test('markers use the four kit states, not colour literals @SI-226-5', async ({ page }) => {

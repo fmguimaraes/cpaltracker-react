@@ -112,7 +112,7 @@ export function Login() {
         toDark: "Switch to dark theme",
       }}
     >
-      <div className="flex flex-col gap-6 rounded-xl shadow-xs">
+      <div className="flex flex-col gap-6 rounded-xl border border-input bg-card p-6 shadow-xs">
         {notice && (
           <Alert
             variant="info"

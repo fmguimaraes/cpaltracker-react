@@ -33,7 +33,7 @@ test('redirects an unauthenticated visit to /login, preserving the return path (
   await expect(page).toHaveURL(/\/login\?suite=%2Fpilotage$/)
 })
 
-test('lists every contract the account can see, in contract context (FR2)', async ({ page }) => {
+test('a single contract loads automatically, with no selector to pick between (FR2)', async ({ page }) => {
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
   )
@@ -46,11 +46,18 @@ test('lists every contract the account can see, in contract context (FR2)', asyn
       }),
     }),
   )
+  const positionsRequest = page.waitForRequest((request) => request.url().includes('/devices/positions.php'))
+  await page.route('**/devices/positions.php**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ positions: [] }) }),
+  )
+  await page.route('**/devices/config.php**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) }),
+  )
 
   await page.goto('/pilotage')
 
-  await page.getByTestId('pilotage-contract-selector').click()
-  await expect(page.getByTestId('pilotage-contract-option-12')).toHaveText('REF-012')
+  await expect(page.getByTestId('contract-selector')).toHaveCount(0)
+  expect((await positionsRequest).url()).toContain('contractId=12')
 })
 
 test('shows the reserved-for-MAIN message and no device list when the API reports the contract ineligible (FR3, NFR4)', async ({
@@ -101,8 +108,6 @@ test('shows the reserved-for-MAIN message and no device list when the API report
   )
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('pilotage-ineligible')).toHaveText(
     'Device pilotage is limited to MAIN contracts.',
@@ -172,8 +177,6 @@ test('shows the live device list for an eligible MAIN contract (FR5, FR6)', asyn
   )
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('pilotage-device-CHIP-001')).toBeVisible()
   await expect(page.getByTestId('pilotage-device-CHIP-002')).toBeVisible()
@@ -201,8 +204,6 @@ test('shows an explicit empty state for a contract with zero live devices (FR5)'
   )
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
 
   await expect(page.getByTestId('pilotage-devices-empty')).toBeVisible()
 })
@@ -231,11 +232,9 @@ test('clears the selection and shows a generic message on an unauthorized/nonexi
   )
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-99').click()
 
   await expect(page.getByTestId('pilotage-contract-access-error')).toBeVisible()
-  await page.getByTestId('pilotage-contract-selector').click()
-  await expect(page.getByTestId('pilotage-contract-option-99')).toHaveAttribute('aria-selected', 'false')
+  // A single, rejected contract leaves nothing to pick between: the selector stays hidden.
+  await expect(page.getByTestId('contract-selector')).toHaveCount(0)
   expect(await page.getByTestId('pilotage-contract-access-error').textContent()).not.toContain('99')
 })

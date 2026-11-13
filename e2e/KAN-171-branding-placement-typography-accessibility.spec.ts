@@ -48,8 +48,9 @@ test('renders the c-PAL brand mark in the sidebar chrome, sized via the reconcil
 
   const brandMark = page.getByTestId('cpal-brand-mark')
   await expect(brandMark).toBeVisible()
-  // CB17's base size: 48px.
-  await expect.poll(async () => (await brandMark.boundingBox())?.height).toBeCloseTo(48, 0)
+  // KAN-217 shell header: a fixed 28px-wide mark that fits the collapsed
+  // icon rail, so it never resizes when the sidebar collapses.
+  await expect.poll(async () => (await brandMark.boundingBox())?.width).toBeCloseTo(28, 0)
 
   // Below the reconciled 768px (`max-md`) cutoff, the mark shrinks to 40px
   // (CB17's reduced size) — proven against the real built CSS, not the

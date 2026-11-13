@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { HistoryDevice } from '../api/history'
+import { cn } from '@/lib/utils'
 import { Button } from '@/ui/button'
 import { Checkbox } from '@/ui/checkbox'
 import { Field, FieldLabel, FieldLegend, FieldSet } from '@/ui/field'
@@ -25,12 +26,15 @@ export interface DeviceChecklistProps {
   devices: HistoryDevice[]
   selected: string[] | null
   onChange: (next: string[] | null) => void
+  className?: string
+  /** Hide the "Appareils (N)" title, e.g. when a trigger button already shows the count. */
+  hideTitle?: boolean
 }
 
 const VIRTUALIZE_THRESHOLD = 50
 const ROW_HEIGHT_PX = 32
 
-export function DeviceChecklist({ devices, selected, onChange }: DeviceChecklistProps) {
+export function DeviceChecklist({ devices, selected, onChange, className, hideTitle = false }: DeviceChecklistProps) {
   const allChipIds = devices.map((device) => device.ChipID)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -54,7 +58,7 @@ export function DeviceChecklist({ devices, selected, onChange }: DeviceChecklist
 
   if (devices.length === 0) {
     return (
-      <p data-testid="device-checklist-empty" className="text-sm text-muted-foreground">
+      <p data-testid="device-checklist-empty" className={cn('text-sm text-muted-foreground', className)}>
         Aucun appareil sur ce contrat.
       </p>
     )
@@ -83,10 +87,15 @@ export function DeviceChecklist({ devices, selected, onChange }: DeviceChecklist
   }
 
   return (
-    <FieldSet className="gap-2 rounded-lg border border-border bg-card p-3 text-sm text-foreground" data-testid="device-checklist">
-      <FieldLegend variant="label" className="px-1 text-xs text-muted-foreground">
-        Appareils ({devices.length})
-      </FieldLegend>
+    <FieldSet
+      className={cn('gap-2 rounded-lg border border-border bg-card p-3 text-sm text-foreground', className)}
+      data-testid="device-checklist"
+    >
+      {!hideTitle && (
+        <FieldLegend variant="label" className="px-1 text-xs text-muted-foreground">
+          Appareils ({devices.length})
+        </FieldLegend>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"

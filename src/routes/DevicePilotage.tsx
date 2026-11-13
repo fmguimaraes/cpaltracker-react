@@ -1,19 +1,15 @@
-import { useEffect, useState } from 'react'
-import { fetchContracts, type Contract } from '../api/contracts'
 import { Alert, AlertDescription } from '@/ui/alert'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { PageHeader } from '@/ui/patterns/page-header'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Skeleton } from '@/ui/skeleton'
+import { useContracts } from '../contracts/ContractContext'
 import { PilotageWorkspace } from '../pilotage/PilotageWorkspace'
-
-type LoadState = 'loading' | 'loaded' | 'error'
 
 /**
  * KAN-227 (FR10): PAT-LIST page — `PageHeader` with the contract choice in its
- * filter slot as the kit `Select` (trigger `pilotage-contract-selector`, one
- * `SelectItem` per contract `pilotage-contract-option-{id}`), then the
- * workspace in the page body. Copy and logic unchanged.
+ * workspace in the page body. Operator decision 2026-10-29: the contract
+ * choice is global (`ContractProvider` + the sidebar `ContractSelect`), so this
+ * page has no selector or contracts fetch of its own.
  *
  * KAN-159 (FR1-FR6, NFR2, NFR4, NFR9, NFR10) — Device Pilotage's entry gate
  * and contract selector, mirroring Live Tracking's own (KAN-158
@@ -30,71 +26,11 @@ type LoadState = 'loading' | 'loaded' | 'error'
  * generic message, revealing nothing about which contracts exist.
  */
 export function DevicePilotage() {
-  const [state, setState] = useState<LoadState>('loading')
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [accessError, setAccessError] = useState<string | null>(null)
-
-  function handleUnauthorizedContract() {
-    setSelectedId(null)
-    setAccessError("Ce contrat n'est pas disponible. Sélectionnez-en un autre.")
-  }
-
-  function selectContract(contractId: number) {
-    setAccessError(null)
-    setSelectedId(contractId)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    setState('loading')
-    fetchContracts()
-      .then((result) => {
-        if (cancelled) return
-        setContracts(result)
-        setState('loaded')
-      })
-      .catch(() => {
-        if (cancelled) return
-        setState('error')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const { contracts, loadState: state, selectedId, accessError, rejectContract } = useContracts()
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Pilotage des devices">
-        {state === 'loaded' && contracts.length > 0 && (
-          <Select
-            value={selectedId === null ? '' : String(selectedId)}
-            onValueChange={(value) => {
-              if (value) selectContract(Number(value))
-            }}
-          >
-            <SelectTrigger
-              data-testid="pilotage-contract-selector"
-              aria-label="Sélection du contrat"
-              className="w-full sm:w-72"
-            >
-              <SelectValue placeholder="— Sélectionner —" />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              {contracts.map((contract) => (
-                <SelectItem
-                  key={contract.contractId}
-                  value={String(contract.contractId)}
-                  data-testid={`pilotage-contract-option-${contract.contractId}`}
-                >
-                  {contract.contractRef}
-                  {contract.clientName ? ` (${contract.clientName})` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </PageHeader>
+      <PageHeader title="Pilotage des devices" />
 
       <div className="flex flex-col gap-6 p-4 md:p-6">
         {state === 'loading' && (
@@ -126,7 +62,7 @@ export function DevicePilotage() {
         )}
 
         {selectedId !== null && (
-          <PilotageWorkspace contractId={selectedId} onUnauthorized={handleUnauthorizedContract} />
+          <PilotageWorkspace contractId={selectedId} onUnauthorized={rejectContract} />
         )}
       </div>
     </div>

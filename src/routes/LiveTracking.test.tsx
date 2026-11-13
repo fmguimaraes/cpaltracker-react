@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthContext'
+import { ContractTestShell } from '../contracts/ContractTestShell'
 import { LiveTracking } from './LiveTracking'
 
 const account = {
@@ -22,6 +23,10 @@ const account = {
 vi.mock('plotly.js-dist-min', () => ({ default: {} }))
 vi.mock('react-plotly.js/factory', () => ({ default: () => () => <div data-testid="mock-plot" /> }))
 beforeEach(() => {
+  // The header contract choice is the kit Select (Radix), which relies on pointer capture and scrollIntoView.
+  Element.prototype.hasPointerCapture ??= () => false
+  Element.prototype.releasePointerCapture ??= () => undefined
+  Element.prototype.scrollIntoView ??= () => undefined
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -56,7 +61,7 @@ function stubFetch(
           typeof positionsResponse === 'function' ? positionsResponse() : positionsResponse
         return Promise.resolve(response)
       }
-      if (url.includes('/messages/global.php') || url.includes('/messages/contract.php')) {
+      if (url.includes('/messages/contract.php')) {
         return Promise.resolve(new Response(JSON.stringify({ message: null }), { status: 200 }))
       }
       if (url.includes('/clients/logo.php/')) {
@@ -80,7 +85,7 @@ function renderLiveTracking() {
     <MemoryRouter initialEntries={['/live-tracking']}>
       <AuthProvider>
         <Routes>
-          <Route path="/live-tracking" element={<LiveTracking />} />
+          <Route path="/live-tracking" element={<ContractTestShell><LiveTracking /></ContractTestShell>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -88,6 +93,7 @@ function renderLiveTracking() {
 }
 
 describe('LiveTracking (KAN-158 FR1/FR2)', () => {
+  beforeEach(() => window.sessionStorage.clear())
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -107,8 +113,8 @@ describe('LiveTracking (KAN-158 FR1/FR2)', () => {
 
     renderLiveTracking()
 
-    await waitFor(() => expect(screen.getByTestId('contract-selector')).toBeInTheDocument())
-    expect(screen.getByTestId('contract-option-12')).toHaveTextContent('REF-012 (Acme Corp)')
+    await userEvent.click(await screen.findByTestId('contract-selector'))
+    expect(await screen.findByTestId('contract-option-12')).toHaveTextContent('REF-012 (Acme Corp)')
     expect(screen.getByTestId('contract-option-34')).toHaveTextContent('REF-034')
     expect(screen.getByTestId('contract-option-34')).not.toHaveTextContent('(')
   })
@@ -122,11 +128,14 @@ describe('LiveTracking (KAN-158 FR1/FR2)', () => {
     expect(screen.queryByTestId('contract-selector')).not.toBeInTheDocument()
   })
 
-  it('lets the user select a contract, toggling its checked state and mounting ContractPositions', async () => {
+  it('pre-selects the first contract on load and mounts ContractPositions, without a global message box', async () => {
     stubFetch(
       new Response(
         JSON.stringify({
-          contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD' }],
+          contracts: [
+            { contractId: 12, contractRef: 'REF-012', contractType: 'STD' },
+            { contractId: 34, contractRef: 'REF-034', contractType: 'STD' },
+          ],
         }),
         { status: 200 },
       ),
@@ -134,13 +143,33 @@ describe('LiveTracking (KAN-158 FR1/FR2)', () => {
 
     renderLiveTracking()
 
-    const option = await screen.findByTestId('contract-option-12')
-    expect(option).toHaveAttribute('aria-checked', 'false')
-
-    await userEvent.click(option)
-
-    expect(option).toHaveAttribute('aria-checked', 'true')
+    await waitFor(() => expect(screen.getByTestId('contract-selector')).toHaveTextContent('REF-012'))
     await waitFor(() => expect(screen.getByTestId('positions-empty')).toBeInTheDocument())
+    expect(screen.queryByTestId('global-message')).not.toBeInTheDocument()
+    expect(window.sessionStorage.getItem('cpaltracker:contract')).toBe('12')
+  })
+
+  it('pre-selects the remembered contract when still listed, and remembers a new pick', async () => {
+    window.sessionStorage.setItem('cpaltracker:contract', '34')
+    stubFetch(
+      new Response(
+        JSON.stringify({
+          contracts: [
+            { contractId: 12, contractRef: 'REF-012', contractType: 'STD' },
+            { contractId: 34, contractRef: 'REF-034', contractType: 'STD' },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    renderLiveTracking()
+
+    await waitFor(() => expect(screen.getByTestId('contract-selector')).toHaveTextContent('REF-034'))
+    await userEvent.click(screen.getByTestId('contract-selector'))
+    await userEvent.click(await screen.findByTestId('contract-option-12'))
+    await waitFor(() => expect(screen.getByTestId('contract-selector')).toHaveTextContent('REF-012'))
+    expect(window.sessionStorage.getItem('cpaltracker:contract')).toBe('12')
   })
 
   it('shows a generic error state on a service failure, never raw backend text', async () => {
@@ -172,11 +201,9 @@ describe('LiveTracking (KAN-158 FR1/FR2)', () => {
 
     renderLiveTracking()
 
-    const option = await screen.findByTestId('contract-option-12')
-    await userEvent.click(option)
-
     await waitFor(() => expect(screen.getByTestId('contract-access-error')).toBeInTheDocument())
-    expect(option).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByTestId('contract-selector')).toHaveTextContent('Choisir un contrat')
+    expect(window.sessionStorage.getItem('cpaltracker:contract')).toBeNull()
     expect(screen.queryByTestId('positions-error')).not.toBeInTheDocument()
     expect(screen.getByTestId('contract-access-error')).not.toHaveTextContent('12')
   })

@@ -5,9 +5,9 @@ import { formatMessageDate } from './messageFormat'
 
 /**
  * KAN-165 (FR12) — the latest message for the selected contract, hidden
- * entirely when none exists. Re-fetches whenever `contractId` changes;
- * see `GlobalMessage.tsx`'s header comment for why this is rendered as
- * plain JSX text rather than `dangerouslySetInnerHTML`.
+ * entirely when none exists. Re-fetches whenever `contractId` changes.
+ * Rendered as a plain JSX text node, not `dangerouslySetInnerHTML` — React
+ * escapes it, and `contenu` is plain text in this API (`T_MESSAGES.Contenu`).
  */
 export function ContractMessage({ contractId }: { contractId: number }) {
   const [message, setMessage] = useState<Message | null>(null)

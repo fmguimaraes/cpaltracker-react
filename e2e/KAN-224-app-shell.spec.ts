@@ -68,7 +68,7 @@ test.describe('KAN-224 app shell', () => {
     await expect(page.getByTestId('cpal-brand-mark')).toHaveCount(1)
   })
 
-  test('AC4 @SI-224-4 theme-toggle flips the theme in one click and theme-system follows the system', async ({
+  test('AC4 @SI-224-4 theme-toggle flips the theme in one click and is the only theme control', async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: 'light' })
@@ -81,10 +81,8 @@ test.describe('KAN-224 app shell', () => {
     await expect(html).toHaveAttribute('data-theme', 'light')
     await page.getByTestId('theme-toggle').click()
     await expect(html).toHaveAttribute('data-theme', 'dark')
-    // The system choice follows the emulated light scheme.
-    await page.getByTestId('theme-system').click()
-    await expect(page.getByTestId('theme-system')).toHaveAttribute('aria-pressed', 'true')
-    await expect(html).toHaveAttribute('data-theme', 'light')
+    // No "system" button: the toggle is the only theme control.
+    await expect(page.getByTestId('theme-system')).toHaveCount(0)
   })
 
   test('AC5 @SI-224-5 the user menu signs out through logout-button', async ({ page }) => {

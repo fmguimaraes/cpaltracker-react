@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-174 (FR10-18, NFR1, NFR3) — the History Dashboard's time-slider /
@@ -74,7 +75,7 @@ async function mockToReadyState(page: import('@playwright/test').Page) {
   )
 
   await page.goto('/history')
-  await page.getByTestId('history-contract-option-12').click()
+  await pickContract(page, 12)
   await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
   await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2)
 }
@@ -153,15 +154,15 @@ test('"Rejouer" animates the slider to the end and the button reverts to "Rejoue
   )
 
   await page.goto('/history')
-  await page.getByTestId('history-contract-option-12').click()
+  await pickContract(page, 12)
   await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
   await expect(page.locator('.leaflet-marker-icon')).toHaveCount(1)
 
   const playButton = page.getByTestId('timeline-play-toggle')
-  await expect(playButton).toHaveText('Rejouer')
+  await expect(playButton).toHaveAccessibleName('Rejouer')
   await playButton.click()
-  await expect(playButton).toHaveText('Pause')
-  await expect(playButton).toHaveText('Rejouer', { timeout: 5000 })
+  await expect(playButton).toHaveAccessibleName('Pause')
+  await expect(playButton).toHaveAccessibleName('Rejouer', { timeout: 5000 })
   await expect(page.getByTestId('timeline-slider')).toHaveAttribute('aria-valuenow', String(shortT1))
 })
 
@@ -179,7 +180,7 @@ test('"Ajuster" re-fits the map without erroring and without a refetch (FR15, NF
   })
 
   await page.goto('/history')
-  await page.getByTestId('history-contract-option-12').click()
+  await pickContract(page, 12)
   await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
   await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2)
 

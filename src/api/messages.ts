@@ -10,11 +10,6 @@ interface MessageResponse {
   message: Message | null
 }
 
-export async function fetchGlobalMessage(): Promise<Message | null> {
-  const body = await apiClient.get<MessageResponse>('/messages/global.php')
-  return body.message ?? null
-}
-
 export async function fetchContractMessage(contractId: number): Promise<Message | null> {
   const body = await apiClient.get<MessageResponse>(`/messages/contract.php?contractId=${contractId}`)
   return body.message ?? null

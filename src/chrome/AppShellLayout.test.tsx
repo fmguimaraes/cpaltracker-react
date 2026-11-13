@@ -134,13 +134,13 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
     )
   })
 
-  it('flips the theme in a single click and offers the system choice', async () => {
+  it('flips the theme in a single click and has no system button', async () => {
     const user = userEvent.setup()
     renderShell()
     expect(document.documentElement.dataset.theme).toBe('dark')
     await user.click(screen.getByTestId('theme-toggle'))
     expect(document.documentElement.dataset.theme).toBe('light')
-    expect(screen.getByTestId('theme-system')).toBeInTheDocument()
+    expect(screen.queryByTestId('theme-system')).not.toBeInTheDocument()
   })
 
   it('exposes sign out (logout-button) in the user menu', async () => {
@@ -177,18 +177,16 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
     expect(logoutCalls).toHaveLength(1)
   })
 
-  it('shows a Skeleton while the client logo loads, then a tokenised placeholder on failure', async () => {
+  it('shows a Skeleton while the client logo loads, then nothing when there is no logo', async () => {
     renderShell({ logoStatus: 404 })
     expect(
       await screen.findByTestId('client-logo-skeleton'),
     ).toBeInTheDocument()
     await waitFor(() =>
-      expect(screen.getByTestId('client-logo-placeholder')).toBeInTheDocument(),
+      expect(screen.queryByTestId('client-logo-skeleton')).toBeNull(),
     )
-    expect(screen.queryByTestId('client-logo-skeleton')).toBeNull()
-    expect(screen.getByTestId('client-logo-placeholder')).not.toHaveAttribute(
-      'style',
-    )
+    expect(screen.queryByTestId('client-logo')).toBeNull()
+    expect(screen.queryByTestId('client-logo-placeholder')).toBeNull()
   })
 
   it('hides the client logo slot for an admin', async () => {

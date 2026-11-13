@@ -102,6 +102,7 @@ export async function fetchContractHistory(
 
 export function parseContractDate(raw: string | null): Date | null {
   if (raw === null) return null
-  const [year, month, day] = raw.split('-').map(Number)
+  // The backend sends DATETIME values ("2026-01-01 00:00:00"); only the date part is used.
+  const [year, month, day] = raw.slice(0, 10).split('-').map(Number)
   return new Date(Date.UTC(year, month - 1, day))
 }

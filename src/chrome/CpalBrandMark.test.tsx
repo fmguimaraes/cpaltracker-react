@@ -31,7 +31,7 @@ describe('CpalBrandMark (KAN-171 FR8, KAN-224 FR6)', () => {
     const img = screen.getByTestId('cpal-brand-mark')
     expect(img).toHaveAttribute('src', '/logo-cpal-orange.png')
     expect(img).toHaveAttribute('alt', 'c-PAL')
-    expect(img.className).toContain('h-12')
+    expect(img.className).toContain('w-7')
     expect(img.className).toContain('max-md:h-10')
     expect(img.className).toContain('w-auto')
   })

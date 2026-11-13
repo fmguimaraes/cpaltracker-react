@@ -31,7 +31,11 @@ export function FleetPanel({ statuses, children }: { statuses: DeviceStatus[]; c
       aria-label="Panneau de flotte"
       data-testid="fleet-panel"
       size="sm"
-      className="z-1000 gap-0 py-0 shadow-overlay md:absolute md:top-3 md:bottom-3 md:left-3 md:w-80"
+      className={cn(
+        'z-1000 gap-0 py-0 shadow-overlay md:absolute md:top-3 md:left-3 md:w-80',
+        // Collapsed: drop the bottom inset so the card shrinks to its header row instead of keeping the map height.
+        open && 'md:bottom-3',
+      )}
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
         <div>

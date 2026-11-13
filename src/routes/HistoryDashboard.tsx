@@ -1,21 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { fetchContracts, type Contract } from '../api/contracts'
 import { Alert } from '@/ui/alert'
-import { Button } from '@/ui/button'
-import { FilterBar } from '@/ui/patterns/filter-bar'
 import { PageHeader } from '@/ui/patterns/page-header'
 import { TimePicker, type TimeRangeValue } from '@/ui/patterns/time-picker'
-import { DateRangePicker } from '../history/DateRangePicker'
+import { useContracts } from '../contracts/ContractContext'
 import { HistoryAccessGate } from '../history/HistoryAccessGate'
-import { formatIsoDate, validateDateRangeInputs } from '../history/dateRange'
+import { validateDateRangeInputs } from '../history/dateRange'
 import { HistoryReadyPanel } from '../history/HistoryReadyPanel'
 import { dayRangeFromTimePicker, isoDays, timePickerValueFromDays } from '../history/timeRange'
 import type { DefaultDateRangeState } from '../history/useDefaultDateRange'
 
 type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
-
-type LoadState = 'loading' | 'loaded' | 'error'
 
 /**
  * KAN-172 (FR1, FR2, FR25, NFR5) — the History Dashboard route's entry
@@ -30,18 +24,19 @@ type LoadState = 'loading' | 'loaded' | 'error'
  * returns only the caller's own contracts (or, for an admin, every contract
  * with `clientName` attached — see `api/contracts.ts`'s doc comment); this
  * component never filters that list by any client-held role or id. A
- * missing/invalid selection (`selectedId === null`, including an `?contrat_id=`
- * query param that isn't a positive integer) is treated as "no contract
- * selected": only the selector renders, no data panels.
+ * missing/invalid `?contrat_id=` query param (not a positive integer) is not
+ * an error: once the list loads, the page defaults to the remembered contract
+ * (sessionStorage, if still in the list) or the first one (operator decision
+ * 2026-10-29). "No contract selected" (`selectedId === null`: no data panels)
+ * then only remains with zero contracts or after an access rejection.
  *
- * The `?contrat_id=` query param is `LiveTracking`'s/`HistoryDashboardLink`'s
- * (KAN-165) handoff. It is read once on mount as the *initial* selection
- * candidate only — never re-validated against the fetched contract list
+ * The `?contrat_id=` query param is a deep-link entry (formerly
+ * Live Tracking's KAN-165 handoff link, withdrawn 2026-10-29). `ContractProvider` reads it on arrival as the
+ * selection candidate only — never re-validated against the fetched contract list
  * client-side (that would be re-implementing server-owned gating). Whether
  * it's actually accessible is decided exclusively by the real history fetch
- * inside `HistoryAccessGate`, via its `/api/v1` 404 (FR25/NFR5). An
- * unparseable/absent param leaves `selectedId` at `null`, i.e. "no contract
- * selected" (FR2) — not an error.
+ * inside `HistoryAccessGate`, via its `/api/v1` 404 (FR25/NFR5). A valid
+ * param always wins over the remembered/first-contract default.
  *
  * FR25/NFR5: `HistoryAccessGate` is the single place that decides and
  * renders the merged not-found/not-yours state; this component's only
@@ -51,58 +46,23 @@ type LoadState = 'loading' | 'loaded' | 'error'
  * to clicking an inaccessible one in the selector).
  */
 export function HistoryDashboard() {
-  const [searchParams] = useSearchParams()
-  const [loadState, setLoadState] = useState<LoadState>('loading')
+  // Operator decision 2026-10-29: the contract list/selection is global (`ContractProvider`, picker in the
+  // sidebar; `?contrat_id=` deep links and the remembered default are handled there).
+  const { contracts, loadState, selectedId, accessError, rejectContract } = useContracts()
   const [timeRangeError, setTimeRangeError] = useState<string | null>(null)
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [accessError, setAccessError] = useState<string | null>(null)
 
-  const [selectedId, setSelectedId] = useState<number | null>(() => {
-    const raw = searchParams.get('contrat_id')
-    if (raw === null) return null
-    const parsed = Number(raw)
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-  })
-
-  function handleUnauthorizedContract() {
-    setSelectedId(null)
-    // Same text/markup as HistoryAccessGate's own message (NFR5): whether
-    // the rejection came from a deep-linked param or a selector click must
-    // look identical either way.
-    setAccessError("Ce contrat n'est pas disponible. Sélectionnez-en un autre.")
-  }
-
-  function selectContract(contractId: number) {
-    setAccessError(null)
-    setSelectedId(contractId)
-  }
-
+  // A new contract starts without the previous contract's period error.
   useEffect(() => {
-    let cancelled = false
-    setLoadState('loading')
-    fetchContracts()
-      .then((result) => {
-        if (cancelled) return
-        setContracts(result)
-        setLoadState('loaded')
-      })
-      .catch(() => {
-        if (cancelled) return
-        setLoadState('error')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    setTimeRangeError(null)
+  }, [selectedId])
 
-  function selectContractByReference(reference: string) {
-    const wanted = reference.trim().toLowerCase()
-    const match = contracts.find((contract) => contract.contractRef.toLowerCase() === wanted)
-    if (match) selectContract(match.contractId)
-  }
+  // FR25/NFR5: the provider clears the selection and the remembered value, and exposes the same
+  // text/markup as HistoryAccessGate's own message, whether the rejection came from a deep link or a pick.
+  const handleUnauthorizedContract = rejectContract
 
-  // FR9: the header `TimePicker` (presets + calendar) maps onto the day-granular range through the same
-  // validation as the typed entry (FR5-FR8): an invalid pick never reaches the fetch.
+  // FR9: the header `TimePicker` (presets + calendar) is the page's only period control (operator decision
+  // 2026-10-29 removed the duplicate typed Du/Au entry). Its value maps onto the day-granular range through
+  // `validateDateRangeInputs` (FR5-FR8): an invalid pick never reaches the fetch.
   function applyTimePickerValue(resolved: ReadyState, value: TimeRangeValue) {
     const days = isoDays(dayRangeFromTimePicker(value))
     const result = validateDateRangeInputs(days.start, days.end)
@@ -115,9 +75,14 @@ export function HistoryDashboard() {
   }
 
   const [gateState, setGateState] = useState<DefaultDateRangeState | null>(null)
+  const [filterSlot, setFilterSlot] = useState<HTMLDivElement | null>(null)
   const state = selectedId === null ? null : gateState
 
-  const selectedContract = contracts.find((contract) => contract.contractId === selectedId)
+  function renderHeaderFilters() {
+    if (loadState !== 'loaded' || contracts.length === 0) return undefined
+    // The device FilterBar is portalled here by `HistoryReadyPanel` once the history is ready.
+    return <div ref={setFilterSlot} data-testid="history-header-filters" className="empty:hidden" />
+  }
 
   function renderContractSection() {
     return (
@@ -140,31 +105,6 @@ export function HistoryDashboard() {
           </p>
         )}
 
-        {loadState === 'loaded' && contracts.length > 0 && (
-          <div
-            role="radiogroup"
-            className="flex flex-wrap gap-2"
-            data-testid="history-contract-selector"
-            aria-label="Sélection du contrat"
-          >
-            {contracts.map((contract) => (
-              <Button
-                key={contract.contractId}
-                type="button"
-                variant="outline"
-                role="radio"
-                data-testid={`history-contract-option-${contract.contractId}`}
-                aria-checked={selectedId === contract.contractId}
-                onClick={() => selectContract(contract.contractId)}
-                className="aria-checked:border-primary aria-checked:bg-muted"
-              >
-                {contract.contractRef}
-                {contract.clientName ? ` (${contract.clientName})` : ''}
-              </Button>
-            ))}
-          </div>
-        )}
-
         {accessError && (
           <Alert variant="danger" data-testid="history-access-error-banner">
             {accessError}
@@ -183,7 +123,11 @@ export function HistoryDashboard() {
   return (
     <div className="flex flex-col" data-testid="history-page">
       <PageHeader
+        // Operator decision 2026-10-29: no visible title — the row holds the contract Select and the
+        // TimePicker; the h1 stays for assistive tech and document structure (sr-only, out of the flex flow).
         title="Historique"
+        className="[&_h1]:sr-only"
+        chips={renderHeaderFilters()}
         actions={
           state?.status === 'ready' ? (
             <TimePicker
@@ -198,26 +142,6 @@ export function HistoryDashboard() {
             {timeRangeError}
           </Alert>
         )}
-        <FilterBar
-          attributes={['Contrat']}
-          filters={
-            selectedContract
-              ? [
-                  {
-                    id: 'contract',
-                    attribute: 'Contrat',
-                    value: `${selectedContract.contractRef}${selectedContract.clientName ? ` (${selectedContract.clientName})` : ''}`,
-                  },
-                ]
-              : []
-          }
-          onRemove={() => {
-            setAccessError(null)
-            setTimeRangeError(null)
-            setSelectedId(null)
-          }}
-          onAdd={({ value }) => selectContractByReference(value)}
-        />
       </PageHeader>
 
       <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -233,24 +157,7 @@ export function HistoryDashboard() {
               // (driving `TimelineMap`'s `visibleDeviceIds`), the map itself (KAN-174), the three charts,
               // lot-hook history, sampling banner and the Stat row (selection summary).
               <section data-testid="history-dashboard-ready" className="flex flex-col gap-4">
-                <p className="text-sm text-foreground">
-                  Contrat {resolved.history.contract.ContratRef} — période du{' '}
-                  {resolved.start ? formatIsoDate(resolved.start) : '…'} au{' '}
-                  {resolved.end ? formatIsoDate(resolved.end) : '…'}.
-                </p>
-                {/*
-                 * KAN-176 (FR5-FR8, NFR8) — the typed date entry next to the header `TimePicker`.
-                 * `resolved.applyRange` is `useDefaultDateRange`'s explicit-range re-fetch, so applying a range
-                 * goes through the exact same ready/unauthorized/error handling as the initial load; a rejected
-                 * range is caught by `DateRangePicker`'s own `validateDateRangeInputs` call before `onApply` is
-                 * reached (FR5: no request while invalid).
-                 */}
-                <DateRangePicker
-                  initialStart={resolved.start}
-                  initialEnd={resolved.end}
-                  onApply={resolved.applyRange}
-                />
-                <HistoryReadyPanel history={resolved.history} />
+                <HistoryReadyPanel history={resolved.history} filterSlot={filterSlot} />
               </section>
             )}
           </HistoryAccessGate>

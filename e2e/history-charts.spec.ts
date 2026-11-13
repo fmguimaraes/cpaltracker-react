@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-175 (FR4, FR9, FR19-24, NFR3) — the device checklist, three Plotly
@@ -67,7 +68,7 @@ async function mockToReadyState(page: import('@playwright/test').Page, body = hi
   )
 
   await page.goto('/history')
-  await page.getByTestId('history-contract-option-12').click()
+  await pickContract(page, 12)
   await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
 }
 
@@ -94,7 +95,7 @@ test('unchecking a device filters the map marker, the charts and the summary wit
   })
 
   await page.goto('/history')
-  await page.getByTestId('history-contract-option-12').click()
+  await pickContract(page, 12)
   await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
   await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2)
 
@@ -158,13 +159,13 @@ test('the selection summary recomputes min/max ambient temperature on every sele
 }) => {
   await mockToReadyState(page)
 
-  await expect(page.getByTestId('selection-summary-temp-range')).toContainText('18.0°C')
-  await expect(page.getByTestId('selection-summary-temp-range')).toContainText('22.0°C')
+  await expect(page.getByTestId('selection-summary-temp-range')).toContainText('18.0°')
+  await expect(page.getByTestId('selection-summary-temp-range')).toContainText('22.0°')
 
   await page.getByTestId('device-checklist-item-CHIP-B').uncheck()
 
-  await expect(page.getByTestId('selection-summary-temp-range')).toContainText('18.0°C')
-  await expect(page.getByTestId('selection-summary-temp-range')).toContainText('19.0°C')
+  await expect(page.getByTestId('selection-summary-temp-range')).toContainText('18.0°')
+  await expect(page.getByTestId('selection-summary-temp-range')).toContainText('19.0°')
 })
 
 test('a fetch failure shows a dismissible error banner (FR4, FR23)', async ({ page }) => {
@@ -183,7 +184,7 @@ test('a fetch failure shows a dismissible error banner (FR4, FR23)', async ({ pa
   )
 
   await page.goto('/history')
-  await page.getByTestId('history-contract-option-12').click()
+  await pickContract(page, 12)
 
   const banner = page.getByTestId('history-fetch-error')
   await expect(banner).toBeVisible()

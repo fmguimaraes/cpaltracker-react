@@ -19,10 +19,33 @@ export class ApiError extends Error {
   }
 }
 
-let authToken: string | null = null
+/**
+ * Dev server only: the token is mirrored in sessionStorage so a Vite reload (HMR full reload
+ * or F5) does not sign the developer out. Production and tests keep it in memory only
+ * (stack decision §3): `import.meta.env.DEV` is false in a build, and MODE is 'test' in vitest.
+ */
+const PERSIST_DEV_TOKEN = import.meta.env.DEV && import.meta.env.MODE !== 'test'
+const DEV_TOKEN_KEY = 'cpaltracker:dev-token'
+
+function readDevToken(): string | null {
+  try {
+    return sessionStorage.getItem(DEV_TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+let authToken: string | null = PERSIST_DEV_TOKEN ? readDevToken() : null
 
 export function setAuthToken(token: string | null): void {
   authToken = token
+  if (!PERSIST_DEV_TOKEN) return
+  try {
+    if (token) sessionStorage.setItem(DEV_TOKEN_KEY, token)
+    else sessionStorage.removeItem(DEV_TOKEN_KEY)
+  } catch {
+    // Storage blocked: the dev session simply does not survive a reload.
+  }
 }
 
 /**

@@ -35,6 +35,9 @@ export interface ChartTheme {
   grid: string
   card: string
   foreground: string
+  primary: string
+  /** Resolved from `<html data-theme>`; 'dark' when absent/unrecognized (D7's default). */
+  theme: 'light' | 'dark'
   warning: string
   danger: string
   success: string
@@ -84,6 +87,8 @@ function readTheme(): ChartTheme {
     grid,
     card: resolveColor('--card'),
     foreground,
+    primary: resolveColor('--primary'),
+    theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark',
     warning: resolveColor('--warning'),
     danger: resolveColor('--danger'),
     success: resolveColor('--success') || colors[2],

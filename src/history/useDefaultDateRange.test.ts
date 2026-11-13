@@ -136,7 +136,7 @@ describe('useDefaultDateRange (KAN-170 FR3)', () => {
     await waitFor(() => expect(result.current.status).toBe('error'))
   })
 
-  describe('applyRange (KAN-176 FR5-FR8, NFR8 — DateRangePicker wiring)', () => {
+  describe('applyRange (KAN-176 FR5-FR8, NFR8 — header TimePicker wiring)', () => {
     it('re-fetches with the explicit range and lands back in "ready" with that exact range, not a re-derived default', async () => {
       const callCount = stubFetchSequence([
         new Response(JSON.stringify(historyBody()), { status: 200 }),

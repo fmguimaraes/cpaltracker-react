@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-173 (epic KAN-140) — Technical Foundation: Stack, Theming, Tests &
@@ -86,8 +87,7 @@ test('the pilotage workspace re-themes with the rest of the app, from the live c
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   const deviceRow = page.getByTestId('pilotage-device-CHIP-000')
   await expect(deviceRow).toBeVisible()
@@ -102,8 +102,7 @@ test('the pilotage workspace re-themes with the rest of the app, from the live c
   await page.goto('/')
   await page.getByTestId('theme-toggle').click()
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
   await expect(page.getByTestId('pilotage-device-CHIP-000')).toBeVisible()
 
   const darkBackground = await readRowBackground()
@@ -116,8 +115,7 @@ test('virtualizes a large device list instead of rendering every row, keeping th
   await mockEligibleWorkspace(page, { positionsCount: 80 })
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await expect(page.getByTestId('pilotage-device-list-scroll')).toBeVisible()
   // Only a window of rows is mounted at once — far fewer than the 80 devices
@@ -134,8 +132,7 @@ test('the settings form is fully keyboard-navigable, with every field reachable 
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await expect(page.getByTestId('settings-form')).toBeVisible()
 

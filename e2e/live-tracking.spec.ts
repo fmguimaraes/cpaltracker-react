@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { openContractSelect, pickContract } from './contract-helpers'
 
 /**
  * KAN-158 smoke coverage for Live Tracking's entry gate and contract
@@ -11,6 +12,12 @@ import { test, expect } from '@playwright/test'
  * per-feature tests above which exercise one FR group at a time), plus the
  * unauthorized/malformed-contract state (FR15).
  */
+
+// The positions fixtures below date from 2026-10-10; Live Tracking now filters by last report over a
+// 30-day default period, so pin the browser clock to keep them inside it.
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-12T09:00:00Z'))
+})
 
 const account = {
   userId: 1,
@@ -40,7 +47,7 @@ test('redirects an unauthenticated visit to /login, preserving the return path (
   await expect(page).toHaveURL(/\/login\?suite=%2Flive-tracking$/)
 })
 
-test('a non-admin sees only their own contracts, with no client name (FR2)', async ({ page }) => {
+test('a non-admin with a single contract sees no selector; it loads automatically (FR2)', async ({ page }) => {
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
   )
@@ -53,10 +60,16 @@ test('a non-admin sees only their own contracts, with no client name (FR2)', asy
       }),
     }),
   )
+  const positionsRequest = page.waitForRequest((request) => request.url().includes('/devices/positions.php'))
+  await page.route('**/devices/positions.php**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ positions: [] }) }),
+  )
 
   await page.goto('/live-tracking')
 
-  await expect(page.getByTestId('contract-option-12')).toHaveText('REF-012')
+  await expect(page.getByTestId('contract-selector')).toHaveCount(0)
+  await expect(page.getByTestId('contract-selector-collapsed')).toHaveCount(0)
+  expect((await positionsRequest).url()).toContain('contractId=12')
 })
 
 test('an admin sees every contract with its client name (FR2)', async ({ page }) => {
@@ -82,6 +95,7 @@ test('an admin sees every contract with its client name (FR2)', async ({ page })
 
   await page.goto('/live-tracking')
 
+  await openContractSelect(page)
   await expect(page.getByTestId('contract-option-12')).toHaveText('REF-012 (Acme Corp)')
   await expect(page.getByTestId('contract-option-34')).toHaveText('REF-034 (Other Client)')
 })
@@ -152,7 +166,6 @@ test('selecting a contract renders one marker per positioned device with an acce
   )
 
   await page.goto('/live-tracking')
-  await page.getByTestId('contract-option-12').click()
 
   const markers = page.locator('.leaflet-marker-icon')
   await expect(markers).toHaveCount(1)
@@ -223,7 +236,6 @@ test('manual refresh keeps the prior snapshot on failure, and the device filter 
   })
 
   await page.goto('/live-tracking')
-  await page.getByTestId('contract-option-12').click()
 
   const markers = page.locator('.leaflet-marker-icon')
   await expect(markers).toHaveCount(2)
@@ -241,7 +253,7 @@ test('manual refresh keeps the prior snapshot on failure, and the device filter 
   await expect(page.getByTestId('positions-refresh-error')).not.toBeVisible()
 })
 
-test('shows the global and per-contract messages as plain text, the logo when flagged, and a History Dashboard link carrying contract + date range (FR11, FR12, FR13, FR14)', async ({
+test('shows the per-contract message as plain text and the logo when flagged, with no global message and no History handoff link (FR12, FR13; FR11/FR14 withdrawn)', async ({
   page,
 }) => {
   await page.route('**/account.php', (route) =>
@@ -258,15 +270,6 @@ test('shows the global and per-contract messages as plain text, the logo when fl
   )
   await page.route('**/devices/positions.php**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ positions: [] }) }),
-  )
-  await page.route('**/messages/global.php', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        message: { date: '2026-10-10T08:00:00+00:00', contenu: '<b>Maintenance</b> ce soir.' },
-      }),
-    }),
   )
   await page.route('**/messages/contract.php**', (route) =>
     route.fulfill({
@@ -292,32 +295,23 @@ test('shows the global and per-contract messages as plain text, the logo when fl
 
   await page.goto('/live-tracking')
 
-  // FR11: global message shown immediately, as the literal text it is in
-  // the API response — never parsed as HTML (no <b> element rendered).
-  await expect(page.getByTestId('global-message')).toContainText('<b>Maintenance</b> ce soir.')
-  expect(await page.locator('[data-testid="global-message"] b').count()).toBe(0)
+  // FR11 (global message) is withdrawn by operator decision 2026-10-29: no announcement box on the page.
+  await expect(page.getByTestId('global-message')).toHaveCount(0)
 
   // FR1 (KAN-161): logo shown once the unified endpoint serves the image.
   await expect(page.getByTestId('client-logo')).toBeVisible()
 
-  // FR14: no History Dashboard link before a contract is selected.
-  await expect(page.getByTestId('history-dashboard-link')).toHaveCount(0)
-
-  await page.getByTestId('contract-option-12').click()
+  // A single-contract non-admin sees no selector; it's pre-selected on load (operator decision 2026-10-29).
+  await expect(page.getByTestId('contract-selector')).toHaveCount(0)
 
   // FR12: per-contract message shown once selected.
   await expect(page.getByTestId('contract-message')).toContainText('Message du contrat 12.')
 
-  // FR14: link now present, carrying contrat_id + date_from + date_to.
-  const href = await page.getByTestId('history-dashboard-link').getAttribute('href')
-  expect(href).toContain('/history?')
-  const params = new URLSearchParams(href!.split('?')[1])
-  expect(params.get('contrat_id')).toBe('12')
-  expect(params.get('date_from')).toBeTruthy()
-  expect(params.get('date_to')).toBeTruthy()
+  // FR14 (History handoff link) is withdrawn by operator decision 2026-10-29.
+  await expect(page.getByTestId('history-dashboard-link')).toHaveCount(0)
 })
 
-test('primary flow: login-gated access, select a contract, markers render, refresh updates "last updated", open History Dashboard (KAN-168)', async ({
+test('primary flow: login-gated access, select a contract, markers render, refresh updates "last updated" (KAN-168)', async ({
   page,
 }) => {
   // FR1: anonymous visit redirects to /login rather than rendering anything.
@@ -344,9 +338,6 @@ test('primary flow: login-gated access, select a contract, markers render, refre
         contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD' }],
       }),
     }),
-  )
-  await page.route('**/messages/global.php', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: null }) }),
   )
   await page.route('**/messages/contract.php**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: null }) }),
@@ -390,8 +381,6 @@ test('primary flow: login-gated access, select a contract, markers render, refre
 
   await page.goto('/live-tracking')
 
-  await page.getByTestId('contract-option-12').click()
-
   const markers = page.locator('.leaflet-marker-icon')
   await expect(markers).toHaveCount(1)
 
@@ -407,10 +396,6 @@ test('primary flow: login-gated access, select a contract, markers render, refre
   await expect(markers).toHaveCount(1)
   await expect(page.getByTestId('positions-refresh-error')).toHaveCount(0)
   expect(positionsRequestCount).toBe(2)
-
-  const historyHref = await page.getByTestId('history-dashboard-link').getAttribute('href')
-  expect(historyHref).toContain('/history?')
-  expect(historyHref).toContain('contrat_id=12')
 })
 
 test('clears the selection and shows a generic message on an unauthorized/nonexistent contract (KAN-168 FR15)', async ({
@@ -437,10 +422,10 @@ test('clears the selection and shows a generic message on an unauthorized/nonexi
   )
 
   await page.goto('/live-tracking')
-  await page.getByTestId('contract-option-99').click()
 
   await expect(page.getByTestId('contract-access-error')).toBeVisible()
-  await expect(page.getByTestId('contract-option-99')).toHaveAttribute('aria-checked', 'false')
+  // A single, rejected contract leaves nothing to pick between: the selector stays hidden.
+  await expect(page.getByTestId('contract-selector')).toHaveCount(0)
   expect(await page.getByTestId('contract-access-error').textContent()).not.toContain('99')
 })
 
@@ -460,7 +445,7 @@ test('clears the selection and shows a generic message on an unauthorized/nonexi
  * admin tests above.
  */
 
-test('renders a neutral, empty placeholder — not nothing, not an error — on the unified 404 (FR3, NFR7)', async ({
+test('renders nothing — no placeholder, no error — on the unified 404 (FR3, NFR7)', async ({
   page,
 }) => {
   await page.route('**/account.php', (route) =>
@@ -481,13 +466,14 @@ test('renders a neutral, empty placeholder — not nothing, not an error — on 
   )
 
   await page.goto('/live-tracking')
+  await expect(page.getByTestId('live-tracking-empty')).toBeVisible()
 
-  await expect(page.getByTestId('client-logo-placeholder')).toBeVisible()
+  await expect(page.getByTestId('client-logo-skeleton')).toHaveCount(0)
   await expect(page.getByTestId('client-logo')).toHaveCount(0)
-  expect((await page.getByTestId('client-logo-placeholder').textContent())?.trim()).toBe('')
+  await expect(page.getByTestId('client-logo-placeholder')).toHaveCount(0)
 })
 
-test('renders the exact same placeholder on a network/service failure as on the unified 404 (FR3, NFR7)', async ({
+test('renders nothing on a network/service failure, exactly as on the unified 404 (FR3, NFR7)', async ({
   page,
 }) => {
   await page.route('**/account.php', (route) =>
@@ -499,9 +485,11 @@ test('renders the exact same placeholder on a network/service failure as on the 
   await page.route('**/clients/logo.php/7', (route) => route.abort('failed'))
 
   await page.goto('/live-tracking')
+  await expect(page.getByTestId('live-tracking-empty')).toBeVisible()
 
-  await expect(page.getByTestId('client-logo-placeholder')).toBeVisible()
+  await expect(page.getByTestId('client-logo-skeleton')).toHaveCount(0)
   await expect(page.getByTestId('client-logo')).toHaveCount(0)
+  await expect(page.getByTestId('client-logo-placeholder')).toHaveCount(0)
 })
 
 test('never requests or renders a logo for an admin account (FR2)', async ({ page }) => {
@@ -529,7 +517,7 @@ test('never requests or renders a logo for an admin account (FR2)', async ({ pag
   expect(logoRequested).toBe(false)
 })
 
-test('renders the exact same placeholder on a forbidden (403) response as on the unified 404 (FR3, NFR2, NFR7)', async ({
+test('renders nothing on a forbidden (403) response, exactly as on the unified 404 (FR3, NFR2, NFR7)', async ({
   page,
 }) => {
   await page.route('**/account.php', (route) =>
@@ -539,7 +527,7 @@ test('renders the exact same placeholder on a forbidden (403) response as on the
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts: [] }) }),
   )
   // Forbidden must be indistinguishable from the 404 case above (GAP1):
-  // same placeholder markup, no text that could reveal the failure cause.
+  // nothing rendered either way, so nothing can reveal the failure cause.
   await page.route('**/clients/logo.php/7', (route) =>
     route.fulfill({
       status: 403,
@@ -549,10 +537,11 @@ test('renders the exact same placeholder on a forbidden (403) response as on the
   )
 
   await page.goto('/live-tracking')
+  await expect(page.getByTestId('live-tracking-empty')).toBeVisible()
 
-  await expect(page.getByTestId('client-logo-placeholder')).toBeVisible()
+  await expect(page.getByTestId('client-logo-skeleton')).toHaveCount(0)
   await expect(page.getByTestId('client-logo')).toHaveCount(0)
-  expect((await page.getByTestId('client-logo-placeholder').textContent())?.trim()).toBe('')
+  await expect(page.getByTestId('client-logo-placeholder')).toHaveCount(0)
 })
 
 test('never requests or renders a logo for a non-admin account with no ClientID (FR2, NFR2)', async ({
@@ -580,4 +569,93 @@ test('never requests or renders a logo for a non-admin account with no ClientID 
   await expect(page.getByTestId('client-logo')).toHaveCount(0)
   await expect(page.getByTestId('client-logo-placeholder')).toHaveCount(0)
   expect(logoRequested).toBe(false)
+})
+
+test('the header period filters devices by their last report (default 30 days, presets narrow it)', async ({ page }) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+  await page.route('**/contracts/list.php', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD' }] }),
+    }),
+  )
+  await page.route('**/messages/contract.php**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: null }) }),
+  )
+  const base = { contractId: 12, latitude: 48.85, longitude: 2.35, ambientTemperature: 19, humidity: 55, mass: 420, mpuTemperature: 21, accelG: 1 }
+  await page.route('**/devices/positions.php**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        positions: [
+          { ...base, chipId: 'CHIP-NEW', timestamp: '2026-10-12T08:00:00Z' },
+          { ...base, chipId: 'CHIP-MID', latitude: 48.9, timestamp: '2026-10-10T08:00:00Z' },
+          { ...base, chipId: 'CHIP-OLD', latitude: 49, timestamp: '2026-08-01T08:00:00Z' },
+        ],
+      }),
+    }),
+  )
+
+  await page.goto('/live-tracking')
+
+  const markers = page.locator('.leaflet-marker-icon')
+  await expect(page.getByTestId('time-30d')).toHaveAttribute('aria-checked', 'true')
+  await expect(markers).toHaveCount(2)
+  await expect(page.getByTestId('device-filter-CHIP-OLD')).toHaveCount(0)
+
+  // Layout (operator decision 2026-10-29): no gap under the header, and on desktop the map fills the
+  // viewport height with no page scrollbar; below md the layout stacks.
+  const metrics = () =>
+    page.evaluate(() => {
+      const header = document.querySelector('[data-testid="page-header"]')!.getBoundingClientRect()
+      const split = document.querySelector('[data-testid="live-split"]')!.getBoundingClientRect()
+      const leaflet = document.querySelector('.leaflet-container')!.getBoundingClientRect()
+      const doc = document.documentElement
+      return {
+        gap: Math.round(split.top - header.bottom),
+        bottomDelta: Math.round(innerHeight - split.bottom),
+        leafletHeight: Math.round(leaflet.height),
+        splitHeight: Math.round(split.height),
+        scrolls: doc.scrollHeight > doc.clientHeight,
+      }
+    })
+  for (const [width, height] of [
+    [1440, 900],
+    [1920, 1080],
+  ]) {
+    await page.setViewportSize({ width, height })
+    await expect.poll(async () => (await metrics()).bottomDelta).toBeLessThanOrEqual(8)
+    const m = await metrics()
+    expect(m.gap).toBe(0)
+    expect(m.scrolls).toBe(false)
+    expect(Math.abs(m.leafletHeight - m.splitHeight)).toBeLessThanOrEqual(1)
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+
+  // Fleet panel collapse shrinks the card to its header row, and reopening restores it.
+  const fleet = page.getByTestId('fleet-panel')
+  const openHeight = (await fleet.boundingBox())!.height
+  await page.getByRole('button', { name: 'Réduire le panneau de flotte' }).click()
+  await expect.poll(async () => (await fleet.boundingBox())!.height).toBeLessThan(80)
+  await page.getByRole('button', { name: 'Ouvrir le panneau de flotte' }).click()
+  await expect.poll(async () => (await fleet.boundingBox())!.height).toBeGreaterThan(openHeight - 2)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  const mobile = await metrics()
+  expect(mobile.gap).toBe(0)
+  await page.setViewportSize({ width: 1440, height: 900 })
+
+  await page.getByTestId('time-24h').click()
+  await expect(markers).toHaveCount(1)
+  await expect(page.getByTestId('device-filter-CHIP-MID')).toHaveCount(0)
+  await expect(page.getByTestId('device-filter-CHIP-NEW')).toBeVisible()
+
+  await page.getByTestId('time-30m').click()
+  await expect(page.getByTestId('positions-period-empty')).toHaveText(
+    "Aucun appareil n'a émis de position sur cette période.",
+  )
 })

@@ -50,7 +50,15 @@ export function TimeSeriesChart({ series, threshold, unit = '°C', label, classN
     shapes,
     showlegend: series.length > 1,
     legend: { ...t.layout.legend, orientation: 'h', y: -0.2 },
-    yaxis: { ...t.layout.yaxis, range: [lo, hi], ticksuffix: ` ${unit}` },
+    // View window (KAN-??): native Plotly interactions, no custom UI. x gets the built-in
+    // two-handle range slider (bottom, date axis); y has no slider equivalent in Plotly, so it's
+    // zoomed by dragging on the y-axis strip or box-zooming the plot (fixedrange: false on both).
+    xaxis: {
+      ...t.layout.xaxis,
+      fixedrange: false,
+      rangeslider: { visible: true, thickness: 0.08, bgcolor: t.card, bordercolor: t.grid, borderwidth: 1 },
+    },
+    yaxis: { ...t.layout.yaxis, range: [lo, hi], ticksuffix: ` ${unit}`, fixedrange: false },
     margin: { l: 56, r: 12, t: 12, b: 36 },
   }
   return <Plot label={label} className={className} data={data} layout={layout} />

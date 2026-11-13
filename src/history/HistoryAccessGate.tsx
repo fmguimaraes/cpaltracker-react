@@ -35,10 +35,10 @@ type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
  * extension point: it is called with the resolved default range and the
  * already-fetched `HistoryResponse` only once `status === 'ready'`, so later
  * stories plug in without this file changing. KAN-176 (FR5-FR8, NFR8) is
- * exactly that: it mounts `DateRangePicker` in `HistoryDashboard` and wires
- * its `onApply` straight to the `applyRange` callback this gate's resolved
- * state now carries (from `useDefaultDateRange`) — this file itself needed
- * no change for that.
+ * exactly that: `HistoryDashboard`'s header `TimePicker` (the page's only
+ * period control since the operator decision of 2026-10-29) calls the
+ * `applyRange` callback this gate's resolved state carries (from
+ * `useDefaultDateRange`) — this file itself needed no change for that.
  *
  * KAN-175 (FR4, FR23) — the `status === 'error'` branch below (a generic
  * network/fetch failure distinct from the `unauthorized` 404 above) is the

@@ -11,6 +11,8 @@ import { Alert } from '@/ui/alert'
 import { Button } from '@/ui/button'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { Skeleton } from '@/ui/skeleton'
+import type { TimeRangeValue } from '@/ui/patterns/time-picker'
+import { filterByLastReport } from './lastReportFilter'
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
@@ -55,6 +57,7 @@ export function ContractPositions({
   contractId,
   onUnauthorized,
   actionsSlot,
+  period,
 }: {
   contractId: number
   onUnauthorized?: () => void
@@ -63,9 +66,14 @@ export function ContractPositions({
    * renders them inline above the map; `null` means the slot is not mounted yet.
    */
   actionsSlot?: HTMLElement | null
+  /**
+   * Operator decision 2026-10-29 ("filter by last report"): when set, only devices whose latest position
+   * timestamp falls inside the period are shown (map, fleet panel, device list). Client-side only.
+   */
+  period?: TimeRangeValue
 }) {
   const [state, setState] = useState<LoadState>('loading')
-  const [positions, setPositions] = useState<Position[]>([])
+  const [allPositions, setPositions] = useState<Position[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
@@ -128,6 +136,10 @@ export function ContractPositions({
   }
 
   // Hooks stay above the early returns below.
+  const positions = useMemo(
+    () => (period ? filterByLastReport(allPositions, period) : allPositions),
+    [allPositions, period],
+  )
   const fleetStatuses = useMemo(() => positions.map((p) => massStatus(p.mass)), [positions])
   const statusByChip = useMemo(
     () => Object.fromEntries(positions.map((p) => [p.chipId, massStatus(p.mass)])),
@@ -172,11 +184,11 @@ export function ContractPositions({
   else if (actionsSlot) actionsNode = createPortal(actions, actionsSlot)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 md:min-h-0 md:flex-1">
       {actionsNode}
 
       {refreshError && (
-        <div className="px-4 md:px-6">
+        <div className="px-4 pt-4 md:px-6">
           <Alert variant="danger" data-testid="positions-refresh-error">
             {refreshError}
           </Alert>
@@ -185,14 +197,18 @@ export function ContractPositions({
 
       {positions.length === 0 ? (
         <div className="px-4 md:px-6">
-          <Empty data-testid="positions-empty">
+          <Empty data-testid={allPositions.length === 0 ? 'positions-empty' : 'positions-period-empty'}>
             <EmptyHeader>
-              <EmptyDescription>Aucune position disponible pour ce contrat.</EmptyDescription>
+              <EmptyDescription>
+                {allPositions.length === 0
+                  ? 'Aucune position disponible pour ce contrat.'
+                  : "Aucun appareil n'a émis de position sur cette période."}
+              </EmptyDescription>
             </EmptyHeader>
           </Empty>
         </div>
       ) : (
-        <div className="relative flex flex-col md:block md:h-176" data-testid="live-split">
+        <div className="relative flex flex-col md:block md:min-h-0 md:flex-1" data-testid="live-split">
           <div className="h-96 md:h-full">
             <PositionsMap positions={visiblePositions} />
           </div>

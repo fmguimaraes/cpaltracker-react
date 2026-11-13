@@ -120,10 +120,10 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
     render(<TimelineMap rows={rows} hooks={hooks} />)
 
     const playButton = screen.getByTestId('timeline-play-toggle')
-    expect(playButton).toHaveTextContent('Rejouer')
+    expect(playButton).toHaveAccessibleName('Rejouer')
 
     fireEvent.click(playButton)
-    expect(playButton).toHaveTextContent('Pause')
+    expect(playButton).toHaveAccessibleName('Pause')
 
     // step = max(1000, floor(1000/200)) = 1000ms per 80ms tick; one tick
     // already reaches tMax (1000) and should auto-stop.
@@ -131,7 +131,7 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
       await vi.advanceTimersByTimeAsync(80)
     })
 
-    expect(playButton).toHaveTextContent('Rejouer')
+    expect(playButton).toHaveAccessibleName('Rejouer')
     expect(sliderThumb()).toHaveAttribute('aria-valuenow', '1000')
   })
 

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-227 (FR10): the transfer dates are the kit `DateTimeField` (calendar popover + time input),
@@ -91,8 +92,7 @@ test('offers only the API-provided STD contracts as transfer targets, never a fr
   await mockEligibleWorkspace(page)
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('transfer-field-target').click()
   await expect(page.getByTestId('transfer-target-option-34')).toHaveText('REF-034-STD')
@@ -120,8 +120,7 @@ test('submits an open-ended transfer and renders it as "en cours" in both the fl
   )
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('transfer-field-target').click()
 
@@ -145,8 +144,7 @@ test('rejects an end date that is not strictly after the start date, client-side
   })
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('transfer-field-target').click()
 
@@ -180,8 +178,7 @@ test("surfaces the API's own rejection (e.g. overlap) verbatim, never a client-g
   )
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('transfer-field-target').click()
 
@@ -209,8 +206,7 @@ test('disables the submit control after a 409 contract_inactive rejection (FR4/F
   )
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('transfer-field-target').click()
 
@@ -230,8 +226,7 @@ test('shows an explicit empty state when the account has no visible STD contract
   })
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await expect(page.getByTestId('transfer-targets-empty')).toBeVisible()
 })

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-166 (epic KAN-140) — Settings Submission, Feedback & Refresh Safety.
@@ -99,8 +100,7 @@ test('an accepted change shows a success flash and refreshes the displayed place
   await mockEligibleWorkspace(page, { config: { FREQ_MESURE_CL: '3' } })
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('10')
   await page.getByTestId('settings-form-submit').click()
@@ -127,8 +127,7 @@ test('a 409 contract_inactive response shows the server message, does not change
   })
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('10')
   await page.getByTestId('settings-form-submit').click()
@@ -157,8 +156,7 @@ test('a 400 "no values changed" response is shown as an informational result, no
   })
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('3')
   await page.getByTestId('settings-form-submit').click()
@@ -172,8 +170,7 @@ test('a browser refresh after a submit never re-sends the write request (FR20)',
   await mockEligibleWorkspace(page, { config: { FREQ_MESURE_CL: '3' } })
 
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('10')
 
@@ -189,8 +186,7 @@ test('a browser refresh after a submit never re-sends the write request (FR20)',
   expect(postCount).toBe(1)
 
   await page.reload()
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 
   // The reload re-renders the whole app from scratch; nothing is replayed.
   await expect(page.getByTestId('settings-form')).toBeVisible()

@@ -2,15 +2,14 @@ import type L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leaflet'
-import { Pause, Play, Maximize2, TriangleAlert } from 'lucide-react'
+import { CheckIcon, Pause, Play, Scan, Route, TriangleAlert } from 'lucide-react'
 import type { HistoryHook, HistoryRow } from '../api/history'
+import { cn } from '@/lib/utils'
 import { Alert } from '@/ui/alert'
 import { Button } from '@/ui/button'
-import { ButtonGroup } from '@/ui/button-group'
-import { Label } from '@/ui/label'
 import { Slider } from '@/ui/slider'
-import { Switch } from '@/ui/switch'
-import { WidgetCard } from '@/ui/widget-card'
+import { Toggle } from '@/ui/toggle'
+import { Card, CardContent } from '@/ui/card'
 import { useChartTheme } from '@/ui/charts/use-chart-theme'
 import { deviceIcon, type MapDevice } from '@/ui/map'
 import {
@@ -96,7 +95,7 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
   const bounds = useMemo(() => computeSliderBounds(rows), [rows])
 
   const [instant, setInstant] = useState(bounds.max)
-  const [trailEnabled, setTrailEnabled] = useState(false)
+  const [trailEnabled, setTrailEnabled] = useState(true)
   const [playing, setPlaying] = useState(false)
 
   // CB19 (`setData`) — a new `rows` set resets the slider to the end,
@@ -152,15 +151,6 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
     setInstant(value)
   }
 
-  function handleTogglePlay() {
-    if (playing) {
-      setPlaying(false)
-      return
-    }
-    setInstant((previous) => (previous >= bounds.max ? bounds.min : previous))
-    setPlaying(true)
-  }
-
   // CB25 (`ajuster`) — on-demand fit over each visible device's ENTIRE
   // positioned series, not just its current marker (FR15, distinct from
   // the current-position-only auto-fit above).
@@ -172,18 +162,78 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
     map.fitBounds(points, FIT_OPTIONS)
   }
 
+  function handleTogglePlay() {
+    if (playing) {
+      setPlaying(false)
+      return
+    }
+    setInstant((previous) => (previous >= bounds.max ? bounds.min : previous))
+    setPlaying(true)
+    handleFit()
+  }
+
   const hasRows = rows.length > 0
 
   return (
-    <WidgetCard title="Chronologie" className="min-w-0" data-testid="timeline-map">
-      <div className="flex flex-col gap-3">
+    <Card size="sm" className="min-w-0 gap-0 py-0" data-testid="timeline-map">
+      <CardContent className="flex flex-col gap-3 px-0">
         {/*
          * KAN-176 (FR26) — `bg-media` shows through at the map's edges/corners
          * (and while tiles load) instead of Leaflet's light-grey default; the
          * dark tile filter is `tokens.css`'s `.leaflet-tile-pane` rule, scoped
          * so it never touches markers/trail/tooltips.
          */}
-        <div className="h-120 w-full overflow-hidden rounded-lg bg-media">
+        <div className="relative aspect-[160/63] w-full overflow-hidden rounded-lg bg-media">
+          <div className="absolute top-2.5 right-2.5 z-[1000] flex gap-1.5">
+            <Toggle
+              variant="outline"
+              size="sm"
+              aria-label="Afficher la trace"
+              title="Afficher la trace"
+              data-testid="timeline-trail-toggle"
+              pressed={trailEnabled}
+              onPressedChange={setTrailEnabled}
+              disabled={!hasRows}
+              className="relative bg-card"
+            >
+              <Route />
+              <span
+                aria-hidden
+                className={cn(
+                  'absolute -right-1 -bottom-1 flex size-3.5 items-center justify-center rounded-[4px] border border-input shadow-xs',
+                  trailEnabled ? 'border-primary-text bg-primary text-primary-foreground' : 'bg-card',
+                )}
+              >
+                {trailEnabled && <CheckIcon className="size-2.5" />}
+              </span>
+            </Toggle>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label={playing ? 'Pause' : 'Rejouer'}
+              title={playing ? 'Pause' : 'Rejouer'}
+              data-testid="timeline-play-toggle"
+              onClick={handleTogglePlay}
+              disabled={!hasRows}
+              className="bg-card"
+            >
+              {playing ? <Pause /> : <Play />}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Ajuster"
+              title="Ajuster"
+              data-testid="timeline-fit"
+              onClick={handleFit}
+              disabled={!hasRows}
+              className="bg-card"
+            >
+              <Scan />
+            </Button>
+          </div>
           <MapContainer
             ref={mapRef}
             center={INITIAL_CENTER}
@@ -202,15 +252,14 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
               markers
                 .filter((marker) => marker.idx > 0)
                 .map((marker) => {
-                  const index = deviceIndex.get(marker.chipId) ?? 0
                   return (
                     <Polyline
                       key={`trail-${marker.chipId}`}
                       positions={trailPositions(marker.series, marker.idx)}
                       pathOptions={{
-                        color: chartTheme.colors[chartTheme.seriesStyle(index).colorIndex],
-                        weight: 2.5,
-                        opacity: 0.55,
+                        color: chartTheme.primary,
+                        weight: chartTheme.theme === 'light' ? 4 : 3,
+                        opacity: 1,
                       }}
                     />
                   )
@@ -258,22 +307,6 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
           aria-label="Lecture de la chronologie"
           data-testid="timeline-controls"
         >
-          <ButtonGroup>
-            <Button
-              type="button"
-              data-testid="timeline-play-toggle"
-              onClick={handleTogglePlay}
-              disabled={!hasRows}
-              className="sm:w-28"
-            >
-              {playing ? <Pause /> : <Play />}
-              {playing ? 'Pause' : 'Rejouer'}
-            </Button>
-            <Button type="button" variant="outline" data-testid="timeline-fit" onClick={handleFit} disabled={!hasRows}>
-              <Maximize2 />
-              Ajuster
-            </Button>
-          </ButtonGroup>
           <div ref={sliderBoxRef} className="flex min-w-0 flex-1 items-center gap-3">
             <Slider
               aria-label="Instant sélectionné"
@@ -288,17 +321,8 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
               {hasRows ? formatUtcInstant(instant) : '—'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="timeline-trail-toggle"
-              data-testid="timeline-trail-toggle"
-              checked={trailEnabled}
-              onCheckedChange={setTrailEnabled}
-            />
-            <Label htmlFor="timeline-trail-toggle">Afficher la trace</Label>
-          </div>
         </div>
-      </div>
-    </WidgetCard>
+      </CardContent>
+    </Card>
   )
 }

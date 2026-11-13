@@ -37,3 +37,13 @@
   outline-width: 2px;
   outline-color: var(--ring);
 }
+
+/*
+ * Live Tracking (operator decision 2026-10-29): from 768 px the page fills the viewport under the 48 px shell
+ * toolbar so the map takes all the height left below the header. Below it the page stacks and scrolls.
+ */
+@media (min-width: 768px) {
+  .page-fill-height {
+    height: calc(100svh - 3rem);
+  }
+}

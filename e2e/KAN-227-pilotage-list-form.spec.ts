@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { pickContract } from './contract-helpers'
 
 /**
  * KAN-227 (epic KAN-217) - pilotage on PAT-LIST and PAT-FORM (FR10): contract `Select` in the
@@ -62,21 +63,21 @@ async function mockWorkspace(page: Page, positionsCount = 2) {
 
 async function openContract12(page: Page) {
   await page.goto('/pilotage')
-  await page.getByTestId('pilotage-contract-selector').click()
-  await page.getByTestId('pilotage-contract-option-12').click()
+  await pickContract(page, 12)
 }
 
 test.describe('KAN-227 pilotage', () => {
-  test('AC1 @SI-227-1 the contract choice is a Select in the page header', async ({ page }) => {
+  test('AC1 @SI-227-1 the contract choice is the global Select in the sidebar (operator decision 2026-10-29)', async ({ page }) => {
     await mockWorkspace(page)
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/pilotage')
-    const trigger = page.getByTestId('pilotage-contract-selector')
+    const trigger = page.getByTestId('contract-selector')
     await expect(trigger).toHaveAttribute('role', 'combobox')
-    await expect(trigger).toHaveText(/— Sélectionner —/)
+    // The first contract is pre-selected on load.
+    await expect(trigger).toHaveText(/REF-012/)
     await trigger.click()
     await expect(page.getByRole('listbox')).toBeVisible()
-    await page.getByTestId('pilotage-contract-option-12').click()
+    await page.getByTestId('contract-option-12').click()
     await expect(trigger).toHaveText(/REF-012/)
     await expect(page.getByTestId('pilotage-device-list')).toBeVisible()
   })

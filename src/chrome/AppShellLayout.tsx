@@ -10,6 +10,8 @@ import {
 } from '../auth/paths'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { AppShell, type ShellNavSection } from '@/ui/patterns/app-shell'
+import { ContractProvider } from '../contracts/ContractContext'
+import { ContractSelect } from '../contracts/ContractSelect'
 import { CpalBrandMark } from './CpalBrandMark'
 import { ShellClientLogo } from './ShellClientLogo'
 
@@ -51,7 +53,7 @@ function initialsOf(prenom: string, nom: string, mail: string) {
  * kit `AppShell`): sidebar + mobile drawer, c-PAL mark, client logo, theme toggle, user menu.
  */
 export function AppShellLayout() {
-  const { account, logout } = useAuth()
+  const { account, isAdmin, logout } = useAuth()
   const mail = account?.mail ?? ''
   const prenom = account?.prenom ?? ''
   const nom = account?.nom ?? ''
@@ -74,17 +76,19 @@ export function AppShellLayout() {
     }
   }
 
-  // One instance only (the test ids stay unique): in the sidebar from 768 px, and in a compact
-  // strip above the page below it, because the sidebar is then a closed drawer.
+  // One instance only (the test ids stay unique): in the sidebar from 768 px (the c-PAL mark in
+  // the header row, aligned with the top bar and kept when collapsed; the client logo above the
+  // user menu), and in a compact strip above the page below it, because the sidebar is then a
+  // closed drawer.
   const brand = (
-    <div className="flex flex-col items-center gap-3 group-data-[collapsible=icon]:hidden max-md:flex-row max-md:gap-4">
+    <div className="flex items-center gap-4">
       <CpalBrandMark />
       <ShellClientLogo />
     </div>
   )
 
   return (
-    <>
+    <ContractProvider>
       {isMobile && (
         <div className="flex items-center justify-center border-b border-border bg-background px-3 py-2">
           {brand}
@@ -92,11 +96,22 @@ export function AppShellLayout() {
       )}
       <AppShell
         sections={SECTIONS}
-        logo={isMobile ? null : brand}
+        logo={
+          isMobile ? null : (
+            <div className="flex items-center gap-2">
+              <CpalBrandMark />
+              <span className="text-sm font-bold tracking-tight text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
+                c-PAL Tracker
+              </span>
+            </div>
+          )
+        }
+        clientLogo={isMobile ? null : <ShellClientLogo />}
+        sidebarTop={<ContractSelect isAdmin={isAdmin} />}
         userMenu={{
           name,
           initials: initialsOf(prenom, nom, mail),
-          caption: 'Mon compte',
+          caption: account?.role === 'admin' ? 'Administrateur' : 'Client',
           triggerLabel: 'Menu utilisateur',
           account: {
             to: CHANGE_PASSWORD_PATH,
@@ -116,9 +131,8 @@ export function AppShellLayout() {
           group: 'Thème',
           toLight: 'Passer au thème clair',
           toDark: 'Passer au thème sombre',
-          system: 'Thème du système',
         }}
       />
-    </>
+    </ContractProvider>
   )
 }

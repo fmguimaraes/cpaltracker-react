@@ -12,11 +12,10 @@ export type DefaultDateRangeState =
       history: HistoryResponse
       /**
        * KAN-176 (FR5-FR8, NFR8) — re-fetches with an explicit,
-       * already-validated range (`DateRangePicker`'s `onApply` payload,
-       * `null` on a side meaning "unbounded", same convention
-       * `fetchContractHistory` itself uses). This is the wiring
-       * `DateRangePicker` (KAN-170) was built against but never had a
-       * caller for until this story: calling it moves the state straight
+       * already-validated range (the header `TimePicker`'s value after
+       * `validateDateRangeInputs`, `null` on a side meaning "unbounded",
+       * same convention `fetchContractHistory` itself uses). Calling it
+       * moves the state straight
        * back to `'loading'` then `'ready'`/`'unauthorized'`/`'error'`,
        * exactly like the initial default-range load, so every consumer
        * of this hook (`HistoryAccessGate`) needs no separate code path
@@ -58,8 +57,8 @@ export type DefaultDateRangeState =
  * supplied load (FR3 is specifically about that case). KAN-176 (FR5-FR8,
  * NFR8) adds the other half: once `status === 'ready'`, the resolved
  * state carries an `applyRange` callback a caller can invoke with an
- * already-validated explicit range (`DateRangePicker`'s `onApply`
- * payload) to re-fetch directly — single request, no default-guessing —
+ * already-validated explicit range (the header `TimePicker`'s
+ * validated value) to re-fetch directly — single request, no default-guessing —
  * and land back in this same `'ready'`/`'unauthorized'`/`'error'` state
  * machine.
  */

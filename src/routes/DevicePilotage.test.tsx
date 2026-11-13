@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ContractTestShell } from '../contracts/ContractTestShell'
 import { DevicePilotage } from './DevicePilotage'
 
 function stubViewport(mobile = false) {
@@ -23,7 +24,7 @@ beforeEach(() => {
 
 /** KAN-227: the contract choice is the kit Select; its options exist once it is open. */
 async function openContracts() {
-  await userEvent.click(await screen.findByTestId('pilotage-contract-selector'))
+  await userEvent.click(await screen.findByTestId('contract-selector'))
 }
 
 
@@ -48,7 +49,7 @@ function renderDevicePilotage() {
   return render(
     <MemoryRouter initialEntries={['/pilotage']}>
       <Routes>
-        <Route path="/pilotage" element={<DevicePilotage />} />
+        <Route path="/pilotage" element={<ContractTestShell><DevicePilotage /></ContractTestShell>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -74,10 +75,10 @@ describe('DevicePilotage (KAN-159 FR1, FR2)', () => {
 
     renderDevicePilotage()
 
-    await waitFor(() => expect(screen.getByTestId('pilotage-contract-selector')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('contract-selector')).toBeInTheDocument())
     await openContracts()
-    expect(await screen.findByTestId('pilotage-contract-option-12')).toHaveTextContent('REF-012')
-    expect(screen.getByTestId('pilotage-contract-option-34')).toHaveTextContent('REF-034')
+    expect(await screen.findByTestId('contract-option-12')).toHaveTextContent('REF-012')
+    expect(screen.getByTestId('contract-option-34')).toHaveTextContent('REF-034')
   })
 
   it('shows an explicit empty state with no selector when the account has zero contracts', async () => {
@@ -86,7 +87,7 @@ describe('DevicePilotage (KAN-159 FR1, FR2)', () => {
     renderDevicePilotage()
 
     await waitFor(() => expect(screen.getByTestId('pilotage-contracts-empty')).toBeInTheDocument())
-    expect(screen.queryByTestId('pilotage-contract-selector')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('contract-selector')).not.toBeInTheDocument()
   })
 
   it('selecting a contract mounts the pilotage workspace for it', async () => {
@@ -99,16 +100,11 @@ describe('DevicePilotage (KAN-159 FR1, FR2)', () => {
 
     renderDevicePilotage()
 
-    await openContracts()
-    const option = await screen.findByTestId('pilotage-contract-option-12')
-    expect(option).toHaveAttribute('aria-selected', 'false')
-
-    await userEvent.click(option)
-
-    expect(screen.getByTestId('pilotage-contract-selector')).toHaveTextContent('REF-012')
+    // The first contract is pre-selected (operator decision 2026-10-29).
+    await waitFor(() => expect(screen.getByTestId('contract-selector')).toHaveTextContent('REF-012'))
     await waitFor(() => expect(screen.getByTestId('pilotage-devices-empty')).toBeInTheDocument())
     await openContracts()
-    expect(await screen.findByTestId('pilotage-contract-option-12')).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByTestId('contract-option-12')).toHaveAttribute('aria-selected', 'true')
   })
 
   it('shows a generic error state on a contract-list service failure, never raw backend text', async () => {
@@ -135,12 +131,9 @@ describe('DevicePilotage (KAN-159 FR1, FR2)', () => {
 
     renderDevicePilotage()
 
-    await openContracts()
-    await userEvent.click(await screen.findByTestId('pilotage-contract-option-12'))
-
     await waitFor(() => expect(screen.getByTestId('pilotage-contract-access-error')).toBeInTheDocument())
     // The selection is cleared: the trigger is back to its placeholder.
-    expect(screen.getByTestId('pilotage-contract-selector')).toHaveTextContent('— Sélectionner —')
+    expect(screen.getByTestId('contract-selector')).toHaveTextContent('Choisir un contrat')
     expect(screen.queryByTestId('pilotage-error')).not.toBeInTheDocument()
     expect(screen.getByTestId('pilotage-contract-access-error')).not.toHaveTextContent('12')
   })

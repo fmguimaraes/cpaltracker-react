@@ -110,6 +110,37 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     await waitFor(() => expect(screen.getByTestId('positions-empty')).toBeInTheDocument())
   })
 
+  it('with a period, hides devices whose latest report is outside it and shows a French empty message when none remain', async () => {
+    const recent = new Date(Date.now() - 60 * 60_000).toISOString()
+    stubFetch(
+      new Response(
+        JSON.stringify({
+          positions: [
+            { ...onePosition, chipId: 'CHIP-NEW', timestamp: recent },
+            { ...onePosition, chipId: 'CHIP-OLD', timestamp: '2020-01-01T00:00:00Z' },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    const { rerender } = render(<ContractPositions contractId={12} period={{ preset: '24h' }} />)
+
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
+    expect(document.querySelector('[data-marker-id="CHIP-NEW"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-marker-id="CHIP-OLD"]')).not.toBeInTheDocument()
+
+    rerender(
+      <ContractPositions
+        contractId={12}
+        period={{ preset: 'custom', from: new Date('2019-01-01'), to: new Date('2019-01-02') }}
+      />,
+    )
+    expect(screen.getByTestId('positions-period-empty')).toHaveTextContent(
+      "Aucun appareil n'a émis de position sur cette période.",
+    )
+  })
+
   it('shows a generic error on a service failure, never raw backend text', async () => {
     stubFetch(
       new Response(JSON.stringify({ error: { code: 'service_unavailable', message: 'DB is down' } }), {

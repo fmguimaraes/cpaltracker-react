@@ -62,7 +62,7 @@ export function HistoryCharts({ rows, visibleDeviceIds = null }: HistoryChartsPr
   }
 
   return (
-    <div className="flex flex-col gap-4" data-testid="history-charts">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-12" data-testid="history-charts">
       {FIELDS.map((field) => {
         const traces = buildChartTraces(rows, visibleDeviceIds, field)
         // `TimeSeriesChart` styles series by position (palette cycle + dash/symbol overflow rule):
@@ -74,7 +74,7 @@ export function HistoryCharts({ rows, visibleDeviceIds = null }: HistoryChartsPr
         }))
         const hasPoints = traces.some((trace) => trace.x.length > 0)
         return (
-          <div key={field} data-testid={`history-chart-${field}`}>
+          <div key={field} data-testid={`history-chart-${field}`} className="sm:col-span-4">
             <WidgetCard
               title={CHART_FIELD_LABELS[field]}
               empty={hasPoints ? undefined : { title: 'Aucune mesure à représenter.' }}

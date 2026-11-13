@@ -22,29 +22,31 @@ export function SelectionSummaryPanel({
 
   return (
     <section aria-label="Sur la sélection" className="flex flex-col gap-2" data-testid="selection-summary">
-      <p className="text-xs text-muted-foreground">Sur la sélection</p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card size="sm">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+        <Card size="sm" className="sm:col-span-12">
           <CardContent>
             <div data-testid="selection-summary-count">
-              <Stat label="Mesures" value={summary.measurementCount} unit=" mesure(s)" accent />
+              <Stat label="Mesures" value={summary.measurementCount} unit=" mesure(s)" accent hideLabel />
             </div>
           </CardContent>
         </Card>
-        <Card size="sm">
+        <Card size="sm" className="sm:col-span-12">
           <CardContent>
             <div data-testid="selection-summary-device-count">
-              <Stat label="Appareils" value={summary.deviceCount} unit=" appareil(s)" />
+              <Stat label="Appareils" value={summary.deviceCount} unit=" appareil(s)" accent hideLabel />
             </div>
           </CardContent>
         </Card>
-        <Card size="sm">
+        <Card size="sm" className="sm:col-span-12">
           <CardContent>
             {minAmbientTemp !== null && maxAmbientTemp !== null ? (
               <div data-testid="selection-summary-temp-range">
                 <Stat
                   label="Température amb."
-                  value={`${minAmbientTemp.toFixed(1)}°C – ${maxAmbientTemp.toFixed(1)}°C`}
+                  value={`${minAmbientTemp.toFixed(1)}° – ${maxAmbientTemp.toFixed(1)}°`}
+                  unit="Celsius"
+                  accent
+                  hideLabel
                 />
               </div>
             ) : (

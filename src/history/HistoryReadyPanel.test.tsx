@@ -101,6 +101,21 @@ describe('HistoryReadyPanel (KAN-175 FR4, FR9, FR19-24, NFR3)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('portals the device FilterBar into the given header slot, still driven by the checklist selection (operator decision 2026-10-29)', async () => {
+    const slot = document.createElement('div')
+    document.body.appendChild(slot)
+
+    render(<HistoryReadyPanel history={historyResponse()} filterSlot={slot} />)
+
+    const bar = screen.getByTestId('filter-bar')
+    expect(slot).toContainElement(bar)
+    expect(screen.getByTestId('history-ready-panel')).not.toContainElement(bar)
+
+    fireEvent.click(screen.getByTestId('device-checklist-item-CHIP-B'))
+    await waitFor(() => expect(slot).toHaveTextContent('Appareils = 1 sur 2'))
+    slot.remove()
+  })
+
   it('shows the sampling banner when the response is sampled (FR22)', () => {
     render(<HistoryReadyPanel history={historyResponse({ sampled: true, count: 10, total: 100 })} />)
     expect(screen.getByTestId('history-sampling-banner')).toBeInTheDocument()

@@ -15,6 +15,8 @@ function Stat({
   comparison = "vs previous period",
   accent = false,
   className,
+  hideLabel = false,
+  valueClassName,
 }: {
   label: string
   /** null = no reading: renders "—" (never 0). */
@@ -27,6 +29,10 @@ function Stat({
   /** Orange key number (use for the one key figure of a view). */
   accent?: boolean
   className?: string
+  /** Hide the visible label text while keeping it available to assistive tech via aria-label. */
+  hideLabel?: boolean
+  /** Override the value's text size, e.g. for a longer value string that needs to shrink slightly. */
+  valueClassName?: string
 }) {
   const hasChange = change !== undefined && change !== null && Number.isFinite(change)
   const dir = !hasChange || change === 0 ? "flat" : change > 0 ? "up" : "down"
@@ -34,14 +40,22 @@ function Stat({
   const Arrow = dir === "up" ? ArrowUpIcon : dir === "down" ? ArrowDownIcon : MinusIcon
   const pct = hasChange ? `${Math.abs(change).toFixed(1)}%` : ""
   return (
-    <div data-slot="stat" className={cn("flex min-w-0 flex-col gap-1", className)}>
-      <p className="truncate text-sm text-muted-foreground">{label}</p>
-      <p className="flex items-baseline gap-1">
-        <span className={cn("font-serif text-4xl leading-none tabular-nums", accent ? "text-primary-text" : "text-foreground")}>
-          {value ?? "—"}
-        </span>
-        {unit && value !== null ? <span className="text-sm text-muted-foreground">{unit}</span> : null}
-      </p>
+    <div
+      data-slot="stat"
+      aria-label={hideLabel ? label : undefined}
+      className={cn("flex min-w-0 flex-col gap-1", className)}
+    >
+      {!hideLabel && <p className="truncate text-sm text-muted-foreground">{label}</p>}
+      <span
+        className={cn(
+          "font-serif text-4xl leading-none tabular-nums",
+          accent ? "text-primary-text" : "text-foreground",
+          valueClassName,
+        )}
+      >
+        {value ?? "—"}
+      </span>
+      {unit && value !== null ? <span className="text-sm text-muted-foreground">{unit}</span> : null}
       {hasChange ? (
         <p className={cn("flex items-center gap-1 text-xs", tone)}>
           <Arrow aria-hidden className="size-3.5" />
