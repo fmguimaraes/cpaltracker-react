@@ -71,6 +71,7 @@ function historyResponse(overrides: Partial<HistoryResponse> = {}): HistoryRespo
     count: 2,
     total: 2,
     sampled: false,
+    summaries: { ta: null, hr: null, m: null },
     ...overrides,
   }
 }
