@@ -47,3 +47,20 @@
     height: calc(100svh - 3rem);
   }
 }
+
+/*
+ * KAN-252 — Plotly's rangeslider drag (`plotly.js`'s `components/dragelement`) appends a
+ * transient full-viewport `.dragcover` div straight onto `<body>` for the duration of a drag, to
+ * keep receiving mousemove/mouseup even once the cursor leaves the handle. Radix `Dialog`
+ * (`@/ui/dialog.tsx`) sets `body { pointer-events: none }` while a modal is open, scoping
+ * interactivity back to the dialog's own portalled content only; `pointer-events` is inherited,
+ * so `.dragcover` — not part of that content, appended straight to `<body>` — silently inherits
+ * `none` too. The handle still receives its initial `mousedown` (inside the dialog content), but
+ * every subsequent `mousemove`/`mouseup` is swallowed, so dragging the rangeslider inside
+ * `MeasureChartModal` looks like it does nothing: no error, no visual feedback, no range change.
+ * `.dragcover` always wants full interactivity whenever it exists, dialog open or not, so this
+ * opts it out of the inherited lockout rather than loosening the dialog's own scope.
+ */
+.dragcover {
+  pointer-events: auto;
+}
