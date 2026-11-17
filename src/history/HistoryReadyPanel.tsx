@@ -50,6 +50,9 @@ export function HistoryReadyPanel({
 }) {
   const [selected, setSelected] = useState<string[] | null>(null)
   const [deviceListOpen, setDeviceListOpen] = useState(false)
+  // KAN-252 — `TimelineMap`'s playback/scrub instant, lifted here so the measure charts' modal
+  // can draw an in-sync cursor; `null` while idle (see `TimelineMap`'s `onInstantChange` doc).
+  const [cursorInstant, setCursorInstant] = useState<number | null>(null)
 
   useEffect(() => {
     setSelected(null)
@@ -109,8 +112,18 @@ export function HistoryReadyPanel({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-10">
-          <TimelineMap rows={history.rows} hooks={history.hooks} visibleDeviceIds={selected} />
-          <HistoryCharts rows={history.rows} visibleDeviceIds={selected} summaries={history.summaries} />
+          <TimelineMap
+            rows={history.rows}
+            hooks={history.hooks}
+            visibleDeviceIds={selected}
+            onInstantChange={setCursorInstant}
+          />
+          <HistoryCharts
+            rows={history.rows}
+            visibleDeviceIds={selected}
+            summaries={history.summaries}
+            cursorInstant={cursorInstant}
+          />
         </div>
         <div className="flex flex-col gap-4 lg:col-span-2">
           <SelectionSummaryPanel rows={history.rows} visibleDeviceIds={selected} />

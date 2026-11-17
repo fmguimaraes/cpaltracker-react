@@ -22,11 +22,19 @@ export interface HistoryChartsProps {
   rows: HistoryRow[]
   visibleDeviceIds?: string[] | null
   summaries: Record<MeasureKey, MeasureSummary | null>
+  /**
+   * KAN-252 — `TimelineMap`'s playback/scrub instant (epoch ms), lifted up
+   * by `HistoryReadyPanel`; `null` while idle. Only forwarded to the modal
+   * while it's actually open (below) — the modal stays mounted throughout a
+   * replay, so this avoids feeding it a new cursor on every 80ms replay
+   * tick while nobody is looking at it.
+   */
+  cursorInstant?: number | null
 }
 
 const MEASURES: MeasureKey[] = ['ta', 'hr', 'm']
 
-export function HistoryCharts({ rows, visibleDeviceIds = null, summaries }: HistoryChartsProps) {
+export function HistoryCharts({ rows, visibleDeviceIds = null, summaries, cursorInstant = null }: HistoryChartsProps) {
   // KAN-252 code review — `MeasureChartModal` is always mounted; only its `open` prop toggles.
   // Gating the mount itself (`{modalOpen && <MeasureChartModal .../>}`) unmounts the whole
   // subtree the instant `setModalOpen(false)` commits, which cuts off Radix's close animation
@@ -71,6 +79,7 @@ export function HistoryCharts({ rows, visibleDeviceIds = null, summaries }: Hist
         rows={rows}
         visibleDeviceIds={visibleDeviceIds}
         summaries={summaries}
+        cursorInstant={modalOpen ? cursorInstant : null}
       />
     </div>
   )

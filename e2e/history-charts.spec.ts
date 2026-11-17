@@ -253,6 +253,42 @@ test('the expand modal stacks above the map on the same page (KAN-252 bugfix: di
   await expect(modalContent).toBeHidden()
 })
 
+test('dragging the modal chart\'s built-in rangeslider zooms the chart (KAN-252 bugfix: FR12 slider swallowed by dialog pointer-events lockout)', async ({
+  page,
+}) => {
+  await mockToReadyState(page)
+
+  await page.getByRole('button', { name: 'Agrandir Température ambiante' }).click()
+  const modalPlot = page.getByTestId('measure-chart-modal-plot')
+  await expect(modalPlot.locator('.js-plotly-plot')).toBeVisible()
+
+  const slidebox = modalPlot.locator('.rangeslider-slidebox')
+  await expect(slidebox).toBeVisible()
+  const box = await slidebox.boundingBox()
+  if (!box) throw new Error('rangeslider-slidebox has no bounding box')
+
+  const before = await modalPlot.locator('.js-plotly-plot').evaluate(
+    (el) => (el as unknown as { _fullLayout: { xaxis: { range: [string, string] } } })._fullLayout.xaxis.range,
+  )
+
+  // Drag the whole slidebox window (not a handle) a third of its width to the right — the
+  // built-in Plotly pan gesture (FR12). Real OS-level pointer events via Playwright's CDP-backed
+  // `page.mouse`, same mechanism Radix's dialog pointer-events lockout (`body { pointer-events:
+  // none }`) would otherwise swallow past the initial mousedown.
+  const y = box.y + box.height / 2
+  await page.mouse.move(box.x + box.width * 0.3, y)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.5, y, { steps: 5 })
+  await page.mouse.move(box.x + box.width * 0.6, y, { steps: 5 })
+  await page.mouse.up()
+
+  const after = await modalPlot.locator('.js-plotly-plot').evaluate(
+    (el) => (el as unknown as { _fullLayout: { xaxis: { range: [string, string] } } })._fullLayout.xaxis.range,
+  )
+
+  expect(after).not.toEqual(before)
+})
+
 test('a fetch failure shows a dismissible error banner (FR4, FR23)', async ({ page }) => {
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),

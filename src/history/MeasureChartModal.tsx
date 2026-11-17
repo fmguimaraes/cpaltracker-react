@@ -44,6 +44,12 @@ export interface MeasureChartModalProps {
   rows: HistoryRow[]
   visibleDeviceIds?: string[] | null
   summaries: Record<MeasureKey, MeasureSummary | null>
+  /**
+   * KAN-252 — `TimelineMap`'s playback/scrub instant (epoch ms), `null` while
+   * idle (nothing playing/scrubbed). Only meaningful — and only passed down
+   * at all — while the modal is actually open; see `HistoryCharts.tsx`.
+   */
+  cursorInstant?: number | null
 }
 
 export function MeasureChartModal({
@@ -54,6 +60,7 @@ export function MeasureChartModal({
   rows,
   visibleDeviceIds = null,
   summaries,
+  cursorInstant = null,
 }: MeasureChartModalProps) {
   const summary = summaries?.[measure] ?? null
   const label = summary?.label ?? MEASURE_LABELS[measure]
@@ -70,7 +77,13 @@ export function MeasureChartModal({
 
         <MeasureTabs active={measure} onSelect={onMeasureChange} />
         <StatsRow summary={summary} unit={unit} />
-        <ModalChart measure={measure} rows={rows} visibleDeviceIds={visibleDeviceIds} unit={unit} />
+        <ModalChart
+          measure={measure}
+          rows={rows}
+          visibleDeviceIds={visibleDeviceIds}
+          unit={unit}
+          cursorInstant={cursorInstant}
+        />
       </DialogContent>
     </Dialog>
   )
@@ -126,11 +139,13 @@ function ModalChart({
   rows,
   visibleDeviceIds,
   unit,
+  cursorInstant,
 }: {
   measure: MeasureKey
   rows: HistoryRow[]
   visibleDeviceIds: string[] | null
   unit: string
+  cursorInstant: number | null
 }) {
   const traces = buildChartTraces(rows, visibleDeviceIds, measure)
   const series: Series[] = traces.map((trace) => ({
@@ -146,6 +161,7 @@ function ModalChart({
         unit={unit}
         threshold={measure === 'ta' ? TEMPERATURE_THRESHOLD : undefined}
         label={CHART_FIELD_LABELS[measure]}
+        cursor={cursorInstant != null ? formatUtc(cursorInstant) : undefined}
       />
     </div>
   )
