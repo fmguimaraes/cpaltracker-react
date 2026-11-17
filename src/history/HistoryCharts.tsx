@@ -4,7 +4,7 @@ import { MeasureChartModal } from './MeasureChartModal'
 import { MeasureTile } from './MeasureTile'
 
 /**
- * KAN-232 (FR10-FR16, NFR5, NFR6) — replaces the three full-size Plotly
+ * KAN-252 (FR10-FR16, NFR5, NFR6) — replaces the three full-size Plotly
  * charts (KAN-175/KAN-223/KAN-176) with one compact `MeasureTile` per
  * measure, each opening the full chart in a `MeasureChartModal` on demand.
  * The full chart itself is unchanged: it moved into the modal verbatim
@@ -12,9 +12,11 @@ import { MeasureTile } from './MeasureTile'
  * the same 2-8 °C threshold band) — see `MeasureChartModal.tsx`'s own
  * doc-comment for what did and didn't change there.
  *
- * Owns exactly one piece of state: which measure's modal is open
- * (`null` = closed). The modal's own tabs call `setOpenMeasure` to switch
- * measures without closing/reopening the dialog.
+ * Owns two pieces of state, deliberately kept separate: `modalOpen`
+ * (whether the modal is visible) and `selectedMeasure` (which measure it
+ * shows), rather than a single `openMeasure: MeasureKey | null`. See the
+ * comment on `modalOpen` below for why — collapsing them back into one
+ * state is what caused the KAN-252 code-review animation bug.
  */
 export interface HistoryChartsProps {
   rows: HistoryRow[]

@@ -1,7 +1,7 @@
 import type { MeasureExcursions, MeasureKey } from '../api/history'
 
 /**
- * KAN-232 (FR11, FR15) — every number shown on a tile or in the expand
+ * KAN-252 (FR11, FR15) — every number shown on a tile or in the expand
  * modal is already computed by the backend (KAN-231); this module owns
  * ONLY formatting (locale, sign, decimals, labels), never a statistic, so
  * it stays a pure, DOM/chart-library-free module to unit-test, same split
@@ -35,10 +35,23 @@ export function formatSignedMeasureValue(value: number | null, decimals: number)
   return `${sign}${formatMeasureValue(Math.abs(value), decimals)}`
 }
 
+/** `"5,2 °C"`, or `"—"` when `value` is `null` — the one unit-appending wrapper every stat
+ * display (tile footer, modal stats row) builds on, so there's a single place that does it. */
+export function formatStatValue(value: number | null, decimals: number, unit: string): string {
+  if (value === null || Number.isNaN(value)) return '—'
+  return `${formatMeasureValue(value, decimals)} ${unit}`
+}
+
+/** Same as `formatStatValue`, with an explicit `+`/`−` sign (U+2212). */
+export function formatSignedStatValue(value: number | null, decimals: number, unit: string): string {
+  if (value === null || Number.isNaN(value)) return '—'
+  return `${formatSignedMeasureValue(value, decimals)} ${unit}`
+}
+
 /** FR11.3 — `"Δ 24 h −3.2 °C"`, or `"Δ 24 h —"` when `change24h` is `null`. */
 export function formatChange24hLabel(change24h: number | null, decimals: number, unit: string): string {
   if (change24h === null || Number.isNaN(change24h)) return 'Δ 24 h —'
-  return `Δ 24 h ${formatSignedMeasureValue(change24h, decimals)} ${unit}`
+  return `Δ 24 h ${formatSignedStatValue(change24h, decimals, unit)}`
 }
 
 /** `"min 2,0 · max 8,4 °C"` — FR11.5's footer, before any excursions badge. */

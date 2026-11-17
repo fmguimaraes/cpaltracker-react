@@ -55,7 +55,7 @@ function summaries(overrides: Partial<Record<MeasureKey, MeasureSummary | null>>
   return { ta: summary(), hr: summary({ label: 'Humidité relative', unit: '%' }), m: null, ...overrides }
 }
 
-describe('MeasureChartModal (KAN-232 FR12-FR15)', () => {
+describe('MeasureChartModal (KAN-252 FR12-FR15)', () => {
   it('shows the title, stats row and chart for the selected measure', () => {
     render(
       <MeasureChartModal

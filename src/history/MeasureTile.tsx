@@ -20,7 +20,7 @@ const SPARKLINE_HEIGHT = 32
 const TREND_ICONS = { up: ArrowUpIcon, down: ArrowDownIcon, flat: MinusIcon }
 
 /**
- * KAN-232 (FR10, FR11, FR16, NFR5, NFR6) — one compact tile per measure,
+ * KAN-252 (FR10, FR11, FR16, NFR5, NFR6) — one compact tile per measure,
  * replacing the full-size chart that used to sit here. All the numbers come
  * straight off `summary` (backend-computed, KAN-231) — this component only
  * lays them out; every format/derivation lives in `measureFormatting.ts`.
@@ -65,7 +65,7 @@ export function MeasureTile({ measure, summary, onExpand }: MeasureTileProps) {
         </Button>
       </div>
 
-      {hasData ? <TileBody measure={measure} summary={summary} unit={unit} /> : <TileEmptyState /> }
+      {hasData ? <TileBody summary={summary} unit={unit} /> : <TileEmptyState /> }
     </div>
   )
 }
@@ -74,7 +74,6 @@ function TileBody({
   summary,
   unit,
 }: {
-  measure: MeasureKey
   summary: MeasureSummary
   unit: string
 }) {

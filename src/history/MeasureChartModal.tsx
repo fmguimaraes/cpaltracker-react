@@ -10,14 +10,14 @@ import {
   MEASURE_UNITS,
   TEMPERATURE_THRESHOLD,
   formatMeasureCount,
-  formatMeasureValue,
-  formatSignedMeasureValue,
+  formatSignedStatValue,
+  formatStatValue,
 } from './measureFormatting'
 
 const MEASURES: MeasureKey[] = ['ta', 'hr', 'm']
 
 /**
- * KAN-232 (FR12-FR15) — the full chart, relocated here from `HistoryCharts.tsx`
+ * KAN-252 (FR12-FR15) — the full chart, relocated here from `HistoryCharts.tsx`
  * verbatim (same `buildChartTraces`/`TimeSeriesChart`/`formatUtc`, same
  * threshold band): this story moves it into a modal, it does not change it.
  *
@@ -119,16 +119,6 @@ function StatsRow({ summary, unit }: { summary: MeasureSummary | null; unit: str
       ))}
     </dl>
   )
-}
-
-function formatStatValue(value: number | null, decimals: number, unit: string): string {
-  if (value === null) return '—'
-  return `${formatMeasureValue(value, decimals)} ${unit}`
-}
-
-function formatSignedStatValue(value: number | null, decimals: number, unit: string): string {
-  if (value === null) return '—'
-  return `${formatSignedMeasureValue(value, decimals)} ${unit}`
 }
 
 function ModalChart({

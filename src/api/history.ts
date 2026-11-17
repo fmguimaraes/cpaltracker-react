@@ -92,7 +92,7 @@ export interface MeasureExcursions {
 
 /**
  * One measure's backend-computed summary (KAN-231 FR1-FR8): every statistic
- * here is already computed server-side — the front end (KAN-232, FR15)
+ * here is already computed server-side — the front end (KAN-252, FR15)
  * SHALL NOT recompute any of it, only format it.
  */
 export interface MeasureSummary {

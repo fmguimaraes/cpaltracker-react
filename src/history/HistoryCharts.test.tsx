@@ -58,7 +58,7 @@ function summary(overrides: Partial<MeasureSummary> = {}): MeasureSummary {
 
 const noSummaries: Record<MeasureKey, MeasureSummary | null> = { ta: null, hr: null, m: null }
 
-describe('HistoryCharts (KAN-232 FR10, FR11, FR12)', () => {
+describe('HistoryCharts (KAN-252 FR10, FR11, FR12)', () => {
   it('shows an empty-state message instead of tiles when there are no rows', () => {
     render(<HistoryCharts rows={[]} summaries={noSummaries} />)
     expect(screen.getByTestId('history-charts-empty')).toBeInTheDocument()

@@ -30,7 +30,7 @@ function summary(overrides: Partial<MeasureSummary> = {}): MeasureSummary {
   }
 }
 
-describe('MeasureTile (KAN-232 FR11, FR16)', () => {
+describe('MeasureTile (KAN-252 FR11, FR16)', () => {
   it('renders the latest value, 24h change and sparkline from the summary', () => {
     render(<MeasureTile measure="ta" summary={summary()} onExpand={vi.fn()} />)
 
