@@ -15,9 +15,17 @@ interface Props {
   unit?: string
   label: string
   className?: string
+  /**
+   * KAN-252 — the timeline map's playback/scrub instant (`TimelineMap`'s
+   * `instant`), formatted through the same `formatUtc` used for every `x`
+   * value here, so it lands exactly on the axis's own time representation.
+   * `undefined`/omitted (the default, and every other `TimeSeriesChart`
+   * caller) draws nothing extra — this is purely additive.
+   */
+  cursor?: string
 }
 
-export function TimeSeriesChart({ series, threshold, unit = '°C', label, className }: Props) {
+export function TimeSeriesChart({ series, threshold, unit = '°C', label, className, cursor }: Props) {
   const t = useChartTheme()
   const all = series.flatMap((s) => s.y.filter((v): v is number => v != null))
   const lo = Math.min(...all, threshold?.min ?? Infinity) - 1
@@ -30,6 +38,18 @@ export function TimeSeriesChart({ series, threshold, unit = '°C', label, classN
         { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: threshold.min, y1: threshold.min, line: { color: t.warning, width: 1, dash: 'dot' } },
       ]
     : []
+  if (cursor != null) {
+    shapes.push({
+      type: 'line',
+      xref: 'x',
+      x0: cursor,
+      x1: cursor,
+      yref: 'paper',
+      y0: 0,
+      y1: 1,
+      line: { color: t.primary, width: 1.5 },
+    })
+  }
   const data: Data[] = series.map((s, i) => {
     const st = t.seriesStyle(i)
     const color = t.colors[st.colorIndex]

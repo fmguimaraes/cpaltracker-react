@@ -50,6 +50,15 @@ export interface TimelineMapProps {
   /** `null` (default) = every device in `rows` is visible — KAN-175's
    * device checklist will pass the actual selection once it exists. */
   visibleDeviceIds?: string[] | null
+  /**
+   * KAN-252 — reports the slider's current instant (epoch ms) up to
+   * `HistoryReadyPanel`, so the measure charts' modal can draw a cursor in
+   * sync with "Rejouer"/scrubbing. `null` whenever nothing is actively
+   * playing or has been scrubbed — i.e. the pristine post-load state,
+   * never "the last instant a `rows` load happened to land on" — so a
+   * chart cursor never appears at a meaningless default position.
+   */
+  onInstantChange?: (instant: number | null) => void
 }
 
 const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -71,7 +80,7 @@ const STATUS_TEXT_FR: Record<MapDevice['status'], string> = {
 }
 const FIT_OPTIONS = { padding: [50, 50] as [number, number], maxZoom: 15 }
 
-export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMapProps) {
+export function TimelineMap({ rows, hooks, visibleDeviceIds = null, onInstantChange }: TimelineMapProps) {
   const mapRef = useRef<L.Map | null>(null)
   const firstRenderPendingRef = useRef(true)
 
@@ -97,6 +106,10 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
   const [instant, setInstant] = useState(bounds.max)
   const [trailEnabled, setTrailEnabled] = useState(true)
   const [playing, setPlaying] = useState(false)
+  // KAN-252 — distinguishes "idle, `instant` just sitting at its post-load default" from "the
+  // user actually played or scrubbed to this instant", so `onInstantChange` below never reports
+  // a meaningful-looking instant when nothing is actually happening.
+  const [hasInteracted, setHasInteracted] = useState(false)
 
   // CB19 (`setData`) — a new `rows` set resets the slider to the end,
   // stops any running replay, and re-arms the once-per-load auto-fit
@@ -106,9 +119,16 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
   useEffect(() => {
     setInstant(bounds.max)
     setPlaying(false)
+    setHasInteracted(false)
     firstRenderPendingRef.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on `rows`, not `bounds` (a new object every render).
   }, [rows])
+
+  // KAN-252 (FR — measure-chart playback cursor) — report the active instant up to
+  // `HistoryReadyPanel` whenever it or `hasInteracted` changes, `null` while idle.
+  useEffect(() => {
+    onInstantChange?.(hasInteracted ? instant : null)
+  }, [instant, hasInteracted, onInstantChange])
 
   const markers = useMemo(
     () => computeVisibleMarkers(byDevice, visibleDeviceIds, instant),
@@ -149,6 +169,7 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
   function handleSliderChange([value]: number[]) {
     setPlaying(false)
     setInstant(value)
+    setHasInteracted(true)
   }
 
   // CB25 (`ajuster`) — on-demand fit over each visible device's ENTIRE
@@ -169,6 +190,7 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null }: TimelineMa
     }
     setInstant((previous) => (previous >= bounds.max ? bounds.min : previous))
     setPlaying(true)
+    setHasInteracted(true)
     handleFit()
   }
 
