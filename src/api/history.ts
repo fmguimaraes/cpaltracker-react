@@ -73,6 +73,50 @@ export interface HistoryHook {
   per: string | null
 }
 
+/** KAN-231's enriched-measure key — same three fields as `ChartField` (`chartData.ts`). */
+export type MeasureKey = 'ta' | 'hr' | 'm'
+
+/**
+ * Threshold-excursion summary for one measure over the range (KAN-231 FR3).
+ * `null` on `MeasureSummary.excursions` means the measure has no thresholds
+ * configured, not that it had zero excursions (that case is
+ * `{ count: 0, ... }`).
+ */
+export interface MeasureExcursions {
+  count: number
+  total: number
+  low: number
+  high: number
+  lastAt: string | null
+}
+
+/**
+ * One measure's backend-computed summary (KAN-231 FR1-FR8): every statistic
+ * here is already computed server-side — the front end (KAN-252, FR15)
+ * SHALL NOT recompute any of it, only format it.
+ */
+export interface MeasureSummary {
+  label: string
+  unit: string
+  decimals: number
+  stableBand: number
+  last: number | null
+  lastAt: string | null
+  min: number | null
+  minAt: string | null
+  max: number | null
+  maxAt: string | null
+  mean: number | null
+  count: number
+  periodChange: number | null
+  change24h: number | null
+  change24hRef: string | null
+  trend: 'rising' | 'falling' | 'stable' | null
+  excursions: MeasureExcursions | null
+  /** ~60 downsampled points, `[isoTimestamp, avgValue]`, ascending by time. */
+  sparkline: [string, number][]
+}
+
 export interface HistoryResponse {
   contract: HistoryContract
   devices: HistoryDevice[]
@@ -81,11 +125,26 @@ export interface HistoryResponse {
   count: number
   total: number
   sampled: boolean
+  /** KAN-231 — per-measure summary + sparkline; `null` when the measure has no readings in range. */
+  summaries: Record<MeasureKey, MeasureSummary | null>
 }
 
 export interface HistoryDateRange {
   start: Date | null
   end: Date | null
+}
+
+/**
+ * KAN-252 code review — the single default for a response missing `summaries` entirely (a
+ * backend not yet carrying KAN-231, or any older/hand-built fixture, e.g.
+ * `e2e/history-charts.spec.ts`'s). Applied once here, at the only place a `HistoryResponse` is
+ * parsed, so every consumer (`HistoryCharts`, `MeasureTile`, `MeasureChartModal`) can treat
+ * `summaries` as always present and degrade to the "no data" tile state instead of crashing.
+ */
+export const EMPTY_MEASURE_SUMMARIES: Record<MeasureKey, MeasureSummary | null> = {
+  ta: null,
+  hr: null,
+  m: null,
 }
 
 export async function fetchContractHistory(
@@ -97,7 +156,8 @@ export async function fetchContractHistory(
   if (range.end) params.set('end', formatIsoDate(range.end))
   const query = params.toString()
   const path = `/contracts/history.php/${contractId}${query ? `?${query}` : ''}`
-  return apiClient.get<HistoryResponse>(path)
+  const response = await apiClient.get<HistoryResponse>(path)
+  return { ...response, summaries: response.summaries ?? EMPTY_MEASURE_SUMMARIES }
 }
 
 export function parseContractDate(raw: string | null): Date | null {

@@ -1,4 +1,4 @@
-import type { HistoryRow } from '../api/history'
+import type { HistoryRow, MeasureKey } from '../api/history'
 import { visibleDeviceOrder } from './timelineData'
 
 /**
@@ -18,7 +18,9 @@ import { visibleDeviceOrder } from './timelineData'
  * series both come from it — one source of truth for "which colour is
  * chip X", not two. No colour lives in this module.
  */
-export type ChartField = 'ta' | 'hr' | 'm'
+/** KAN-252 — alias of the API's `MeasureKey` (`src/api/history.ts`): one canonical
+ * `'ta' | 'hr' | 'm'` union, so callers never need an `as ChartField` cast. */
+export type ChartField = MeasureKey
 
 export interface ChartTrace {
   chipId: string
