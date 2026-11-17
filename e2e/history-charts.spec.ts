@@ -2,12 +2,16 @@ import { test, expect } from '@playwright/test'
 import { pickContract } from './contract-helpers'
 
 /**
- * KAN-175 (FR4, FR9, FR19-24, NFR3) — the device checklist, three Plotly
- * charts, lot-hook history, sampling banner and selection summary. Run
- * against a real browser (same "build + preview, mock `/api/v1` with
- * `page.route`" pattern every other spec in this repo uses) because Plotly
- * actually needs a real `<canvas>`/WebGL context to render — exactly the
- * jsdom gap `HistoryCharts.test.tsx` documents and defers to this file for.
+ * KAN-175 (FR4, FR9, FR19-24, NFR3) — the device checklist, compact measure
+ * tiles + expand modal (KAN-252), lot-hook history, sampling banner and
+ * selection summary. Run against a real browser (same "build + preview,
+ * mock `/api/v1` with `page.route`" pattern every other spec in this repo
+ * uses) because Plotly actually needs a real `<canvas>`/WebGL context to
+ * render — exactly the jsdom gap `HistoryCharts.test.tsx`/`MeasureChartModal.test.tsx`
+ * document and defer to this file for.
+ *
+ * KAN-252: the three Plotly charts no longer render inline — they only
+ * mount inside `MeasureChartModal` once a tile's expand button is clicked.
  */
 
 const account = {
@@ -26,6 +30,39 @@ const contracts = [{ contractId: 12, contractRef: 'REF-012', contractType: 'STD'
 
 const T0 = Date.UTC(2026, 9, 1, 8, 0, 0)
 const T1 = Date.UTC(2026, 9, 1, 9, 0, 0)
+
+const MEASURE_META: Record<string, { label: string; unit: string; last: number; min: number; max: number }> = {
+  ta: { label: 'Température ambiante', unit: '°C', last: 22, min: 18, max: 22 },
+  hr: { label: 'Humidité relative', unit: '%', last: 60, min: 50, max: 60 },
+  m: { label: 'Masse', unit: 'kg', last: 520, min: 150, max: 520 },
+}
+
+function measureSummary(field: 'ta' | 'hr' | 'm') {
+  const meta = MEASURE_META[field]
+  return {
+    label: meta.label,
+    unit: meta.unit,
+    decimals: 1,
+    stableBand: 0.5,
+    last: meta.last,
+    lastAt: '2026-10-01T09:00:00Z',
+    min: meta.min,
+    minAt: '2026-10-01T08:00:00Z',
+    max: meta.max,
+    maxAt: '2026-10-01T09:00:00Z',
+    mean: (meta.min + meta.max) / 2,
+    count: 3,
+    periodChange: meta.last - meta.min,
+    change24h: meta.last - meta.min,
+    change24hRef: '2026-10-01T08:00:00Z',
+    trend: 'rising' as const,
+    excursions: null,
+    sparkline: [
+      ['2026-10-01T08:00:00Z', meta.min],
+      ['2026-10-01T09:00:00Z', meta.last],
+    ] as Array<[string, number]>,
+  }
+}
 
 function historyBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -52,6 +89,7 @@ function historyBody(overrides: Record<string, unknown> = {}) {
     count: 3,
     total: 3,
     sampled: false,
+    summaries: { ta: measureSummary('ta'), hr: measureSummary('hr'), m: measureSummary('m') },
     ...overrides,
   }
 }
@@ -109,16 +147,39 @@ test('unchecking a device filters the map marker, the charts and the summary wit
   expect(historyRequests).toBe(requestsAfterLoad)
 })
 
-test('renders the three Plotly charts (temperature, humidity, mass) with one trace per device (FR19)', async ({
+test('renders a compact tile per measure, and expanding one opens the full chart in a modal (KAN-252 FR10-FR14, FR19)', async ({
   page,
 }) => {
   await mockToReadyState(page)
 
-  for (const field of ['ta', 'hr', 'm']) {
-    const chart = page.getByTestId(`history-chart-${field}`)
-    await expect(chart.locator('.js-plotly-plot')).toBeVisible()
-    await expect(chart.locator('.scatterlayer .trace')).toHaveCount(2)
+  for (const field of ['ta', 'hr', 'm'] as const) {
+    const tile = page.getByTestId(`history-chart-${field}`)
+    await expect(tile).toBeVisible()
+    // The tile itself never mounts Plotly (NFR6's compact row) — no chart inline.
+    await expect(tile.locator('.js-plotly-plot')).toHaveCount(0)
   }
+
+  const modal = page.getByTestId('measure-chart-modal')
+  const modalPlot = page.getByTestId('measure-chart-modal-plot')
+
+  // Open from the temperature tile, then switch measure via the modal's own tabs (FR12) rather
+  // than closing/reopening each time — exercises the single always-mounted modal instance.
+  await page.getByRole('button', { name: `Agrandir ${MEASURE_META.ta.label}` }).click()
+  await expect(modal).toBeVisible()
+
+  for (const field of ['ta', 'hr', 'm'] as const) {
+    await page.getByTestId(`measure-tab-${field}`).click()
+    await expect(page.getByTestId(`measure-tab-${field}`)).toHaveAttribute('aria-pressed', 'true')
+    await expect(modalPlot.locator('.js-plotly-plot')).toBeVisible()
+    // `.scatterlayer.rangeplot` is the built-in range-slider's own mini duplicate of every
+    // trace (FR12's "zoom slider stays here, and only here") — excluded so the count reflects
+    // the main plot's traces (one per device), not that duplicate.
+    await expect(modalPlot.locator('.scatterlayer:not(.rangeplot) .trace')).toHaveCount(2)
+  }
+
+  await page.keyboard.press('Escape')
+  await expect(modal).toBeHidden()
+  await expect(modalPlot).toHaveCount(0)
 })
 
 test('renders the lot-hook history row for the active hook (FR21)', async ({ page }) => {
@@ -166,6 +227,30 @@ test('the selection summary recomputes min/max ambient temperature on every sele
 
   await expect(page.getByTestId('selection-summary-temp-range')).toContainText('18.0°')
   await expect(page.getByTestId('selection-summary-temp-range')).toContainText('19.0°')
+})
+
+test('the expand modal stacks above the map on the same page (KAN-252 bugfix: dialog z-index vs map controls)', async ({
+  page,
+}) => {
+  await mockToReadyState(page)
+
+  await page.getByRole('button', { name: 'Agrandir Température ambiante' }).click()
+  const modalContent = page.locator('[data-slot="dialog-content"]')
+  await expect(modalContent).toBeVisible()
+
+  const mapZIndex = await page
+    .getByTestId('timeline-trail-toggle')
+    .evaluate((el) => Number(getComputedStyle(el.parentElement ?? el).zIndex) || 0)
+  const dialogZIndex = await modalContent.evaluate((el) => Number(getComputedStyle(el).zIndex) || 0)
+
+  expect(dialogZIndex).toBeGreaterThan(mapZIndex)
+
+  // The dialog's own stacking context must resolve above Leaflet's panes visually too, not just
+  // on paper: a click where the two visually overlap should land on the modal, not the map.
+  const closeButton = page.getByRole('button', { name: 'Close' })
+  await expect(closeButton).toBeVisible()
+  await closeButton.click()
+  await expect(modalContent).toBeHidden()
 })
 
 test('a fetch failure shows a dismissible error banner (FR4, FR23)', async ({ page }) => {

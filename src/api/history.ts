@@ -134,6 +134,19 @@ export interface HistoryDateRange {
   end: Date | null
 }
 
+/**
+ * KAN-252 code review — the single default for a response missing `summaries` entirely (a
+ * backend not yet carrying KAN-231, or any older/hand-built fixture, e.g.
+ * `e2e/history-charts.spec.ts`'s). Applied once here, at the only place a `HistoryResponse` is
+ * parsed, so every consumer (`HistoryCharts`, `MeasureTile`, `MeasureChartModal`) can treat
+ * `summaries` as always present and degrade to the "no data" tile state instead of crashing.
+ */
+export const EMPTY_MEASURE_SUMMARIES: Record<MeasureKey, MeasureSummary | null> = {
+  ta: null,
+  hr: null,
+  m: null,
+}
+
 export async function fetchContractHistory(
   contractId: number,
   range: HistoryDateRange = { start: null, end: null },
@@ -143,7 +156,8 @@ export async function fetchContractHistory(
   if (range.end) params.set('end', formatIsoDate(range.end))
   const query = params.toString()
   const path = `/contracts/history.php/${contractId}${query ? `?${query}` : ''}`
-  return apiClient.get<HistoryResponse>(path)
+  const response = await apiClient.get<HistoryResponse>(path)
+  return { ...response, summaries: response.summaries ?? EMPTY_MEASURE_SUMMARIES }
 }
 
 export function parseContractDate(raw: string | null): Date | null {

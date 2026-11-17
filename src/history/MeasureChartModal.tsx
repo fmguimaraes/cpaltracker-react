@@ -3,13 +3,12 @@ import type { MeasureKey, MeasureSummary } from '../api/history'
 import { Button } from '@/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog'
 import { TimeSeriesChart, type Series } from '@/ui/charts/time-series-chart'
-import { buildChartTraces, CHART_FIELD_LABELS, type ChartField } from './chartData'
+import { buildChartTraces, CHART_FIELD_LABELS } from './chartData'
 import { formatUtc } from './timelineData'
 import {
   MEASURE_LABELS,
   MEASURE_UNITS,
   TEMPERATURE_THRESHOLD,
-  formatChange24hLabel,
   formatMeasureCount,
   formatMeasureValue,
   formatSignedMeasureValue,
@@ -56,7 +55,7 @@ export function MeasureChartModal({
   visibleDeviceIds = null,
   summaries,
 }: MeasureChartModalProps) {
-  const summary = summaries[measure]
+  const summary = summaries?.[measure] ?? null
   const label = summary?.label ?? MEASURE_LABELS[measure]
   const unit = summary?.unit ?? MEASURE_UNITS[measure]
 
@@ -106,7 +105,7 @@ function StatsRow({ summary, unit }: { summary: MeasureSummary | null; unit: str
     ['Max', formatStatValue(summary?.max ?? null, decimals, unit)],
     ['Moyenne', formatStatValue(summary?.mean ?? null, decimals, unit)],
     ['Δ période', formatSignedStatValue(summary?.periodChange ?? null, decimals, unit)],
-    ['Δ 24 h', formatChange24hLabel(summary?.change24h ?? null, decimals, unit).replace('Δ 24 h ', '')],
+    ['Δ 24 h', formatSignedStatValue(summary?.change24h ?? null, decimals, unit)],
     ['Mesures', summary ? formatMeasureCount(summary.count) : '—'],
   ]
 
@@ -143,8 +142,7 @@ function ModalChart({
   visibleDeviceIds: string[] | null
   unit: string
 }) {
-  const field = measure as ChartField
-  const traces = buildChartTraces(rows, visibleDeviceIds, field)
+  const traces = buildChartTraces(rows, visibleDeviceIds, measure)
   const series: Series[] = traces.map((trace) => ({
     name: trace.chipId,
     x: trace.x.map(formatUtc),
@@ -156,8 +154,8 @@ function ModalChart({
         className="h-80 w-full"
         series={series}
         unit={unit}
-        threshold={field === 'ta' ? TEMPERATURE_THRESHOLD : undefined}
-        label={CHART_FIELD_LABELS[field]}
+        threshold={measure === 'ta' ? TEMPERATURE_THRESHOLD : undefined}
+        label={CHART_FIELD_LABELS[measure]}
       />
     </div>
   )
