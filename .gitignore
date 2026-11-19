@@ -34,3 +34,6 @@ playwright/.cache
 *.sw?
 
 dist-e2e-*
+
+# Local build verification output
+dist-verify
