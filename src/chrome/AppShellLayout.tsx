@@ -1,4 +1,4 @@
-import { Clock, Home, MapPin, SlidersHorizontal } from 'lucide-react'
+import { Activity, Clock, Home, MapPin, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
@@ -7,6 +7,7 @@ import {
   HISTORY_DASHBOARD_PATH,
   HOME_PATH,
   LIVE_TRACKING_PATH,
+  PULSE_PATH,
 } from '../auth/paths'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { AppShell, type ShellNavSection } from '@/ui/patterns/app-shell'
@@ -21,6 +22,7 @@ const SECTIONS: ShellNavSection[] = [
     title: 'Navigation',
     items: [
       { to: HOME_PATH, label: 'Accueil', icon: Home, testId: 'nav-home' },
+      { to: PULSE_PATH, label: 'Pulse', icon: Activity, testId: 'nav-pulse' },
       {
         to: LIVE_TRACKING_PATH,
         label: 'Suivi en direct',

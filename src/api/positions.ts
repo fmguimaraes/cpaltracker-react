@@ -18,6 +18,17 @@ export interface Position {
   mass: number | null
   mpuTemperature: number | null
   accelG: number | null
+  /** KAN-272 — only on Pulse positions (`api/pulse.ts`); absent on Live Tracking's. */
+  lot?: PositionLot | null
+}
+
+/** KAN-272 — the lot hooked on a device at its latest reading (`null` when none or not the caller's). */
+export interface PositionLot {
+  cpalLot: string
+  custLotNumber: string | null
+  productName: string | null
+  expiryDate: string | null
+  status: string | null
 }
 
 interface PositionsResponse {

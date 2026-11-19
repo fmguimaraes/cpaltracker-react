@@ -7,6 +7,7 @@ import {
   FORGOT_PASSWORD_PATH,
   HISTORY_DASHBOARD_PATH,
   LIVE_TRACKING_PATH,
+  PULSE_PATH,
   RESET_PASSWORD_PATH,
 } from './auth/paths'
 import { DocumentTitle } from '@/chrome/DocumentTitle'
@@ -19,6 +20,7 @@ import { ForgotPassword } from './routes/ForgotPassword'
 import { HelloWorld } from './routes/HelloWorld'
 import { HistoryDashboard } from './routes/HistoryDashboard'
 import { LiveTracking } from './routes/LiveTracking'
+import { Pulse } from './routes/Pulse'
 import { Login } from './routes/Login'
 import { NotFound } from './routes/NotFound'
 import { RequireAuth } from './routes/RequireAuth'
@@ -40,6 +42,7 @@ export function App() {
                 }
               >
                 <Route path="/" element={<HelloWorld />} />
+                <Route path={PULSE_PATH} element={<Pulse />} />
                 <Route path={LIVE_TRACKING_PATH} element={<LiveTracking />} />
                 <Route
                   path={HISTORY_DASHBOARD_PATH}

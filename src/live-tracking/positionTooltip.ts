@@ -35,6 +35,18 @@ function formatNumber(value: number | null, unit: string): string {
   return `${value} ${unit}`
 }
 
+/** KAN-272: lot lines, only for a position that carries a lot (Pulse). */
+function lotFields(position: Position): TooltipField[] {
+  const { lot } = position
+  if (!lot) return []
+  return [
+    { label: 'Lot client', value: lot.custLotNumber ?? UNKNOWN },
+    { label: 'Produit', value: lot.productName ?? UNKNOWN },
+    { label: 'Lot cPAL', value: lot.cpalLot },
+    { label: 'Péremption', value: lot.expiryDate ?? UNKNOWN },
+  ]
+}
+
 export function formatPositionTooltip(position: Position): TooltipField[] {
   return [
     { label: 'Date', value: formatUtc(position.timestamp) },
@@ -50,5 +62,6 @@ export function formatPositionTooltip(position: Position): TooltipField[] {
     { label: 'Masse', value: formatNumber(position.mass, 'kg') },
     { label: 'Accélération', value: formatNumber(position.accelG, 'g') },
     { label: 'Température MPU', value: formatNumber(position.mpuTemperature, '°C') },
+    ...lotFields(position),
   ]
 }

@@ -7,6 +7,7 @@ import {
   HISTORY_DASHBOARD_PATH,
   HOME_PATH,
   LIVE_TRACKING_PATH,
+  PULSE_PATH,
   LOGIN_PATH,
   RESET_PASSWORD_PATH,
 } from '../auth/paths'
@@ -19,6 +20,7 @@ const ROUTE_TITLES: Record<string, string> = {
   [FORGOT_PASSWORD_PATH]: 'Mot de passe oublié',
   [RESET_PASSWORD_PATH]: 'Nouveau mot de passe',
   [CHANGE_PASSWORD_PATH]: 'Mon compte',
+  [PULSE_PATH]: 'Pulse',
   [LIVE_TRACKING_PATH]: 'Suivi en direct',
   [HISTORY_DASHBOARD_PATH]: 'Historique',
   [DEVICE_PILOTAGE_PATH]: 'Pilotage des devices',
