@@ -119,6 +119,7 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
     )
     expect(screen.getByTestId('nav-history')).toHaveTextContent('Historique')
     expect(screen.getByTestId('nav-pilotage')).toHaveTextContent('Pilotage')
+    expect(screen.getByTestId('nav-pulse')).toHaveTextContent('Pulse')
     expect(screen.getByTestId('nav-live-tracking')).toHaveAttribute(
       'aria-current',
       'page',

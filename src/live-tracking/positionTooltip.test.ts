@@ -60,4 +60,16 @@ describe('formatPositionTooltip (KAN-160 FR7)', () => {
     const fields = formatPositionTooltip({ ...basePosition, timestamp: 'not-a-date' })
     expect(fields.find((f) => f.label === 'Date')?.value).toBe('Inconnu(e)')
   })
+
+  it('appends the lot lines only when the position carries a lot (KAN-272)', () => {
+    expect(formatPositionTooltip(basePosition).some((f) => f.label === 'Lot client')).toBe(false)
+    const withLot: Position = {
+      ...basePosition,
+      lot: { cpalLot: 'LOT-A', custLotNumber: 'L-001', productName: 'Doliprane', expiryDate: '2027-05-31', status: 'created' },
+    }
+    const fields = formatPositionTooltip(withLot)
+    expect(fields.find((f) => f.label === 'Lot client')?.value).toBe('L-001')
+    expect(fields.find((f) => f.label === 'Produit')?.value).toBe('Doliprane')
+    expect(fields.find((f) => f.label === 'Péremption')?.value).toBe('2027-05-31')
+  })
 })

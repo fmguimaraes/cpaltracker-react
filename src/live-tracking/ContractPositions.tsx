@@ -58,6 +58,8 @@ export function ContractPositions({
   onUnauthorized,
   actionsSlot,
   period,
+  load = fetchPositions,
+  filter,
 }: {
   contractId: number
   onUnauthorized?: () => void
@@ -71,6 +73,10 @@ export function ContractPositions({
    * timestamp falls inside the period are shown (map, fleet panel, device list). Client-side only.
    */
   period?: TimeRangeValue
+  /** KAN-272 (Pulse): the data source, `fetchPositions` by default. Must be referentially stable. */
+  load?: (contractId: number) => Promise<Position[]>
+  /** KAN-272 (Pulse): extra client-side predicate (lot filter) applied after `period`. */
+  filter?: (position: Position) => boolean
 }) {
   const [state, setState] = useState<LoadState>('loading')
   const [allPositions, setPositions] = useState<Position[]>([])
@@ -97,7 +103,7 @@ export function ContractPositions({
     setRefreshError(null)
     setRefreshing(false)
     showAll()
-    fetchPositions(contractId)
+    load(contractId)
       .then((result) => {
         if (cancelled) return
         setPositions(result)
@@ -115,12 +121,12 @@ export function ContractPositions({
     return () => {
       cancelled = true
     }
-  }, [contractId, showAll])
+  }, [contractId, showAll, load])
 
   function refresh() {
     setRefreshing(true)
     setRefreshError(null)
-    fetchPositions(contractId)
+    load(contractId)
       .then((result) => {
         if (activeContractIdRef.current !== contractId) return
         setPositions(result)
@@ -136,10 +142,10 @@ export function ContractPositions({
   }
 
   // Hooks stay above the early returns below.
-  const positions = useMemo(
-    () => (period ? filterByLastReport(allPositions, period) : allPositions),
-    [allPositions, period],
-  )
+  const positions = useMemo(() => {
+    const inPeriod = period ? filterByLastReport(allPositions, period) : allPositions
+    return filter ? inPeriod.filter(filter) : inPeriod
+  }, [allPositions, period, filter])
   const fleetStatuses = useMemo(() => positions.map((p) => massStatus(p.mass)), [positions])
   const statusByChip = useMemo(
     () => Object.fromEntries(positions.map((p) => [p.chipId, massStatus(p.mass)])),
