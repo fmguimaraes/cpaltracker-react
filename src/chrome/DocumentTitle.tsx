@@ -9,6 +9,7 @@ import {
   LIVE_TRACKING_PATH,
   LOGIN_PATH,
   RESET_PASSWORD_PATH,
+  TRENDS_PATH,
 } from '../auth/paths'
 
 const APP_NAME = 'cpaltracker-react'
@@ -22,6 +23,7 @@ const ROUTE_TITLES: Record<string, string> = {
   [LIVE_TRACKING_PATH]: 'Suivi en direct',
   [HISTORY_DASHBOARD_PATH]: 'Historique',
   [DEVICE_PILOTAGE_PATH]: 'Pilotage des devices',
+  [TRENDS_PATH]: 'Tendances',
   [HOME_PATH]: '',
 }
 

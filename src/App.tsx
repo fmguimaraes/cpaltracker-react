@@ -8,6 +8,7 @@ import {
   HISTORY_DASHBOARD_PATH,
   LIVE_TRACKING_PATH,
   RESET_PASSWORD_PATH,
+  TRENDS_PATH,
 } from './auth/paths'
 import { DocumentTitle } from '@/chrome/DocumentTitle'
 import { ThemeProvider } from '@/app/theme'
@@ -23,6 +24,7 @@ import { Login } from './routes/Login'
 import { NotFound } from './routes/NotFound'
 import { RequireAuth } from './routes/RequireAuth'
 import { ResetPassword } from './routes/ResetPassword'
+import { Trends } from './routes/Trends'
 
 export function App() {
   return (
@@ -49,6 +51,7 @@ export function App() {
                   path={DEVICE_PILOTAGE_PATH}
                   element={<DevicePilotage />}
                 />
+                <Route path={TRENDS_PATH} element={<Trends />} />
               </Route>
               <Route path="/login" element={<Login />} />
               <Route path={FORGOT_PASSWORD_PATH} element={<ForgotPassword />} />

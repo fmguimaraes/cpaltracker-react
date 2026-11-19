@@ -38,3 +38,6 @@ export const HISTORY_DASHBOARD_PATH = '/history'
  * (epic KAN-140, `pilotage.php` equivalent, CB1/CB2).
  */
 export const DEVICE_PILOTAGE_PATH = '/pilotage'
+
+/** KAN-256 — Trends (risk quadrant + lot table). */
+export const TRENDS_PATH = '/trends'
