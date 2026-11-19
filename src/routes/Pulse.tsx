@@ -4,6 +4,7 @@ import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { PageHeader } from '@/ui/patterns/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Skeleton } from '@/ui/skeleton'
+import { AnomaliesButton } from '../anomalies/AnomaliesButton'
 import { fetchPulse } from '../api/pulse'
 import type { Position } from '../api/positions'
 import { useContracts } from '../contracts/ContractContext'
@@ -68,6 +69,7 @@ export function Pulse() {
                 </SelectContent>
               </Select>
             )}
+            {selectedId !== null && <AnomaliesButton contractId={selectedId} />}
             <div ref={setActionsSlot} className="flex flex-wrap items-center gap-3" />
           </>
         }
