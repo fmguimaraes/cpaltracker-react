@@ -51,3 +51,25 @@ export function formatMoment(text: string): string {
 export function formatCoordinates(point: { lat: number; lng: number }): string {
   return `${point.lat}, ${point.lng}`
 }
+
+export const COMMENT_MAX_LENGTH = 2000
+
+/** The button label of a transition; reopening a closed-for-review anomaly is "Rouvrir". */
+export function actionLabel(from: AnomalyStatus, to: AnomalyStatus): string {
+  if (to === 'fermee') return 'Fermer'
+  if (to === 'cloturee') return 'Clôturer'
+  return from === 'fermee' ? 'Rouvrir' : 'Prendre en charge'
+}
+
+/** Inline error for the comment, or null when it may be sent. */
+export function commentError(commentRequired: boolean, comment: string): string | null {
+  if (commentRequired && comment.trim() === '') return 'Un résumé des actions est obligatoire pour fermer.'
+  if (comment.length > COMMENT_MAX_LENGTH) return `Le commentaire ne peut pas dépasser ${COMMENT_MAX_LENGTH} caractères.`
+  return null
+}
+
+export const READ_ONLY_NOTE: Record<string, string> = {
+  cloturee: 'Anomalie clôturée',
+  closing_right_required: 'La clôture est réservée aux responsables',
+  std_scope: 'Consultation seule sur un contrat partagé',
+}

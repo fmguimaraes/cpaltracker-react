@@ -1,6 +1,7 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { fetchAnomalyDetail, type AnomalyDetail as Detail } from '../api/anomalies'
 import { formatCoordinates, formatMoment, formatValue, STATUS_LABEL, STATUS_TONE } from './anomalyFormat'
+import { TransitionForm } from './TransitionForm'
 import { useLoad } from './useLoad'
 import { Badge } from '@/ui/badge'
 import { Button } from '@/ui/button'
@@ -77,42 +78,55 @@ export function AnomalyDetail({
 }) {
   const load = useCallback(() => fetchAnomalyDetail(contractId, anomalyKey), [contractId, anomalyKey])
   const { state, reload } = useLoad(load)
+  // After a transition the server's answer replaces the loaded detail until the next reload.
+  const [updated, setUpdated] = useState<Detail | null>(null)
+  const current = updated ?? (state.status === 'ready' ? state.value : null)
+  const reloadDetail = () => {
+    setUpdated(null)
+    reload()
+  }
 
   return (
     <div className="flex flex-col gap-4" data-testid="anomaly-detail">
       <Button variant="link" className="w-fit px-0" onClick={onBack} data-testid="anomaly-back">
         ← Retour à la liste
       </Button>
-      {state.status === 'loading' ? <Skeleton className="h-48 w-full" /> : null}
-      {state.status === 'error' ? (
+      {state.status === 'loading' && !current ? <Skeleton className="h-48 w-full" /> : null}
+      {state.status === 'error' && !current ? (
         <Empty data-testid="anomaly-detail-error">
           <EmptyHeader>
             <EmptyDescription>Impossible de charger cette anomalie.</EmptyDescription>
           </EmptyHeader>
-          <Button variant="outline" onClick={reload}>
+          <Button variant="outline" onClick={reloadDetail}>
             Réessayer
           </Button>
         </Empty>
       ) : null}
-      {state.status === 'ready' ? (
+      {current ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-medium">
-              {state.value.code} — {state.value.label}
+              {current.code} — {current.label}
             </h3>
-            <Badge variant={STATUS_TONE[state.value.status]} data-testid="anomaly-status">
-              {STATUS_LABEL[state.value.status]}
+            <Badge variant={STATUS_TONE[current.status]} data-testid="anomaly-status">
+              {STATUS_LABEL[current.status]}
             </Badge>
           </div>
-          {state.value.lastChange ? (
+          {current.lastChange ? (
             <p className="text-xs text-muted-foreground" data-testid="anomaly-last-change">
-              Dernier changement par {state.value.lastChange.by.name ?? 'Autre organisation'} le{' '}
-              {formatMoment(state.value.lastChange.at)}
+              Dernier changement par {current.lastChange.by.name ?? 'Autre organisation'} le{' '}
+              {formatMoment(current.lastChange.at)}
             </p>
           ) : null}
-          <Facts detail={state.value} />
+          <TransitionForm
+            contractId={contractId}
+            detail={current}
+            onChanged={setUpdated}
+            onReload={reloadDetail}
+          />
+          <Facts detail={current} />
           <h4 className="text-sm font-medium">Historique</h4>
-          <History detail={state.value} />
+          <History detail={current} />
         </>
       ) : null}
     </div>

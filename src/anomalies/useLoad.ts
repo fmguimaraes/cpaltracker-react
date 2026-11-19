@@ -20,7 +20,8 @@ export function useLoad<T>(load: () => Promise<T>): { state: LoadState<T>; reloa
   }, [load, attempt])
 
   const reload = useCallback(() => {
-    setState({ status: 'loading' })
+    // A displayed value stays on screen while it is fetched again.
+    setState((previous) => (previous.status === 'ready' ? previous : { status: 'loading' }))
     setAttempt((n) => n + 1)
   }, [])
 

@@ -49,6 +49,9 @@ export interface AnomalyDetail extends Omit<AnomalyRow, 'status'> {
   status: AnomalyStatus
   lastChange: { at: string; by: AnomalyHistoryEntry['by'] } | null
   history: AnomalyHistoryEntry[]
+  /** Computed by the server only (KAN-263): what this user may do now, and why nothing when empty. */
+  allowedTransitions: { to: AnomalyStatus; commentRequired: boolean }[]
+  readOnlyReason: 'cloturee' | 'std_scope' | 'closing_right_required' | null
 }
 
 /** `statuses` omitted = the server default (everything but `cloturee`). */
@@ -62,4 +65,16 @@ export function fetchAnomalyDetail(contractId: number, anomalyKey: string): Prom
   return apiClient.get<AnomalyDetail>(
     `/anomalies/detail.php/${encodeURIComponent(anomalyKey)}?contractId=${contractId}`,
   )
+}
+
+/** `POST /api/v1/anomalies/transition.php/{anomalyKey}` (KAN-263): answers 201 with the updated detail. */
+export function postAnomalyTransition(
+  contractId: number,
+  anomalyKey: string,
+  input: { from: AnomalyStatus; to: AnomalyStatus; comment: string },
+): Promise<AnomalyDetail> {
+  return apiClient.post<AnomalyDetail>(`/anomalies/transition.php/${encodeURIComponent(anomalyKey)}`, {
+    contractId,
+    ...input,
+  })
 }

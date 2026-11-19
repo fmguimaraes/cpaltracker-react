@@ -26,6 +26,8 @@ const detail: AnomalyDetail = {
   readings: { temperature: 19.5, humidity: null, mass: 1000, acceleration: 0.15 },
   position: { lat: 43.48, lng: 5.37 },
   referencePoint: null,
+  allowedTransitions: [],
+  readOnlyReason: 'std_scope',
   lastChange: { at: '2026-11-19 15:37:24.916', by: { name: 'Marie Durand', sameOrganisation: true } },
   history: [
     {
