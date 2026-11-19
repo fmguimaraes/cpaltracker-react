@@ -41,3 +41,5 @@ export const DEVICE_PILOTAGE_PATH = '/pilotage'
 
 /** KAN-272 — Pulse: Live Tracking plus each device's lot (route `routes/Pulse.tsx`). */
 export const PULSE_PATH = '/pulse'
+/** KAN-256 — Trends (risk quadrant + lot table). */
+export const TRENDS_PATH = '/trends'

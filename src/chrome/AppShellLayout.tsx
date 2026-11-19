@@ -1,4 +1,4 @@
-import { Activity, Clock, Home, MapPin, SlidersHorizontal } from 'lucide-react'
+import { Activity, Clock, Home, MapPin, SlidersHorizontal, TrendingUp } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
@@ -8,6 +8,7 @@ import {
   HOME_PATH,
   LIVE_TRACKING_PATH,
   PULSE_PATH,
+  TRENDS_PATH,
 } from '../auth/paths'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { AppShell, type ShellNavSection } from '@/ui/patterns/app-shell'
@@ -41,6 +42,7 @@ const SECTIONS: ShellNavSection[] = [
         icon: SlidersHorizontal,
         testId: 'nav-pilotage',
       },
+      { to: TRENDS_PATH, label: 'Tendances', icon: TrendingUp, testId: 'nav-trends' },
     ],
   },
 ]
