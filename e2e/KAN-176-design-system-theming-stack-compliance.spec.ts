@@ -8,7 +8,7 @@ import { pickContract } from './contract-helpers'
  *
  * 1. **US3's explicit-range path (FR5, FR8) is reachable through the real
  *    app.** Originally proven through the typed `DateRangePicker`; since the
- *    operator decision of 2026-10-29 the header `TimePicker` is the only
+ *    operator decision of 2026-10-29 the header period control is the only
  *    period control, so the over-span rejection and the valid explicit-range
  *    re-fetch are driven through it (`resolved.applyRange`). The reversed-range
  *    and malformed-date paths (FR6, FR7) can no longer be produced from the UI
@@ -77,10 +77,10 @@ async function mockToReadyState(page: import('@playwright/test').Page) {
 }
 
 // Operator decision 2026-10-29: the typed Du/Au entry (`DateRangePicker`) was removed as a duplicate of the
-// header `TimePicker`, which is now the page's only period control. Its calendar normalises a range (start is
+// header period control, which is now the page's only period control. Its calendar normalises a range (start is
 // always <= end) and only yields real dates, so the reversed-range (FR6) and malformed-date (FR7) paths are no
 // longer reachable from the UI — they stay covered by `src/history/dateRange.test.ts`. The over-span (FR8)
-// rejection and the explicit-range re-fetch (FR5) are still reachable and are driven through the TimePicker.
+// rejection and the explicit-range re-fetch (FR5) are still reachable and are driven through the period control.
 async function mockHistoryCounting(page: import('@playwright/test').Page, requestedRanges: string[]) {
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
@@ -96,10 +96,10 @@ async function mockHistoryCounting(page: import('@playwright/test').Page, reques
   await page.goto('/history')
   await pickContract(page, 12)
   await expect(page.getByTestId('history-dashboard-ready')).toBeVisible()
-  await expect(page.getByTestId('page-header').getByTestId('time-picker')).toBeVisible()
+  await expect(page.getByTestId('history-header').getByTestId('time')).toBeVisible()
 }
 
-test.describe('Header TimePicker range wiring (FR5, FR8, NFR8 — US3)', () => {
+test.describe('Header period control range wiring (FR5, FR8, NFR8 — US3)', () => {
   test('a span over the 1-year maximum picked in the calendar is rejected inline, stating the limit, with no request issued (FR8)', async ({
     page,
   }) => {
@@ -135,10 +135,8 @@ test.describe('Header TimePicker range wiring (FR5, FR8, NFR8 — US3)', () => {
     expect(start).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(end).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect((Date.parse(end) - Date.parse(start)) / 86_400_000).toBe(7)
-    // The applied day range is what the header picker now shows (dd/MM 00:00 → dd/MM 23:59).
-    const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
-    await expect(page.getByTestId('time-custom')).toContainText(`${ddmm(start)} 00:00`)
-    await expect(page.getByTestId('time-custom')).toContainText(`${ddmm(end)} 23:59`)
+    // The applied preset is what the header period control now shows as the selected segment.
+    await expect(page.getByTestId('time-7d')).toHaveAttribute('data-state', 'on')
     await expect(page.getByTestId('history-time-range-error')).toHaveCount(0)
   })
 })
@@ -151,6 +149,7 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     await mockToReadyState(page)
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await expect(page.locator('.timeline-map')).toBeVisible()
 
     const tilePaneFilter = await page
       .locator('.timeline-map .leaflet-tile-pane')
@@ -167,9 +166,9 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     // inline `background` style (not a `fill` attribute) — this proves the
     // dark palette actually reached Plotly, not Plotly's own white default
     // (FR26).
-    const chart = page.getByTestId('history-chart-ta')
-    // FR9: the kit chart paper is transparent; the surface behind it is the WidgetCard's --card.
-    const paperBackground = await chart.locator('[data-slot="card"]').first().evaluate((node) => getComputedStyle(node).backgroundColor)
+    // FR9: the chart paper is transparent; the surface behind it is the measure tile's --card (the Plotly chart itself
+    // only mounts in the expand modal now).
+    const paperBackground = await page.getByTestId('measure-tile-ta').evaluate((node) => getComputedStyle(node).backgroundColor)
     expect(paperBackground).toBe('rgb(29, 30, 32)') // --card dark: #1d1e20 (Sombre graphite, 2026-11-25)
   })
 
@@ -181,6 +180,7 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     await mockToReadyState(page)
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+    await expect(page.locator('.timeline-map')).toBeVisible()
 
     const tilePaneFilter = await page
       .locator('.timeline-map .leaflet-tile-pane')
@@ -188,9 +188,9 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     // Light tiles are recolored to the mineral grey (--map-tile-filter, Clair minéral 2026-11-25), never inverted.
     expect(tilePaneFilter).toBe('grayscale(0.85) brightness(1.03) contrast(0.9)')
 
-    const chart = page.getByTestId('history-chart-ta')
-    // FR9: the kit chart paper is transparent; the surface behind it is the WidgetCard's --card.
-    const paperBackground = await chart.locator('[data-slot="card"]').first().evaluate((node) => getComputedStyle(node).backgroundColor)
+    // FR9: the chart paper is transparent; the surface behind it is the measure tile's --card (the Plotly chart itself
+    // only mounts in the expand modal now).
+    const paperBackground = await page.getByTestId('measure-tile-ta').evaluate((node) => getComputedStyle(node).backgroundColor)
     expect(paperBackground).toBe('rgb(237, 241, 238)') // --card light: #edf1ee (Clair minéral, 2026-11-25)
   })
 })

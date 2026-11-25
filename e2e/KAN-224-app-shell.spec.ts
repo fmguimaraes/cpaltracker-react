@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { chooseTheme } from './theme-helpers'
 
 /**
  * KAN-224 (epic KAN-217) - one AppShell for every authenticated route (FR6, FR7 shell part).
@@ -34,7 +35,8 @@ test.describe('KAN-224 app shell', () => {
 
   test('AC1 @SI-224-1 one main landmark, skip link, sidebar and nav at 1440 px', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/live-tracking')
+    // Pilotage is not a map page: the nav opens expanded, with the c-PAL wordmark
+    await page.goto('/pilotage')
     await expect(page.getByTestId('app-sidebar')).toBeVisible()
     await expect(page.getByTestId('app-nav')).toBeVisible()
     await expect(page.getByTestId('cpal-brand-mark')).toBeVisible()
@@ -44,46 +46,65 @@ test.describe('KAN-224 app shell', () => {
     await expect(page.getByRole('link', { name: 'Aller au contenu' })).toBeFocused()
   })
 
-  test('AC2 @SI-224-2 nav labels are unchanged and the active item has aria-current', async ({ page }) => {
+  test('AC2 @SI-224-2 nav labels and the active item has aria-current', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/live-tracking')
-    // No "Accueil" item: "/" redirects to Pulse, the landing page
+    await page.goto('/pilotage')
+    // Pulse layout v2: Pulse, Tendances, Pilotage. No "Accueil" ("/" redirects to Pulse), no Suivi en
+    // direct / Historique entries (Pulse replaces them)
     await expect(page.getByTestId('nav-home')).toHaveCount(0)
-    await expect(page.getByTestId('nav-live-tracking')).toHaveText('Suivi en direct')
-    await expect(page.getByTestId('nav-history')).toHaveText('Historique')
+    await expect(page.getByTestId('nav-live-tracking')).toHaveCount(0)
+    await expect(page.getByTestId('nav-pulse')).toHaveText('Pulse')
+    await expect(page.getByTestId('nav-trends')).toHaveText('Tendances')
     await expect(page.getByTestId('nav-pilotage')).toHaveText('Pilotage')
-    await expect(page.getByTestId('nav-live-tracking')).toHaveAttribute('aria-current', 'page')
-    await expect(page.getByTestId('nav-history')).not.toHaveAttribute('aria-current', 'page')
+    await expect(page.getByTestId('nav-pilotage')).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByTestId('nav-pulse')).not.toHaveAttribute('aria-current', 'page')
+  })
+
+  test('AC2b map pages open with the icon rail and the rail mark; the remembered choice wins', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/pulse')
+    await expect(page.getByTestId('cpal-rail-mark')).toBeVisible()
+    await expect(page.getByTestId('cpal-brand-mark')).toBeHidden()
+    await page.evaluate(() => window.localStorage.setItem('cpal.shell.nav', 'expanded'))
+    await page.reload()
+    await expect(page.getByTestId('cpal-brand-mark')).toBeVisible()
+    await expect(page.getByTestId('cpal-rail-mark')).toBeHidden()
   })
 
   test('AC3 @SI-224-3 below 768 px the sidebar becomes a drawer opened from the toolbar', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/live-tracking')
-    await expect(page.getByTestId('nav-history')).toHaveCount(0)
+    await expect(page.getByTestId('nav-trends')).toHaveCount(0)
     // The brand stays visible outside the closed drawer, and exists once.
     await expect(page.getByTestId('cpal-brand-mark')).toHaveCount(1)
     await expect(page.getByTestId('cpal-brand-mark')).toBeVisible()
     await page.getByTestId('shell-toolbar').getByRole('button').first().click()
     await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByTestId('nav-history')).toBeVisible()
+    await expect(page.getByTestId('nav-trends')).toBeVisible()
     await expect(page.getByTestId('cpal-brand-mark')).toHaveCount(1)
   })
 
-  test('AC4 @SI-224-4 theme-toggle flips the theme in one click and is the only theme control', async ({
+  test('AC4 @SI-224-4 the user menu sets the theme: Clair, Sombre, Système (follows the OS); the choice persists', async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: 'light' })
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/live-tracking')
+    await page.goto('/pilotage')
     const html = page.locator('html')
-    // The default follows the OS (D7, 2026-11-25): light here.
+    // The default is Système (D7, 2026-11-25): the OS says light
     await expect(html).toHaveAttribute('data-theme', 'light')
-    await page.getByTestId('theme-toggle').click()
+    // The top bar has no theme control any more: it lives in the user menu
+    await expect(page.getByTestId('theme-toggle')).toHaveCount(0)
+    await chooseTheme(page, 'dark')
     await expect(html).toHaveAttribute('data-theme', 'dark')
-    await page.getByTestId('theme-toggle').click()
+    await page.reload()
+    await expect(html).toHaveAttribute('data-theme', 'dark')
+    await chooseTheme(page, 'system')
     await expect(html).toHaveAttribute('data-theme', 'light')
-    // No "system" button: the toggle is the only theme control.
-    await expect(page.getByTestId('theme-system')).toHaveCount(0)
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(html).toHaveAttribute('data-theme', 'dark')
+    await chooseTheme(page, 'light')
+    await expect(html).toHaveAttribute('data-theme', 'light')
   })
 
   test('AC5 @SI-224-5 the user menu signs out through logout-button', async ({ page }) => {
@@ -108,7 +129,6 @@ test.describe('KAN-224 app shell', () => {
     await expect(page.getByTestId('app-sidebar')).toBeVisible()
     await expect(page.getByTestId('app-nav')).toBeVisible()
     await expect(page.getByTestId('shell-toolbar')).toBeVisible()
-    await expect(page.getByTestId('theme-toggle')).toBeVisible()
     await expect(page.getByTestId('user-menu')).toBeVisible()
     await expect(page.locator('main')).toHaveCount(1)
     await expect(page.getByTestId('account-back-to-app')).toBeVisible()

@@ -62,6 +62,9 @@ const twoContracts = [
 ]
 
 async function mockTwoContracts(page: import('@playwright/test').Page) {
+  // /history is a map page: the nav opens on the icon rail by default, where the contract Select is collapsed
+  // to an icon. Force the expanded sidebar so the Select is reachable.
+  await page.addInitScript(() => window.localStorage.setItem('cpal.shell.nav', 'expanded'))
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
   )

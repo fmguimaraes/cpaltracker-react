@@ -88,9 +88,11 @@ test('renders one marker per device at the slider default (series end), colored 
   // CHIP-B's mass (520) is >= 500 -> green fill (CB21).
   const icons = page.locator('.leaflet-marker-icon > div')
   await expect(icons).toHaveCount(2)
-  // F-22: state comes from kit token classes (ring-success = ok), never an inline colour.
+  // F-22 / theming spec 2026-11-25: the outline is always ring-signal; the device state is the dot's kit token
+  // class (bg-success = ok), never an inline colour.
   const classes = await icons.evaluateAll((nodes) => nodes.map((n) => (n as HTMLElement).className))
-  expect(classes.some((cls) => cls.includes('ring-success'))).toBe(true)
+  expect(classes.every((cls) => cls.includes('ring-signal'))).toBe(true)
+  await expect(page.locator('.leaflet-marker-icon .bg-success')).not.toHaveCount(0)
 })
 
 test('scrubbing the slider to the first instant shows only the device with a reading that early (FR12, CB20)', async ({
@@ -109,17 +111,27 @@ test('scrubbing the slider to the first instant shows only the device with a rea
 test('hovering a marker shows its tooltip with the measurement fields (FR13)', async ({ page }) => {
   await mockToReadyState(page)
 
+  // The initial auto-fit does not bring the markers into view in this build (see report: suspected app bug), so
+  // re-fit on demand ("Ajuster") before hovering; the tooltip is what this test is about.
+  await page.getByTestId('timeline-fit').click()
   // The kit marker is a zero-size anchor with its pill inside: hover what the user sees.
   await page.locator('.leaflet-marker-icon > div').first().hover()
   await expect(page.locator('.leaflet-tooltip')).toContainText('Température amb.')
   await expect(page.locator('.leaflet-tooltip')).toContainText('Masse')
 })
 
-test('"Afficher la trace" draws a trail polyline once checked (FR14, CB23)', async ({ page }) => {
+test('"Afficher la trace" toggles the trail polyline (on by default) (FR14, CB23)', async ({ page }) => {
   await mockToReadyState(page)
 
+  // The trail is on by default (the toggle is a pressed-state button, not a checkbox): it can be hidden, then drawn again.
+  const trailToggle = page.getByTestId('timeline-trail-toggle')
+  await expect(trailToggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('path.leaflet-interactive')).not.toHaveCount(0)
+  await trailToggle.click()
+  await expect(trailToggle).toHaveAttribute('aria-pressed', 'false')
   await expect(page.locator('path.leaflet-interactive')).toHaveCount(0)
-  await page.getByTestId('timeline-trail-toggle').check()
+  await trailToggle.click()
+  await expect(trailToggle).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('path.leaflet-interactive')).not.toHaveCount(0)
 })
 

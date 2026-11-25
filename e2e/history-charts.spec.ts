@@ -94,6 +94,12 @@ function historyBody(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/** The device checklist lives in a popover opened from the page-header "Appareils (n/N)" filter button. */
+async function openDeviceChecklist(page: import('@playwright/test').Page) {
+  await page.getByTestId('device-checklist-trigger').click()
+  await expect(page.getByTestId('device-checklist')).toBeVisible()
+}
+
 async function mockToReadyState(page: import('@playwright/test').Page, body = historyBody()) {
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
@@ -112,6 +118,7 @@ async function mockToReadyState(page: import('@playwright/test').Page, body = hi
 
 test('device checklist lists every device, selected by default (FR9)', async ({ page }) => {
   await mockToReadyState(page)
+  await openDeviceChecklist(page)
 
   await expect(page.getByTestId('device-checklist-item-CHIP-A')).toBeChecked()
   await expect(page.getByTestId('device-checklist-item-CHIP-B')).toBeChecked()
@@ -138,6 +145,7 @@ test('unchecking a device filters the map marker, the charts and the summary wit
   await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2)
 
   const requestsAfterLoad = historyRequests
+  await openDeviceChecklist(page)
   await page.getByTestId('device-checklist-item-CHIP-B').uncheck()
 
   await expect(page.locator('.leaflet-marker-icon')).toHaveCount(1)
@@ -223,6 +231,7 @@ test('the selection summary recomputes min/max ambient temperature on every sele
   await expect(page.getByTestId('selection-summary-temp-range')).toContainText('18.0°')
   await expect(page.getByTestId('selection-summary-temp-range')).toContainText('22.0°')
 
+  await openDeviceChecklist(page)
   await page.getByTestId('device-checklist-item-CHIP-B').uncheck()
 
   await expect(page.getByTestId('selection-summary-temp-range')).toContainText('18.0°')

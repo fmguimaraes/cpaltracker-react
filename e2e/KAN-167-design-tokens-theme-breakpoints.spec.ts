@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { chooseTheme } from './theme-helpers'
 
 /**
  * KAN-167 (epic KAN-141) — Design-Token System: Colors, Themes & Breakpoints.
@@ -38,7 +39,10 @@ test('switches every color token to its dark-theme value via one data-theme chan
     }),
   )
 
+  // The default follows the OS: start from light
+  await page.emulateMedia({ colorScheme: 'light' })
   await page.goto('/')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 
   const readTokens = () =>
     page.evaluate(() => {
@@ -54,12 +58,11 @@ test('switches every color token to its dark-theme value via one data-theme chan
   expect(lightTokens.bg).not.toBe('')
   expect(lightTokens.primaryText).not.toBe('')
 
-  await page.getByTestId('theme-toggle').click()
+  await chooseTheme(page, 'dark')
 
   await expect.poll(async () => (await readTokens()).bg).not.toBe(lightTokens.bg)
   const darkTokens = await readTokens()
-  // The cyan fill (--primary) is the same in both themes by design (blue charter); surfaces and the
-  // text cyan are what the theme switch changes.
+  // Surfaces and the accent text are what the theme switch changes (Clair minéral / Sombre graphite)
   expect(darkTokens.card).not.toBe(lightTokens.card)
   expect(darkTokens.primaryText).not.toBe(lightTokens.primaryText)
 })

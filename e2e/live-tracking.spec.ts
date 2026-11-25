@@ -73,6 +73,8 @@ test('a non-admin with a single contract sees no selector; it loads automaticall
 })
 
 test('an admin sees every contract with its client name (FR2)', async ({ page }) => {
+  // Map pages open with the icon rail by default; the full contract Select needs the expanded nav.
+  await page.addInitScript(() => window.localStorage.setItem('cpal.shell.nav', 'expanded'))
   await page.route('**/account.php', (route) =>
     route.fulfill({
       status: 200,
@@ -171,8 +173,12 @@ test('selecting a contract renders one marker per positioned device with an acce
   await expect(markers).toHaveCount(1)
 
   await markers.first().focus()
-  await expect(page.locator('.leaflet-tooltip')).toContainText('10/10/2026 08:00 UTC')
-  await expect(page.locator('.leaflet-tooltip')).toContainText('Masse: 420 kg')
+  // The card shows local time (fr-FR, browser zone): the day, a relative age, the 4-decimal place and the weight.
+  const tooltip = page.locator('.leaflet-tooltip')
+  await expect(tooltip.getByTestId('marker-tooltip-title')).toHaveText('CHIP-001')
+  await expect(tooltip.getByTestId('marker-tooltip-when')).toContainText(/10\soct\.\s[\s\S]*il\sy\sa\s2\sj/)
+  await expect(tooltip.getByTestId('marker-tooltip-place')).toHaveText('48,8566, 2,3522')
+  await expect(tooltip.getByTestId('marker-tooltip-weight')).toContainText(/420\s*kg/)
 })
 
 test('manual refresh keeps the prior snapshot on failure, and the device filter hides markers without a new request (FR8, FR9, FR10)', async ({
@@ -256,6 +262,8 @@ test('manual refresh keeps the prior snapshot on failure, and the device filter 
 test('shows the per-contract message as plain text and the logo when flagged, with no global message and no History handoff link (FR12, FR13; FR11/FR14 withdrawn)', async ({
   page,
 }) => {
+  // The client logo lives in the sidebar header, hidden in the icon rail.
+  await page.addInitScript(() => window.localStorage.setItem('cpal.shell.nav', 'expanded'))
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
   )
@@ -611,7 +619,7 @@ test('the header period filters devices by their last report (default 30 days, p
   // viewport height with no page scrollbar; below md the layout stacks.
   const metrics = () =>
     page.evaluate(() => {
-      const header = document.querySelector('[data-testid="page-header"]')!.getBoundingClientRect()
+      const header = document.querySelector('[data-testid="shell-toolbar"]')!.getBoundingClientRect()
       const split = document.querySelector('[data-testid="live-split"]')!.getBoundingClientRect()
       const leaflet = document.querySelector('.leaflet-container')!.getBoundingClientRect()
       const doc = document.documentElement
@@ -654,7 +662,9 @@ test('the header period filters devices by their last report (default 30 days, p
   await expect(page.getByTestId('device-filter-CHIP-MID')).toHaveCount(0)
   await expect(page.getByTestId('device-filter-CHIP-NEW')).toBeVisible()
 
-  await page.getByTestId('time-30m').click()
+  // The shortest preset is now 1 j: advance the browser clock so every device is older than the 7 j window.
+  await page.clock.setFixedTime(new Date('2026-10-25T09:00:00Z'))
+  await page.getByTestId('time-7d').click()
   await expect(page.getByTestId('positions-period-empty')).toHaveText(
     "Aucun appareil n'a émis de position sur cette période.",
   )

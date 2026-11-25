@@ -44,7 +44,8 @@ test('renders the c-PAL brand mark in the sidebar chrome, sized via the reconcil
   )
 
   await page.setViewportSize({ width: 1280, height: 900 })
-  await page.goto('/live-tracking')
+  // A non-map page: the nav opens expanded (map pages open with the icon rail, which hides the logos)
+  await page.goto('/pilotage')
 
   const brandMark = page.getByTestId('cpal-brand-mark')
   await expect(brandMark).toBeVisible()
@@ -72,7 +73,8 @@ test('renders the client logo exactly once, in the chrome branding slot above th
     route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('fake-png') }),
   )
 
-  await page.goto('/live-tracking')
+  // A non-map page: the nav opens expanded (map pages open with the icon rail, which hides the logos)
+  await page.goto('/pilotage')
 
   await expect(page.getByTestId('client-logo')).toHaveCount(1)
   await expect(page.getByTestId('client-logo')).toBeVisible()
@@ -160,7 +162,9 @@ test('disables transitions/animations app-wide when the user prefers reduced mot
   expect(Number.parseFloat(transitionDuration)).toBeLessThan(0.0001)
 })
 
-test('renders the login form inside the shared soft-shadow card idiom (FR12)', async ({ page }) => {
+// FR12 revised: the login is a split screen (brand panel + form on the page surface). The theming spec
+// 2026-11-25 forbids card shadows, so the form sits flat, never in a shadowed card.
+test('renders the login form flat on the page surface beside the brand panel (FR12, theming spec 2026-11-25)', async ({ page }) => {
   await page.route('**/account.php', (route) =>
     route.fulfill({
       status: 401,
@@ -175,5 +179,6 @@ test('renders the login form inside the shared soft-shadow card idiom (FR12)', a
     .getByTestId('login-form')
     .evaluate((el) => getComputedStyle(el.parentElement as HTMLElement).boxShadow)
 
-  expect(boxShadow).not.toBe('none')
+  expect(boxShadow).toBe('none')
+  await expect(page.locator('aside').getByRole('img', { name: 'c-PAL' })).toBeVisible()
 })

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { chooseTheme } from './theme-helpers'
 
 /**
  * `/` is a protected route (KAN-149, FR13) — an anonymous visit now redirects
@@ -6,7 +7,7 @@ import { test, expect } from '@playwright/test'
  * This spec mocks an authenticated `/account.php` response via `page.route`
  * so the redirect to the landing page (Pulse) stays covered.
  */
-test('"/" redirects to Pulse (the landing page) and the theme toggles for an authenticated session', async ({
+test('"/" redirects to Pulse (the landing page) and the theme switches for an authenticated session', async ({
   page,
 }) => {
   await page.route('**/account.php', (route) =>
@@ -34,11 +35,9 @@ test('"/" redirects to Pulse (the landing page) and the theme toggles for an aut
   await expect(page).toHaveURL(/\/pulse$/)
   await expect(page.getByTestId('nav-pulse')).toHaveAttribute('aria-current', 'page')
 
-  const toggle = page.getByTestId('theme-toggle')
-  await expect(toggle).toBeVisible()
-
+  // The theme choice lives in the user menu (Clair | Sombre | Système)
   const before = await page.locator('html').getAttribute('data-theme')
-  await toggle.click()
+  await chooseTheme(page, before === 'dark' ? 'light' : 'dark')
   await expect
     .poll(() => page.locator('html').getAttribute('data-theme'))
     .not.toBe(before)
