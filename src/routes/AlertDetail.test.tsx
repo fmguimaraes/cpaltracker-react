@@ -131,7 +131,7 @@ describe('AlertDetail (full page)', () => {
     expect(screen.getByTestId('alert-action-map')).toHaveAttribute('href', '/pulse?anomalie=80480-2')
     expect(screen.getByTestId('alert-action-pallet')).toHaveAttribute('href', '/pulse?palette=cpaldev021')
     expect(screen.getByTestId('alert-action-readings')).toHaveAttribute('href', '/pilotage/cpaldev021/releves')
-    expect(screen.getByTestId('alert-action-device-alerts')).toHaveAttribute('href', '/alertes?device=cpaldev021')
+    expect(screen.getByTestId('alert-action-device-alerts')).toHaveAttribute('href', '/pilotage/cpaldev021/alertes')
     expect(screen.getByTestId('alert-lot')).toHaveTextContent('Lot client L-100 · Lot cPAL CP-1 · Produit Yaourt')
     expect(plain(screen.getByTestId('anomaly-position').textContent)).toBe('Position 43,48, 5,37')
   })
@@ -139,9 +139,9 @@ describe('AlertDetail (full page)', () => {
   it('goes back to the list, keeping the query string it came from', async () => {
     const user = userEvent.setup()
     stubFetch(ok)
-    renderDetail({ pathname: '/alertes/80480-2', state: { listSearch: '?statut=all&device=cpaldev021' } })
+    renderDetail({ pathname: '/alertes/80480-2', state: { listPath: '/pilotage/cpaldev021/alertes?statut=all' } })
     await user.click(await screen.findByRole('button', { name: 'Retour à la liste' }))
-    expect(screen.getByTestId('location')).toHaveTextContent('/alertes?statut=all&device=cpaldev021')
+    expect(screen.getByTestId('location')).toHaveTextContent('/pilotage/cpaldev021/alertes?statut=all')
   })
 
   it('goes back to the bare list on a direct visit', async () => {

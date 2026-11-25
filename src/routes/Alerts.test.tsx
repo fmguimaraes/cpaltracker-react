@@ -180,7 +180,7 @@ describe('Alerts (list page)', () => {
 
     await user.click(screen.getByTestId('alert-row-K2'))
     expect(screen.getByTestId('location')).toHaveTextContent('/alertes/K2')
-    expect(JSON.parse(screen.getByTestId('location').dataset.state ?? 'null')).toEqual({ listSearch: '?statut=all' })
+    expect(JSON.parse(screen.getByTestId('location').dataset.state ?? 'null')).toEqual({ listPath: '/alertes?statut=all' })
   })
 
   it('opens the alert from the keyboard through the type link', async () => {

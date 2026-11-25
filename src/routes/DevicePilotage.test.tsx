@@ -7,6 +7,7 @@ import { ContractTestShell } from '../contracts/ContractTestShell'
 import { DevicePilotage } from './DevicePilotage'
 import { PilotageDeviceDetail } from './PilotageDeviceDetail'
 import { PilotageDeviceList } from './PilotageDeviceList'
+import { DeviceAlerts } from './DeviceAlerts'
 import { DeviceReadings } from './DeviceReadings'
 
 function stubViewport(mobile = false) {
@@ -61,7 +62,10 @@ function LocationProbe() {
   const navigate = useNavigate()
   return (
     <>
-      <output data-testid="location">{location.pathname}</output>
+      <output data-testid="location" data-state={JSON.stringify(location.state ?? null)}>
+        {location.pathname}
+        {location.search}
+      </output>
       <Button data-testid="browser-back" onClick={() => navigate(-1)}>
         back
       </Button>
@@ -77,7 +81,9 @@ function renderDevicePilotage(entry = '/pilotage') {
           <Route index element={<PilotageDeviceList />} />
           <Route path=":chipId" element={<PilotageDeviceDetail />} />
           <Route path=":chipId/releves" element={<DeviceReadings />} />
+          <Route path=":chipId/alertes" element={<DeviceAlerts />} />
         </Route>
+        <Route path="/alertes/:anomalyKey" element={<p>alert page</p>} />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,
@@ -247,6 +253,8 @@ describe('DevicePilotage (KAN-159 FR1, FR2)', () => {
   })
 })
 
+const withAnomalies = (anomalies: unknown[]) => new Response(JSON.stringify({ anomalies }), { status: 200 })
+
 function anomaly(key: string, chipId: string, status: string, overrides: Record<string, unknown> = {}) {
   return {
     anomalyKey: key, status, code: 'TH', label: 'Température haute', threshold: 8, value: 11, excess: 3, unit: '°C',
@@ -259,7 +267,6 @@ describe('PilotageDeviceDetail alerts', () => {
     vi.unstubAllGlobals()
   })
 
-  const withAnomalies = (anomalies: unknown[]) => new Response(JSON.stringify({ anomalies }), { status: 200 })
 
   it('badges this device’s open alerts (danger, linked to the filtered list) and lists them, never another device’s', async () => {
     stubFetch(
@@ -274,7 +281,7 @@ describe('PilotageDeviceDetail alerts', () => {
     renderDevicePilotage('/pilotage/CHIP-001')
     const badge = await screen.findByTestId('pilotage-device-alerts-indicator')
     expect(badge).toHaveTextContent('2 alertes ouvertes')
-    expect(badge).toHaveAttribute('href', '/alertes?device=CHIP-001')
+    expect(badge).toHaveAttribute('href', '/pilotage/CHIP-001/alertes')
     const section = screen.getByTestId('pilotage-device-alerts-section')
     expect(section).toHaveTextContent('Alertes')
     expect(screen.getByTestId('pilotage-device-alert-k1')).toHaveTextContent('Température 11 °C')
@@ -283,7 +290,7 @@ describe('PilotageDeviceDetail alerts', () => {
     expect(within(screen.getByTestId('pilotage-device-alert-k1')).getByRole('link')).toHaveAttribute('href', '/alertes/k1')
     expect(screen.queryByTestId('pilotage-device-alert-k3')).not.toBeInTheDocument()
     expect(screen.queryByTestId('pilotage-device-alert-k4')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('pilotage-device-alerts-all')).not.toBeInTheDocument()
+    expect(screen.getByTestId('pilotage-device-alerts-all')).toHaveTextContent('Toutes les alertes')
   })
 
   it('shows at most 3 alerts and a "Voir toutes" link when there are more', async () => {
@@ -294,7 +301,7 @@ describe('PilotageDeviceDetail alerts', () => {
     renderDevicePilotage('/pilotage/CHIP-001')
     expect(await screen.findByTestId('pilotage-device-alerts-indicator')).toHaveTextContent('4 alertes ouvertes')
     expect(screen.getAllByTestId(/^pilotage-device-alert-k/)).toHaveLength(3)
-    expect(screen.getByTestId('pilotage-device-alerts-all')).toHaveAttribute('href', '/alertes?device=CHIP-001')
+    expect(screen.getByTestId('pilotage-device-alerts-all')).toHaveAttribute('href', '/pilotage/CHIP-001/alertes')
   })
 
   it('says "Aucune alerte ouverte" (muted, not a link) when the device has none', async () => {
@@ -304,6 +311,8 @@ describe('PilotageDeviceDetail alerts', () => {
     expect(indicator).toHaveTextContent('Aucune alerte ouverte')
     expect(indicator).not.toHaveAttribute('href')
     expect(screen.getByTestId('pilotage-device-alerts-empty')).toBeInTheDocument()
+    // The closed ones stay one click away.
+    expect(screen.getByTestId('pilotage-device-alerts-all')).toHaveAttribute('href', '/pilotage/CHIP-001/alertes')
   })
 
   it('a failed alerts fetch leaves the page working, with a quiet note', async () => {
@@ -313,5 +322,62 @@ describe('PilotageDeviceDetail alerts', () => {
     expect(screen.getByTestId('pilotage-device-alerts-indicator')).toHaveAttribute('data-state', 'unknown')
     expect(screen.getByTestId('pilotage-device-readings-section')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('settings-form')).toBeInTheDocument())
+  })
+})
+
+describe('DevicePilotage — one device\'s alerts page', () => {
+  const rows = () =>
+    withAnomalies([
+      anomaly('k1', 'CHIP-001', 'detectee'),
+      anomaly('k2', 'CHIP-001', 'en_cours', { code: 'CH', label: 'Choc', unit: 'G', value: 5, threshold: 3, excess: 2 }),
+      anomaly('k3', 'CHIP-002', 'detectee'),
+      anomaly('k4', 'CHIP-001', 'fermee'),
+    ])
+
+  it('lists the device\'s open alerts only, under "Pilotage › CHIP › Alertes", without a Device column', async () => {
+    stubFetch(mainContract(), twoDevices(), config(), rows())
+    renderDevicePilotage('/pilotage/CHIP-001/alertes')
+    expect(await screen.findByTestId('alerts-table')).toBeInTheDocument()
+    expect(screen.getByTestId('device-alerts-title')).toHaveTextContent('Alertes · CHIP-001')
+    expect(screen.getAllByTestId(/^alert-row-/).map((row) => row.dataset.testid)).toEqual(['alert-row-k1', 'alert-row-k2'])
+    expect(screen.getByTestId('breadcrumb-device')).toHaveAttribute('href', '/pilotage/CHIP-001')
+    expect(screen.getByTestId('breadcrumb-device-alerts')).toHaveTextContent('Alertes')
+    expect(screen.queryByRole('columnheader', { name: 'Device' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('alerts-device-chip')).not.toBeInTheDocument()
+    expect(screen.getByTestId('alerts-status-count-all')).toHaveTextContent('3')
+  })
+
+  it('shows the closed ones on "Toutes", and a row opens the alert with this page as its way back', async () => {
+    const user = userEvent.setup()
+    stubFetch(mainContract(), twoDevices(), config(), rows())
+    renderDevicePilotage('/pilotage/CHIP-001/alertes')
+    await screen.findByTestId('alerts-table')
+    await user.click(screen.getByTestId('alerts-status-all'))
+    expect(screen.getAllByTestId(/^alert-row-/)).toHaveLength(3)
+    await user.click(screen.getByTestId('alert-row-k4'))
+    expect(screen.getByTestId('location')).toHaveTextContent('/alertes/k4')
+    expect(JSON.parse(screen.getByTestId('location').dataset.state ?? 'null')).toEqual({ listPath: '/pilotage/CHIP-001/alertes?statut=all' })
+  })
+
+  it('says so when the device has no alert, without the contract list\'s device reset', async () => {
+    stubFetch(mainContract(), twoDevices(), config(), withAnomalies([anomaly('k3', 'CHIP-002', 'detectee')]))
+    renderDevicePilotage('/pilotage/CHIP-001/alertes')
+    const empty = await screen.findByTestId('alerts-empty')
+    expect(empty).toHaveTextContent('pour ce device')
+    expect(screen.queryByTestId('alerts-device-reset')).not.toBeInTheDocument()
+  })
+
+  it('goes back to the device page with its back button', async () => {
+    const user = userEvent.setup()
+    stubFetch(mainContract(), twoDevices(), config(), rows())
+    renderDevicePilotage('/pilotage/CHIP-001/alertes')
+    await user.click(await screen.findByTestId('device-alerts-back'))
+    expect(screen.getByTestId('location')).toHaveTextContent('/pilotage/CHIP-001')
+  })
+
+  it('says the device is unknown in this contract', async () => {
+    stubFetch(mainContract(), twoDevices(), config(), rows())
+    renderDevicePilotage('/pilotage/NOPE/alertes')
+    expect(await screen.findByTestId('pilotage-device-not-found')).toBeInTheDocument()
   })
 })

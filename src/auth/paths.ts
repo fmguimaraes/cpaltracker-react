@@ -56,9 +56,9 @@ export function alertPath(anomalyKey: string): string {
   return `${ALERTS_PATH}/${encodeURIComponent(anomalyKey)}`
 }
 
-/** The alerts list filtered to one device (`?device=`), linked from that device's page. */
+/** Every alert of one device, a child page of its device page (linked from its alerts badge and section). */
 export function deviceAlertsPath(chipId: string): string {
-  return `${ALERTS_PATH}?device=${encodeURIComponent(chipId)}`
+  return `${devicePilotagePath(chipId)}/alertes`
 }
 
 /** KAN-272 — Pulse: Live Tracking plus each device's lot (route `routes/Pulse.tsx`). */

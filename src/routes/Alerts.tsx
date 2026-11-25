@@ -53,12 +53,18 @@ function ListSkeleton() {
   )
 }
 
-function AlertsList({ contractId }: { contractId: number }) {
+/**
+ * The filterable alerts list. `device` pins it to one device (the device's own alerts page): the `?device=`
+ * param, its chip and its reset are then left out.
+ */
+export function AlertsList({ contractId, device: fixedDevice }: { contractId: number; device?: string }) {
   const [params, setParams] = useSearchParams()
   const isMobile = useIsMobile()
   const status = parseStatus(params.get(STATUS_PARAM))
   const types = parseTypes(params.get(TYPE_PARAM))
-  const device = params.get(DEVICE_PARAM)
+  const device = fixedDevice ?? params.get(DEVICE_PARAM)
+  /** A removable `?device=` filter on the contract-wide list. */
+  const deviceFilter = fixedDevice === undefined && device !== null
 
   const load = useCallback(() => fetchAnomalies(contractId, ALL), [contractId])
   const { state, reload } = useLoad(load)
@@ -109,13 +115,19 @@ function AlertsList({ contractId }: { contractId: number }) {
     )
   } else if (view.rows.length === 0) {
     body = (
-      <Empty data-testid="alerts-empty" data-reason={view.typeFiltered ? 'type' : device !== null ? 'device' : 'status'}>
+      <Empty data-testid="alerts-empty" data-reason={view.typeFiltered ? 'type' : deviceFilter ? 'device' : 'status'}>
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <BellOff aria-hidden />
           </EmptyMedia>
           <EmptyDescription>
-            {view.typeFiltered ? 'Aucune alerte pour ces types.' : device !== null ? `${statusEmpty} pour le device ${device}.` : `${statusEmpty}.`}
+            {view.typeFiltered
+              ? 'Aucune alerte pour ces types.'
+              : fixedDevice !== undefined
+                ? `${statusEmpty} pour ce device.`
+                : deviceFilter
+                  ? `${statusEmpty} pour le device ${device}.`
+                  : `${statusEmpty}.`}
           </EmptyDescription>
         </EmptyHeader>
         <div className="flex flex-wrap justify-center gap-2">
@@ -129,7 +141,7 @@ function AlertsList({ contractId }: { contractId: number }) {
               Afficher aussi les clôturées
             </Button>
           )}
-          {device !== null && (
+          {deviceFilter && (
             <Button variant="outline" size="sm" onClick={() => update({ [DEVICE_PARAM]: null })} data-testid="alerts-device-reset">
               Retirer le filtre device
             </Button>
@@ -137,7 +149,7 @@ function AlertsList({ contractId }: { contractId: number }) {
         </div>
       </Empty>
     )
-  } else body = <AlertsTable rows={view.rows} mobile={isMobile} />
+  } else body = <AlertsTable rows={view.rows} mobile={isMobile} hideDevice={fixedDevice !== undefined} />
 
   return (
     <TooltipProvider>
@@ -196,7 +208,7 @@ function AlertsList({ contractId }: { contractId: number }) {
             </div>
           )}
 
-          {device !== null && (
+          {deviceFilter && (
             <Badge variant="outline" className="h-7 gap-1 pr-1 text-sm font-normal" data-testid="alerts-device-chip">
               <span>
                 Device <span className="font-mono font-medium">{device}</span>

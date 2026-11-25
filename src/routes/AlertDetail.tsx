@@ -88,8 +88,7 @@ function QuickLink({ to, children, testId }: { to: string; children: ReactNode; 
 function AlertBody({ contractId, anomalyKey }: { contractId: number; anomalyKey: string }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const listSearch = (location.state as AlertsLocationState | null)?.listSearch ?? ''
-  const listPath = `${ALERTS_PATH}${listSearch}`
+  const listPath = (location.state as AlertsLocationState | null)?.listPath ?? ALERTS_PATH
   const { state, current, setUpdated, reloadDetail } = useAnomalyDetail(contractId, anomalyKey)
   const now = new Date()
   const card = current ? anomalyCardContent({ ...current }, { now }) : null

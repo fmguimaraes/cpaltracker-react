@@ -145,10 +145,24 @@ test.describe('pilotage device readings and alerts', () => {
     await page.goto('/pilotage/CHIP-000')
     const badge = page.getByTestId('pilotage-device-alerts-indicator')
     await expect(badge).toHaveText('4 alertes ouvertes')
-    await expect(badge).toHaveAttribute('href', '/alertes?device=CHIP-000')
+    await expect(badge).toHaveAttribute('href', '/pilotage/CHIP-000/alertes')
     await expect(page.getByTestId('pilotage-device-alerts-section').getByTestId(/^pilotage-device-alert-/)).toHaveCount(3)
-    await expect(page.getByTestId('pilotage-device-alerts-all')).toHaveAttribute('href', '/alertes?device=CHIP-000')
+    await expect(page.getByTestId('pilotage-device-alerts-all')).toHaveAttribute('href', '/pilotage/CHIP-000/alertes')
     await expectNoHorizontalScroll(page)
+  })
+
+  test('the badge opens the device\'s own alerts page, under "Pilotage › CHIP › Alertes"', async ({ page }) => {
+    await mockApi(page, { alerts })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/pilotage/CHIP-000')
+    await page.getByTestId('pilotage-device-alerts-indicator').click()
+    await expect(page).toHaveURL(/\/pilotage\/CHIP-000\/alertes$/)
+    await expect(page.getByTestId('device-alerts-title')).toHaveText('Alertes · CHIP-000')
+    await expect(page.getByTestId('shell-breadcrumb')).toHaveAttribute('title', 'Pilotage › CHIP-000 › Alertes')
+    await expect(page.getByTestId('alerts-table').getByTestId(/^alert-row-/)).toHaveCount(4)
+    await expectNoHorizontalScroll(page)
+    await page.getByTestId('device-alerts-back').click()
+    await expect(page).toHaveURL(/\/pilotage\/CHIP-000$/)
   })
 
   test('no open alert is a muted note; a failed fetch leaves the page usable', async ({ page }) => {

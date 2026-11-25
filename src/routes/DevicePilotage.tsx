@@ -6,7 +6,7 @@ import { ShellBreadcrumb, type ShellBreadcrumbLevel } from '@/ui/patterns/shell-
 import { ShellPageTitle } from '@/ui/patterns/shell-title'
 import { Skeleton } from '@/ui/skeleton'
 import { useContracts } from '../contracts/ContractContext'
-import { DEVICE_PILOTAGE_PATH, devicePilotagePath, deviceReadingsPath } from '../auth/paths'
+import { DEVICE_PILOTAGE_PATH, deviceAlertsPath, devicePilotagePath, deviceReadingsPath } from '../auth/paths'
 import { DeviceList } from '../pilotage/DeviceList'
 import { loadPilotageWorkspace } from '../pilotage/loadPilotageWorkspace'
 import type { Position } from '../api/positions'
@@ -113,18 +113,23 @@ export function DevicePilotage() {
     if (previous !== null && previous !== selectedId && chipId) navigate(DEVICE_PILOTAGE_PATH, { replace: true })
   }, [selectedId, chipId, navigate])
 
-  // "Pilotage › CHIP" on the device page; "Pilotage › CHIP › Relevés" on its readings page, where the
-  // chip level links back to the device page.
-  const onReadings = chipId !== undefined && pathname.replace(/\/+$/, '') === deviceReadingsPath(chipId)
+  // "Pilotage › CHIP" on the device page; "Pilotage › CHIP › Relevés" (or "› Alertes") on its sub-pages,
+  // where the chip level links back to the device page.
+  const here = pathname.replace(/\/+$/, '')
+  const subPage =
+    chipId === undefined ? null
+    : here === deviceReadingsPath(chipId) ? { label: 'Relevés', testId: 'breadcrumb-readings' }
+    : here === deviceAlertsPath(chipId) ? { label: 'Alertes', testId: 'breadcrumb-device-alerts' }
+    : null
   const levels: ShellBreadcrumbLevel[] =
     chipId === undefined
       ? [{ label: 'Pilotage', testId: 'breadcrumb-pilotage' }]
       : [
           { label: 'Pilotage', to: DEVICE_PILOTAGE_PATH, testId: 'breadcrumb-pilotage' },
-          onReadings
+          subPage
             ? { label: chipId, to: devicePilotagePath(chipId), testId: 'breadcrumb-device' }
             : { label: chipId, testId: 'breadcrumb-device' },
-          ...(onReadings ? [{ label: 'Relevés', testId: 'breadcrumb-readings' }] : []),
+          ...(subPage ? [subPage] : []),
         ]
 
   return (

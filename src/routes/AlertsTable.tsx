@@ -23,9 +23,9 @@ export function lotSummary(row: AnomalyRow): string {
   return [lot, row.lot?.productName?.trim()].filter(Boolean).join(' · ')
 }
 
-/** The state the list hands to a detail page, so its back button returns to the same filters. */
+/** The state a list hands to a detail page, so its back button returns to the same list and filters. */
 export interface AlertsLocationState {
-  listSearch?: string
+  listPath?: string
 }
 
 function rowContent(row: AnomalyRow) {
@@ -94,11 +94,11 @@ const columns: DataTableColumn<AnomalyRow>[] = [
   { id: 'detected', header: 'Détectée', accessorFn: (row) => row.detectedAt, cell: ({ row }) => <DetectedCell row={row.original} /> },
 ]
 
-function DesktopTable({ rows }: { rows: AnomalyRow[] }) {
+function DesktopTable({ rows, hideDevice }: { rows: AnomalyRow[]; hideDevice: boolean }) {
   const navigate = useNavigate()
-  const { search } = useLocation()
-  const open = (key: string) => navigate(alertPath(key), { state: { listSearch: search } satisfies AlertsLocationState })
-  const tableColumns = useMemo(() => columns, [])
+  const { pathname, search } = useLocation()
+  const open = (key: string) => navigate(alertPath(key), { state: { listPath: `${pathname}${search}` } satisfies AlertsLocationState })
+  const tableColumns = useMemo(() => (hideDevice ? columns.filter((column) => column.id !== 'device') : columns), [hideDevice])
   return (
     <DataTable<AnomalyRow>
       label="Alertes"
@@ -125,7 +125,7 @@ function DesktopTable({ rows }: { rows: AnomalyRow[] }) {
 }
 
 function MobileCards({ rows }: { rows: AnomalyRow[] }) {
-  const { search } = useLocation()
+  const { pathname, search } = useLocation()
   return (
     <MobileList<AnomalyRow>
       items={rows}
@@ -143,7 +143,7 @@ function MobileCards({ rows }: { rows: AnomalyRow[] }) {
         return (
           <Link
             to={alertPath(row.anomalyKey)}
-            state={{ listSearch: search } satisfies AlertsLocationState}
+            state={{ listPath: `${pathname}${search}` } satisfies AlertsLocationState}
             className={cn(
               'flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3 outline-none focus-visible:ring-3 focus-visible:ring-signal-ring',
               isClosed(row.status) && 'text-muted-foreground',
@@ -168,7 +168,10 @@ function MobileCards({ rows }: { rows: AnomalyRow[] }) {
   )
 }
 
-/** The alerts as the kit `DataTable` (md and up) or the kit `MobileList` (below md); one click opens an alert. */
-export function AlertsTable({ rows, mobile }: { rows: AnomalyRow[]; mobile: boolean }) {
-  return mobile ? <MobileCards rows={rows} /> : <DesktopTable rows={rows} />
+/**
+ * The alerts as the kit `DataTable` (md and up) or the kit `MobileList` (below md); one click opens an alert.
+ * `hideDevice` drops the Device column, for a list that already belongs to one device.
+ */
+export function AlertsTable({ rows, mobile, hideDevice = false }: { rows: AnomalyRow[]; mobile: boolean; hideDevice?: boolean }) {
+  return mobile ? <MobileCards rows={rows} /> : <DesktopTable rows={rows} hideDevice={hideDevice} />
 }

@@ -194,12 +194,11 @@ function AlertsSection({ alerts, chipId }: { alerts: DeviceAlerts; chipId: strin
       title="Alertes"
       testId="pilotage-device-alerts-section"
       className="max-lg:order-first"
+      // Always there: the device's alerts page also holds its closed alerts.
       action={
-        more && (
-          <Link to={deviceAlertsPath(chipId)} className={SECTION_LINK_CLASS} data-testid="pilotage-device-alerts-all">
-            Voir toutes ({rows.length}) →
-          </Link>
-        )
+        <Link to={deviceAlertsPath(chipId)} className={SECTION_LINK_CLASS} data-testid="pilotage-device-alerts-all">
+          {more ? `Voir toutes (${rows.length}) →` : 'Toutes les alertes →'}
+        </Link>
       }
     >
       {alerts.status === 'loading' && <p className="text-sm text-muted-foreground">Chargement des alertes…</p>}

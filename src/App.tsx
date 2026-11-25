@@ -18,6 +18,7 @@ import { TooltipProvider } from '@/ui/tooltip'
 import { Account } from './routes/Account'
 import { AlertDetail } from './routes/AlertDetail'
 import { Alerts } from './routes/Alerts'
+import { DeviceAlerts } from './routes/DeviceAlerts'
 import { DeviceReadings } from './routes/DeviceReadings'
 import { AccountLayout } from './routes/AccountLayout'
 import { DevicePilotage } from './routes/DevicePilotage'
@@ -63,6 +64,7 @@ export function App() {
                   <Route index element={<PilotageDeviceList />} />
                   <Route path=":chipId" element={<PilotageDeviceDetail />} />
                   <Route path=":chipId/releves" element={<DeviceReadings />} />
+                  <Route path=":chipId/alertes" element={<DeviceAlerts />} />
                 </Route>
                 <Route path={TRENDS_PATH} element={<Trends />} />
                 <Route path={ALERTS_PATH} element={<Alerts />} />
