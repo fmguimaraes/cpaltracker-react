@@ -13,10 +13,11 @@ const account = {
   userId: 1, clientId: null, mail: 'demo@cpal.test', nom: 'Demo', prenom: 'User',
   role: 'client', telephone: null, lastLoginAt: null, mustChangePassword: false,
 }
-const lot = (n: string, risk: string, z: number, expiryDate: string) => ({
-  cpalLot: `CPL-${n}`, custLotNumber: n, productName: `Produit ${n}`, balanceKg: 9800, referenceVelocity: 140,
-  requiredVelocity: 217.1, z, risk, expiryDate,
+const lot = (n: string, risk: string, z: number, expiryDate: string, placed = true) => ({
+  cpalLot: `CPL-${n}`, custLotNumber: n, productName: `Produit ${n}`, balanceKg: 9800, referenceVelocity: placed ? 140 : 0,
+  requiredVelocity: 217.1, velocityRatio: placed ? 1.55 : null, z, risk, placed, expiryDate, daysToExpiry: 310,
 })
+const NO_SUMMARY = { eleve: 0, moyen: 0, nextExpiryDays: null }
 
 function stub(contractType: string, trends: () => Response) {
   vi.stubGlobal(
@@ -60,6 +61,7 @@ describe('Trends (KAN-256)', () => {
     stub('MAIN', () =>
       new Response(JSON.stringify({
         contract: { contractId: 4, contractRef: 'REF', contractType: 'MAIN' },
+        asOf: '2026-11-25', summary: { eleve: 1, moyen: 0, nextExpiryDays: 310 },
         lots: [lot('2026001', 'eleve', 2.4, '2027-10-01'), lot('2026002', 'faible', -0.7, '2027-10-09')],
       }), { status: 200 }),
     )
@@ -71,9 +73,45 @@ describe('Trends (KAN-256)', () => {
     expect(screen.getByText('01/10/2027')).toBeInTheDocument()
   })
 
+  it('sorts by z desc, filters the table from the summary counts, flags insufficient history', async () => {
+    stub('MAIN', () =>
+      new Response(JSON.stringify({
+        contract: { contractId: 4, contractRef: 'REF', contractType: 'MAIN' },
+        asOf: '2026-11-25',
+        summary: { eleve: 1, moyen: 1, nextExpiryDays: 310 },
+        lots: [
+          lot('2026002', 'faible', -0.7, '2027-10-09'),
+          lot('2026001', 'eleve', 2.4, '2027-10-01'),
+          lot('2026009', 'moyen', 0.6, '2027-12-04'),
+          lot('2026010', 'faible', 0, '2027-12-10', false),
+        ],
+      }), { status: 200 }),
+    )
+    renderPage()
+    const rows = await screen.findAllByTestId('trends-row')
+    expect(rows.map((r) => r.querySelector('td')?.textContent)).toEqual([
+      '2026001Produit 2026001',
+      '2026009Produit 2026009',
+      '2026002Produit 2026002',
+      '2026010Produit 2026010',
+    ])
+    expect(screen.getByText('historique insuffisant')).toBeInTheDocument()
+    expect(screen.getByText('+2,40')).toBeInTheDocument()
+
+    const eleve = screen.getByTestId('trends-filter-eleve')
+    expect(eleve).toHaveTextContent('1 lot à risque élevé')
+    expect(screen.getByTestId('trends-toolbar')).toHaveTextContent('prochaine péremption dans 310 j')
+    expect(screen.getAllByText('×1,6')).toHaveLength(3)
+    await userEvent.click(eleve)
+    expect(screen.getAllByTestId('trends-row')).toHaveLength(1)
+    expect(eleve).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(eleve)
+    expect(screen.getAllByTestId('trends-row')).toHaveLength(4)
+  })
+
   it('shows the STD empty state', async () => {
     stub('STD', () =>
-      new Response(JSON.stringify({ contract: { contractId: 4, contractRef: 'REF', contractType: 'STD' }, lots: [] }), { status: 200 }),
+      new Response(JSON.stringify({ contract: { contractId: 4, contractRef: 'REF', contractType: 'STD' }, asOf: '2026-11-25', summary: NO_SUMMARY, lots: [] }), { status: 200 }),
     )
     renderPage()
     expect(await screen.findByTestId('trends-std')).toBeInTheDocument()
@@ -81,7 +119,7 @@ describe('Trends (KAN-256)', () => {
 
   it('shows the no-lot state', async () => {
     stub('MAIN', () =>
-      new Response(JSON.stringify({ contract: { contractId: 4, contractRef: 'REF', contractType: 'MAIN' }, lots: [] }), { status: 200 }),
+      new Response(JSON.stringify({ contract: { contractId: 4, contractRef: 'REF', contractType: 'MAIN' }, asOf: '2026-11-25', summary: NO_SUMMARY, lots: [] }), { status: 200 }),
     )
     renderPage()
     expect(await screen.findByTestId('trends-empty')).toBeInTheDocument()
@@ -92,7 +130,7 @@ describe('Trends (KAN-256)', () => {
     stub('MAIN', () =>
       ++calls === 1
         ? new Response('{}', { status: 500 })
-        : new Response(JSON.stringify({ contract: { contractId: 4, contractRef: 'REF', contractType: 'MAIN' }, lots: [lot('1', 'moyen', 0.5, '2027-10-01')] }), { status: 200 }),
+        : new Response(JSON.stringify({ contract: { contractId: 4, contractRef: 'REF', contractType: 'MAIN' }, asOf: '2026-11-25', summary: NO_SUMMARY, lots: [lot('1', 'moyen', 0.5, '2027-10-01')] }), { status: 200 }),
     )
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Réessayer' }))

@@ -3,7 +3,7 @@ import { Badge } from '@/ui/badge'
 import { Card, CardContent } from '@/ui/card'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { ActivityTimeline, type ActivityItem } from '@/ui/timeline'
-import { formatUtc } from '../history/timelineData'
+import { formatAbsolute } from '../anomalies/anomalyCard'
 
 /**
  * KAN-169 (FR18, CB29) — the transfer history panel.
@@ -23,8 +23,9 @@ import { formatUtc } from '../history/timelineData'
  *
  * KAN-227 (FR10): rendered as the kit `ActivityTimeline` (DAT-TIMELINE,
  * vertical), one item per transfer (`testId` = `transfer-history-row-*`), the
- * period as the API returned it in the item detail, its start as the item
- * time (UTC, as the monolith's "(UTC)" fields), and a `Badge` for an ongoing
+ * period in the item detail and its start as the item time, both in the
+ * browser's time zone in French (unified shell §1.4: never ISO/UTC on screen;
+ * the `<time dateTime>` keeps the ISO instant), and a `Badge` for an ongoing
  * transfer (`-ongoing`).
  *
  * CB29's "en cours" marking is preserved exactly: `openEnded` (the API's
@@ -41,9 +42,22 @@ function utcTextToIso(text: string): string {
   return /(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`
 }
 
-/** Item time: the transfer start, in UTC, to the minute. */
+/** Item time: the transfer start, local ("10 juin 2026 02:00", the year only when not the current one). */
 function formatStart(at: Date): string {
-  return Number.isNaN(at.getTime()) ? '' : `${formatUtc(at.getTime()).slice(0, 16)} UTC`
+  return Number.isNaN(at.getTime()) ? '' : formatAbsolute(at)
+}
+
+const DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+
+/**
+ * A transfer bound as a French day ("1 juil. 2026"): a bare `AAAA-MM-JJ` is a calendar day (shown as is), a
+ * UTC timestamp is shown in the browser's time zone; the API text when unreadable.
+ */
+function formatBound(text: string | null): string {
+  if (!text) return ''
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text)
+  const date = day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])) : new Date(utcTextToIso(text))
+  return Number.isNaN(date.getTime()) ? text : DAY_FORMAT.format(date)
 }
 
 export function TransferHistory({ entries }: { entries: TransferResult[] }) {
@@ -64,7 +78,9 @@ export function TransferHistory({ entries }: { entries: TransferResult[] }) {
       testId: rowId,
       at: utcTextToIso(entry.startDate),
       title: `${entry.deviceId} → contrat #${entry.targetContractId}`,
-      detail: entry.openEnded ? `${entry.startDate} –` : `${entry.startDate} – ${entry.endDate}`,
+      detail: entry.openEnded
+        ? `${formatBound(entry.startDate)} –`
+        : `${formatBound(entry.startDate)} – ${formatBound(entry.endDate)}`,
       badge: entry.openEnded ? (
         <Badge variant="neutral" data-testid={`${rowId}-ongoing`}>
           en cours

@@ -106,13 +106,14 @@ export function Login() {
 
   return (
     <AuthLayout
-      title="Sign in"
+      title="Connexion"
+      subtitle="Accédez aux données des devices de vos contrats."
       themeLabels={{
-        toLight: "Switch to light theme",
-        toDark: "Switch to dark theme",
+        toLight: "Passer au thème clair",
+        toDark: "Passer au thème sombre",
       }}
     >
-      <div className="flex flex-col gap-6 rounded-xl border border-input bg-card p-6 shadow-xs">
+      <div className="flex flex-col gap-6 py-6">
         {notice && (
           <Alert
             variant="info"
@@ -136,11 +137,13 @@ export function Login() {
               name="email"
               rules={{
                 validate: (value) =>
-                  value.trim() !== "" || "Email is required.",
+                  value.trim() !== "" || "Adresse e-mail requise.",
               }}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Adresse e-mail
+                  </FormLabel>
                   <FormControl>
                     <Input
                       {...field}
@@ -160,14 +163,16 @@ export function Login() {
             <FormField
               control={form.control}
               name="password"
-              rules={{ required: "Password is required." }}
+              rules={{ required: "Mot de passe requis." }}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Mot de passe
+                  </FormLabel>
                   <PasswordInput
                     {...field}
-                    showLabel="Show characters"
-                    hideLabel="Hide characters"
+                    showLabel="Afficher les caractères"
+                    hideLabel="Masquer les caractères"
                     autoComplete="current-password"
                     data-testid="login-password"
                   />
@@ -195,14 +200,15 @@ export function Login() {
               loading={isSubmitting}
               data-testid="login-submit"
             >
-              {isSubmitting ? "Signing in…" : "Sign in"}
+              {isSubmitting ? "Connexion…" : "Se connecter"}
             </Button>
 
             <AuthLink
               to={FORGOT_PASSWORD_PATH}
+              className="self-center text-sm text-muted-foreground"
               data-testid="login-forgot-password-link"
             >
-              Forgot password?
+              Mot de passe oublié
             </AuthLink>
           </form>
         </Form>

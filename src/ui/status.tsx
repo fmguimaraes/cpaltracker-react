@@ -28,7 +28,7 @@ export function countByStatus(list: ReadonlyArray<{ status: DeviceStatus }>): Re
   return counts
 }
 
-/** D3: ok = success, warning = yellow (never orange), alert = danger, offline = grey. */
+/** D3: ok = success, warning = yellow, alert = danger, offline = grey. */
 export const statusTone: Record<DeviceStatus, { dot: string; text: string; badge: "success" | "warning" | "danger" | "offline" }> = {
   ok: { dot: "bg-success", text: "text-success", badge: "success" },
   warning: { dot: "bg-warning", text: "text-warning", badge: "warning" },

@@ -42,7 +42,7 @@ export interface ChartTheme {
   danger: string
   success: string
   fontSans: string
-  fontSerif: string
+  fontDisplay: string
   /** Style (colour, dash, symbol) of series i; see `seriesStyle`. */
   seriesStyle: (i: number) => SeriesStyle
   /** Plotly layout base: transparent, token font/grid, responsive. */
@@ -63,7 +63,7 @@ function resolveColor(name: string): string {
 function readTheme(): ChartTheme {
   const root = getComputedStyle(document.documentElement)
   const fontSans = root.getPropertyValue('--font-sans').trim()
-  const fontSerif = root.getPropertyValue('--font-serif').trim()
+  const fontDisplay = root.getPropertyValue('--font-display').trim()
   const colors = [1, 2, 3, 4, 5].map((i) => resolveColor(`--chart-${i}`))
   const axis = resolveColor('--chart-axis')
   const grid = resolveColor('--chart-grid')
@@ -76,9 +76,9 @@ function readTheme(): ChartTheme {
     margin: { l: 40, r: 12, t: 12, b: 32 },
     autosize: true,
     hovermode: 'x unified',
-    hoverlabel: { bgcolor: resolveColor('--card'), font: { color: foreground, family: fontSans }, bordercolor: grid },
-    xaxis: { gridcolor: grid, linecolor: grid, zeroline: false, tickfont: { color: axis }, fixedrange: true },
-    yaxis: { gridcolor: grid, linecolor: grid, zeroline: false, tickfont: { color: axis }, fixedrange: true },
+    hoverlabel: { bgcolor: resolveColor('--popover'), font: { color: foreground, family: fontSans }, bordercolor: grid },
+    xaxis: { showgrid: false, gridcolor: grid, linecolor: grid, zeroline: false, tickfont: { color: axis }, fixedrange: true },
+    yaxis: { showgrid: false, gridcolor: grid, linecolor: grid, zeroline: false, tickfont: { color: axis }, fixedrange: true },
     legend: { font: { color: foreground } },
   }
   return {
@@ -87,13 +87,13 @@ function readTheme(): ChartTheme {
     grid,
     card: resolveColor('--card'),
     foreground,
-    primary: resolveColor('--primary'),
+    primary: resolveColor('--signal'), // primary series = the signal accent
     theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark',
     warning: resolveColor('--warning'),
     danger: resolveColor('--danger'),
     success: resolveColor('--success') || colors[2],
     fontSans,
-    fontSerif,
+    fontDisplay,
     seriesStyle,
     layout,
   }

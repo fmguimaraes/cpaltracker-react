@@ -5,22 +5,22 @@ import { statusTone, type DeviceStatus } from "@/ui/status"
 
 export interface TimelineItem {
   id: string
-  /** Display date for the brand timeline (e.g. "2026"), shown in Georgia above the dot. */
+  /** Display date for the brand timeline (e.g. "2026"), shown in Montserrat ExtraBold above the dot. */
   date: string
   label: string
 }
 
-/** DAT-TIMELINE (brand): grey line, orange dots, Georgia date above, label below. Scrolls sideways on mobile. */
+/** DAT-TIMELINE (brand): grey line, cyan dots, Montserrat ExtraBold date above, label below. Scrolls sideways on mobile. */
 function Timeline({ items, className, label }: { items: TimelineItem[]; className?: string; label?: string }) {
   return (
     <div data-slot="timeline" className={cn("overflow-x-auto pb-1", className)}>
       <ol aria-label={label} className="flex min-w-max">
         {items.map((it) => (
           <li key={it.id} className="relative flex w-40 flex-col gap-2 pr-3">
-            <span className="font-serif text-xl text-foreground">{it.date}</span>
+            <span className="font-display font-extrabold text-xl text-foreground">{it.date}</span>
             <span className="relative flex h-3 items-center">
               <span aria-hidden className="absolute inset-x-0 h-px bg-border" />
-              <span aria-hidden className="relative size-3 rounded-full bg-primary" />
+              <span aria-hidden className="relative size-3 rounded-full bg-signal" />
             </span>
             <span className="text-sm text-muted-foreground">{it.label}</span>
           </li>

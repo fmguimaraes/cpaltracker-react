@@ -19,7 +19,7 @@ export interface BreadcrumbEntry {
 }
 
 export interface PageHeaderProps {
-  /** Short orange uppercase label above the title. */
+  /** Short cyan uppercase label above the title. */
   eyebrow?: string
   /** Trail above the title; the last entry is the current page. */
   breadcrumb?: BreadcrumbEntry[]

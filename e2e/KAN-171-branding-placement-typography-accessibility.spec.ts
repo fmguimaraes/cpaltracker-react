@@ -48,15 +48,17 @@ test('renders the c-PAL brand mark in the sidebar chrome, sized via the reconcil
 
   const brandMark = page.getByTestId('cpal-brand-mark')
   await expect(brandMark).toBeVisible()
-  // KAN-217 shell header: a fixed 28px-wide mark that fits the collapsed
-  // icon rail, so it never resizes when the sidebar collapses.
-  await expect.poll(async () => (await brandMark.boundingBox())?.width).toBeCloseTo(28, 0)
+  // KAN-217 shell header, superseded by the wordmark swap: a fixed 20px-tall
+  // mark, sized by height (not width) so the wordmark's own aspect ratio
+  // stays legible. Hidden in the collapsed icon rail instead (no square
+  // icon-only variant exists for it).
+  await expect.poll(async () => (await brandMark.boundingBox())?.height).toBeCloseTo(20, 0)
 
-  // Below the reconciled 768px (`max-md`) cutoff, the mark shrinks to 40px
-  // (CB17's reduced size) — proven against the real built CSS, not the
+  // Below the reconciled 768px (`max-md`) cutoff, the mark grows to 28px
+  // (CB17's mobile size) — proven against the real built CSS, not the
   // source Tailwind class names.
   await page.setViewportSize({ width: 700, height: 900 })
-  await expect.poll(async () => (await brandMark.boundingBox())?.height).toBeCloseTo(40, 0)
+  await expect.poll(async () => (await brandMark.boundingBox())?.height).toBeCloseTo(28, 0)
 })
 
 test('renders the client logo exactly once, in the chrome branding slot above the page content (FR1)', async ({

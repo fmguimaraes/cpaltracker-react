@@ -22,7 +22,7 @@ function readStored(): ThemeChoice {
   } catch {
     // storage unavailable: fall back to the default
   }
-  return 'dark' // D7: dark by default
+  return 'system' // D7: follow the OS by default; the toggle overrides and persists (2026-11-25)
 }
 
 function systemTheme(): ResolvedTheme {
@@ -61,4 +61,14 @@ export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext)
   if (!context) throw new Error('useTheme must be used inside ThemeProvider')
   return context
+}
+
+/**
+ * The resolved theme for components that may render outside the provider (kit components in isolation,
+ * unit tests): the provider's value when there is one, else <html data-theme> as theme-init.js set it.
+ */
+export function useResolvedTheme(): ResolvedTheme {
+  const context = useContext(ThemeContext)
+  if (context) return context.resolved
+  return typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
 }

@@ -70,7 +70,7 @@ describe('AccountLayout (FR12, F-41)', () => {
     renderAt('', false)
     expect(await screen.findByTestId('page-content')).toBeInTheDocument()
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
-    expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
+    expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     expect(screen.getAllByRole('main')).toHaveLength(1)
   })
 

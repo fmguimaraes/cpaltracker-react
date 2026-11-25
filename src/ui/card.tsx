@@ -2,13 +2,13 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
-/** DAT-CARD: plain, orange left border, orange top border (orange signals, one edge only). */
+/** DAT-CARD: plain, cyan left border, cyan top border (the accent signals, one edge only). */
 const cardVariants = cva("", {
   variants: {
     variant: {
       plain: "",
-      "accent-left": "border-l-4 border-l-primary",
-      "accent-top": "border-t-4 border-t-primary",
+      "accent-left": "border-l-4 border-l-signal",
+      "accent-top": "border-t-4 border-t-signal",
     },
   },
   defaultVariants: { variant: "plain" },
@@ -26,7 +26,7 @@ function Card({
       data-size={size}
       data-variant={variant}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground shadow-xs ring-1 ring-foreground/10 [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground dark:ring-1 dark:ring-border [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
         cardVariants({ variant }),
         className
       )}

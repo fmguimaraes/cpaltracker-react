@@ -58,7 +58,7 @@ test('logout is an explicit POST action that clears AuthContext and redirects to
 
   await page.getByTestId('logout-button').click()
 
-  await expect(page).toHaveURL(/\/login\?suite=%2F&notice=logged-out$/)
+  await expect(page).toHaveURL(/\/login\?suite=%2Fpulse&notice=logged-out$/)
   await expect(page.getByTestId('login-notice')).toHaveText(
     'Vous avez été déconnecté(e).',
   )
@@ -98,10 +98,10 @@ test('a 401 unauthorized on an authenticated call (here, the logout POST itself)
   )
 
   await page.goto('/login')
-  await page.getByLabel('Email').fill('demo@cpal.test')
-  await page.getByLabel('Password').fill('correct-horse-battery-staple')
+  await page.getByLabel('Adresse e-mail').fill('demo@cpal.test')
+  await page.getByLabel('Mot de passe').fill('correct-horse-battery-staple')
   await page.getByTestId('login-submit').click()
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/pulse$/)
 
   // Simulates the session having already been invalidated server-side
   // (idle timeout, absolute timeout, account disabled, epoch mismatch —
@@ -123,7 +123,7 @@ test('a 401 unauthorized on an authenticated call (here, the logout POST itself)
   await page.getByTestId('user-menu').click()
   await page.getByTestId('logout-button').click()
 
-  await expect(page).toHaveURL(/\/login\?suite=%2F&notice=session-expired$/)
+  await expect(page).toHaveURL(/\/login\?suite=%2Fpulse&notice=session-expired$/)
   await expect(page.getByTestId('login-notice')).toHaveText(
     'Votre session a expiré. Rechargez la page et réessayez.',
   )

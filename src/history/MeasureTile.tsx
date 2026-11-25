@@ -86,7 +86,7 @@ function TileBody({
   return (
     <>
       <div className="flex items-baseline gap-1">
-        <span className="font-serif text-2xl leading-none text-primary-text tabular-nums">
+        <span className="font-display font-extrabold text-2xl leading-none text-primary-text tabular-nums">
           {formatMeasureValue(summary.last, summary.decimals)}
         </span>
         <span className="text-sm text-muted-foreground">{unit}</span>
@@ -124,7 +124,7 @@ function TileBody({
 function TileEmptyState() {
   return (
     <div className="flex flex-1 flex-col items-start justify-center gap-1 py-1">
-      <span className="font-serif text-2xl leading-none text-muted-foreground">—</span>
+      <span className="font-display font-extrabold text-2xl leading-none text-muted-foreground">—</span>
       <p className="text-xs text-muted-foreground">Aucune mesure sur cette période</p>
     </div>
   )

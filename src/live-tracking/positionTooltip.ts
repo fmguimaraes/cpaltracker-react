@@ -1,67 +1,57 @@
 import type { Position } from '../api/positions'
+import { formatAbsolute, formatMeasure, formatRelative } from '../anomalies/anomalyCard'
 
 /**
- * KAN-160 (FR7) — formats one device's reading into the ordered list of
- * text fields the tooltip renders. Pure/independently-testable (NFR8), so
- * the actual `<Tooltip>` JSX only needs to map this array, never compute
- * display text itself. Values are always plain strings — the tooltip
- * renders every one as text content, never `dangerouslySetInnerHTML`
- * (NFR6).
+ * KAN-160 (FR7), reworked by Pulse layout v2 §4 — the content of a marker's detail card, for Pulse and
+ * Suivi en direct alike (local time, fr-FR numbers: strictly better than the former UTC/raw-number list):
  *
- * Batch/lot fields (FR7's "plus batch/lot when a hook covers that
- * instant") are deliberately omitted here: that data comes only from
- * `GET /contracts/{id}/history`, which this story's data source
- * (`GET /devices/positions.php`) does not return. Cross-referencing a
- * live position against a history hook is out of this story's scope —
- * logged as a follow-up for whichever Live Tracking story first needs it.
+ *   title    the chip ID (positions carry no pallet name)
+ *   when     "15 nov. 12:00 · il y a 9 j" (browser time zone)
+ *   place    "49,5000, 3,0000" (4 decimals, fr-FR; no place names: there is no geocoding source)
+ *   metrics  a compact 2 × 2 grid: temperature, humidity, acceleration, weight
+ *
+ * Every line only when its data exists. "Température MPU" is no longer shown (a support value). Pure and
+ * text-only (NFR6/NFR8): the card renders these strings as text content.
  */
-export interface TooltipField {
+export type TooltipMetricKey = 'temperature' | 'humidity' | 'acceleration' | 'weight'
+
+export interface TooltipMetric {
+  key: TooltipMetricKey
+  /** Accessible name of the metric (the grid shows an icon). */
   label: string
   value: string
 }
 
-const UNKNOWN = 'Inconnu(e)'
-
-function formatUtc(timestamp: string | null): string {
-  if (timestamp === null) return UNKNOWN
-  const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return UNKNOWN
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())} UTC`
+export interface PositionCard {
+  title: string
+  when: string | null
+  place: string | null
+  metrics: TooltipMetric[]
 }
 
-function formatNumber(value: number | null, unit: string): string {
-  if (value === null || Number.isNaN(value)) return UNKNOWN
-  return `${value} ${unit}`
+const COORDINATE = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 4, maximumFractionDigits: 4, useGrouping: false })
+
+/** "49,5000, 3,0000". */
+export function formatPlace(latitude: number, longitude: number): string {
+  return `${COORDINATE.format(latitude)}, ${COORDINATE.format(longitude)}`
 }
 
-/** KAN-272: lot lines, only for a position that carries a lot (Pulse). */
-function lotFields(position: Position): TooltipField[] {
-  const { lot } = position
-  if (!lot) return []
-  return [
-    { label: 'Lot client', value: lot.custLotNumber ?? UNKNOWN },
-    { label: 'Produit', value: lot.productName ?? UNKNOWN },
-    { label: 'Lot cPAL', value: lot.cpalLot },
-    { label: 'Péremption', value: lot.expiryDate ?? UNKNOWN },
-  ]
+function metric(key: TooltipMetricKey, label: string, value: number | null, unit: string): TooltipMetric[] {
+  return value === null || Number.isNaN(value) ? [] : [{ key, label, value: formatMeasure(value, unit) }]
 }
 
-export function formatPositionTooltip(position: Position): TooltipField[] {
-  return [
-    { label: 'Date', value: formatUtc(position.timestamp) },
-    {
-      label: 'Position',
-      value:
-        position.latitude !== null && position.longitude !== null
-          ? `${position.latitude}, ${position.longitude}`
-          : UNKNOWN,
-    },
-    { label: 'Température ambiante', value: formatNumber(position.ambientTemperature, '°C') },
-    { label: 'Humidité', value: formatNumber(position.humidity, '%') },
-    { label: 'Masse', value: formatNumber(position.mass, 'kg') },
-    { label: 'Accélération', value: formatNumber(position.accelG, 'g') },
-    { label: 'Température MPU', value: formatNumber(position.mpuTemperature, '°C') },
-    ...lotFields(position),
-  ]
+export function formatPositionCard(position: Position, now: Date = new Date()): PositionCard {
+  const date = position.timestamp ? new Date(position.timestamp) : null
+  const validDate = date && !Number.isNaN(date.getTime()) ? date : null
+  return {
+    title: position.chipId,
+    when: validDate ? `${formatAbsolute(validDate, now)} · ${formatRelative(validDate, now)}` : null,
+    place: position.latitude !== null && position.longitude !== null ? formatPlace(position.latitude, position.longitude) : null,
+    metrics: [
+      ...metric('temperature', 'Température', position.ambientTemperature, '°C'),
+      ...metric('humidity', 'Humidité', position.humidity, '%HR'),
+      ...metric('acceleration', 'Accélération', position.accelG, 'g'),
+      ...metric('weight', 'Poids', position.mass, 'kg'),
+    ],
+  }
 }

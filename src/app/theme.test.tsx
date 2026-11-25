@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ThemeProvider, useTheme } from '@/app/theme'
@@ -6,7 +6,7 @@ import { Button } from '@/ui/button'
 
 /**
  * KAN-223 (FR4) — the app's theme provider (copied from the UI reference): light | dark |
- * system, dark by default (D7), stored under the same key the former themeStore used.
+ * system, following the OS by default (D7, 2026-11-25), stored under the same key the former themeStore used.
  */
 type Listener = () => void
 
@@ -65,10 +65,14 @@ describe('ThemeProvider (KAN-223 FR4)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('defaults to dark and writes it to <html data-theme> (D7)', () => {
+  it('defaults to "system" and writes the OS preference to <html data-theme> (D7, 2026-11-25)', () => {
     renderProbe()
-    expect(screen.getByTestId('choice')).toHaveTextContent('dark')
+    expect(screen.getByTestId('choice')).toHaveTextContent('system')
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    cleanup()
+    prefersLight = true
+    renderProbe()
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
 
   it('restores the choice stored under cpaltracker:theme', () => {
@@ -78,10 +82,10 @@ describe('ThemeProvider (KAN-223 FR4)', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
 
-  it('ignores an unknown stored value and falls back to dark', () => {
+  it('ignores an unknown stored value and falls back to "system"', () => {
     window.localStorage.setItem('cpaltracker:theme', 'sepia')
     renderProbe()
-    expect(screen.getByTestId('choice')).toHaveTextContent('dark')
+    expect(screen.getByTestId('choice')).toHaveTextContent('system')
   })
 
   it('persists an explicit choice under the same storage key', async () => {

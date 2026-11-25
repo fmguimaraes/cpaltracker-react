@@ -13,7 +13,7 @@ import {
   TRENDS_PATH,
 } from '../auth/paths'
 
-const APP_NAME = 'cpaltracker-react'
+const APP_NAME = 'cPal'
 
 /** Per-route page names, each in the language the page already shows (no translation). */
 const ROUTE_TITLES: Record<string, string> = {

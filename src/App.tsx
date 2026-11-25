@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { AppShellLayout } from './chrome/AppShellLayout'
 import {
@@ -17,8 +17,9 @@ import { TooltipProvider } from '@/ui/tooltip'
 import { Account } from './routes/Account'
 import { AccountLayout } from './routes/AccountLayout'
 import { DevicePilotage } from './routes/DevicePilotage'
+import { PilotageDeviceDetail } from './routes/PilotageDeviceDetail'
+import { PilotageDeviceList } from './routes/PilotageDeviceList'
 import { ForgotPassword } from './routes/ForgotPassword'
-import { HelloWorld } from './routes/HelloWorld'
 import { HistoryDashboard } from './routes/HistoryDashboard'
 import { LiveTracking } from './routes/LiveTracking'
 import { Pulse } from './routes/Pulse'
@@ -43,17 +44,21 @@ export function App() {
                   </RequireAuth>
                 }
               >
-                <Route path="/" element={<HelloWorld />} />
+                {/* The landing page is Pulse: "/" (post-login default, "back to app" links) redirects there */}
+                <Route path="/" element={<Navigate to={PULSE_PATH} replace />} />
                 <Route path={PULSE_PATH} element={<Pulse />} />
+                {/* Deprecated (unified shell 2026-11-25): Suivi en direct and Historique are superseded by
+                    Pulse; kept with their nav entries until their removal is confirmed (remaining gaps listed
+                    in the unified-shell report). */}
                 <Route path={LIVE_TRACKING_PATH} element={<LiveTracking />} />
                 <Route
                   path={HISTORY_DASHBOARD_PATH}
                   element={<HistoryDashboard />}
                 />
-                <Route
-                  path={DEVICE_PILOTAGE_PATH}
-                  element={<DevicePilotage />}
-                />
+                <Route path={DEVICE_PILOTAGE_PATH} element={<DevicePilotage />}>
+                  <Route index element={<PilotageDeviceList />} />
+                  <Route path=":chipId" element={<PilotageDeviceDetail />} />
+                </Route>
                 <Route path={TRENDS_PATH} element={<Trends />} />
               </Route>
               <Route path="/login" element={<Login />} />

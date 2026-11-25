@@ -160,7 +160,9 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
     render(<TimelineMap rows={rows} hooks={hooks} />)
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
     const html = document.querySelector('.leaflet-marker-icon')?.innerHTML ?? ''
-    expect(html).toContain('ring-warning')
+    // Theming spec 2026-11-25: the state is the marker's dot; the outline is always --signal
+    expect(html).toContain('bg-warning')
+    expect(html).toContain('ring-signal')
     expect(html).not.toMatch(/style=|#[0-9a-f]{6}/i)
   })
 })

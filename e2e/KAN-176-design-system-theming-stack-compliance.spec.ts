@@ -170,13 +170,13 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     const chart = page.getByTestId('history-chart-ta')
     // FR9: the kit chart paper is transparent; the surface behind it is the WidgetCard's --card.
     const paperBackground = await chart.locator('[data-slot="card"]').first().evaluate((node) => getComputedStyle(node).backgroundColor)
-    expect(paperBackground).toBe('rgb(34, 37, 46)') // --card dark: #22252e (KAN-223 FR4)
+    expect(paperBackground).toBe('rgb(29, 30, 32)') // --card dark: #1d1e20 (Sombre graphite, 2026-11-25)
   })
 
-  test('light mode (the default) leaves the map tiles un-filtered and charts on the light palette', async ({
+  test('light mode desaturates the map tiles (never inverts them) and puts charts on the light palette', async ({
     page,
   }) => {
-    // The default is dark (D7, KAN-223); light is an explicit stored choice.
+    // The default follows the OS (D7, 2026-11-25); light is stored explicitly.
     await page.addInitScript(() => window.localStorage.setItem('cpaltracker:theme', 'light'))
     await mockToReadyState(page)
 
@@ -185,12 +185,12 @@ test.describe('Dark-mode correctness for map chrome and charts (FR26, NFR6)', ()
     const tilePaneFilter = await page
       .locator('.timeline-map .leaflet-tile-pane')
       .evaluate((node) => getComputedStyle(node).filter)
-    // Light tiles are only softened (--map-tile-filter, KAN-223 F-19), never inverted.
-    expect(tilePaneFilter).toBe('saturate(0.55) sepia(0.12)')
+    // Light tiles are recolored to the mineral grey (--map-tile-filter, Clair minéral 2026-11-25), never inverted.
+    expect(tilePaneFilter).toBe('grayscale(0.85) brightness(1.03) contrast(0.9)')
 
     const chart = page.getByTestId('history-chart-ta')
     // FR9: the kit chart paper is transparent; the surface behind it is the WidgetCard's --card.
     const paperBackground = await chart.locator('[data-slot="card"]').first().evaluate((node) => getComputedStyle(node).backgroundColor)
-    expect(paperBackground).toBe('rgb(238, 230, 212)') // --card light: #eee6d4 (KAN-223 FR4)
+    expect(paperBackground).toBe('rgb(237, 241, 238)') // --card light: #edf1ee (Clair minéral, 2026-11-25)
   })
 })

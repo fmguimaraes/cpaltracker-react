@@ -25,6 +25,7 @@ import {
   visibleDeviceOrder,
 } from './timelineData'
 import { formatTimelineTooltip } from './timelineTooltip'
+import { useBasemap } from '@/ui/map/basemap'
 
 /**
  * KAN-174 (FR10-18, NFR1, NFR3) — the self-contained scrubbable/replayable
@@ -61,7 +62,6 @@ export interface TimelineMapProps {
   onInstantChange?: (instant: number | null) => void
 }
 
-const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 /** Same rule as the kit's `FleetMap`: no tile ever loaded and at least 3 errors. */
 const TILE_ERROR_THRESHOLD = 3
 
@@ -99,6 +99,7 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null, onInstantCha
   useEffect(() => {
     sliderBoxRef.current?.querySelector('[role="slider"]')?.setAttribute('data-testid', 'timeline-slider')
   })
+  const basemap = useBasemap()
   const [tiles, setTiles] = useState({ ok: 0, err: 0 })
   const tileError = tiles.ok === 0 && tiles.err >= TILE_ERROR_THRESHOLD
   const bounds = useMemo(() => computeSliderBounds(rows), [rows])
@@ -223,7 +224,7 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null, onInstantCha
                 aria-hidden
                 className={cn(
                   'absolute -right-1 -bottom-1 flex size-3.5 items-center justify-center rounded-[4px] border border-input shadow-xs',
-                  trailEnabled ? 'border-primary-text bg-primary text-primary-foreground' : 'bg-card',
+                  trailEnabled ? 'border-signal bg-accent text-foreground' : 'bg-card',
                 )}
               >
                 {trailEnabled && <CheckIcon className="size-2.5" />}
@@ -263,8 +264,8 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null, onInstantCha
             className="timeline-map size-full"
           >
             <TileLayer
-              url={TILE_URL}
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url={basemap.url}
+              attribution={basemap.attribution}
               eventHandlers={{
                 tileerror: () => setTiles((t) => ({ ...t, err: t.err + 1 })),
                 tileload: () => setTiles((t) => (t.ok ? t : { ...t, ok: 1 })),

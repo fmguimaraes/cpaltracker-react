@@ -10,6 +10,11 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
+  // Dev server: a test file is not part of the app, but its change still forced a full page reload
+  // (losing UI state such as the selected period). Tests run through vitest's own watcher.
+  server: {
+    watch: { ignored: ['**/*.test.ts', '**/*.test.tsx', '**/e2e/**'] },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

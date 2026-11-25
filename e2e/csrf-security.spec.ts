@@ -64,11 +64,11 @@ test('the login request carries no Cookie header and the issued token is never w
   })
 
   await page.goto('/login')
-  await page.getByLabel('Email').fill('demo@cpal.test')
-  await page.getByLabel('Password').fill('correct-horse-battery-staple')
+  await page.getByLabel('Adresse e-mail').fill('demo@cpal.test')
+  await page.getByLabel('Mot de passe').fill('correct-horse-battery-staple')
   await page.getByTestId('login-submit').click()
 
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/pulse$/)
 
   expect(loginRequests).toHaveLength(1)
   expect(loginRequests[0].cookie).toBeUndefined()

@@ -8,7 +8,7 @@ import { MobileList as KitMobileList } from '@/ui/mobile-list'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/ui/empty'
 import { cn } from '@/lib/utils'
 import { StatusDot, type DeviceStatus } from '@/ui/status'
-import { formatUtcInstant } from '../history/timelineData'
+import { formatAbsolute, formatLocalIso, formatRelative } from '../anomalies/anomalyCard'
 
 /**
  * KAN-159 (FR5, FR6) — renders the device list for an eligible, resolved
@@ -31,7 +31,8 @@ import { formatUtcInstant } from '../history/timelineData'
  * (FR7).
  *
  * KAN-227 (FR10, F-33, F-36): rendered as the reference's PAT-LIST `DataTable`
- * (status dot first, mono id, last-seen with its absolute UTC time in `title`,
+ * (status dot first, mono id, last-seen as local relative + absolute time with the local ISO in `title`
+ * — unified shell, never UTC/ISO on screen —
  * kit virtualization above `VIRTUALIZE_THRESHOLD`, the row testid and the
  * selection accent through `rowProps`, the list testid through
  * `containerProps`) and, below `md`, as the reference `MobileList` (one card
@@ -56,14 +57,20 @@ import { formatUtcInstant } from '../history/timelineData'
  */
 type SelectProps = { selectedChipId?: string; onSelect?: (chipId: string) => void }
 
-function lastSeenLabel(device: Position) {
-  return `Dernière position connue : ${device.timestamp}`
+/**
+ * "il y a 2 h · 10 oct. 08:00" in the browser's time zone (unified shell §1.4); the raw text if
+ * unreadable. Exported so `PilotageDeviceDetail`'s subtitle row reads the same last-seen text, not a
+ * second rendering of the same timestamp.
+ */
+export function lastSeenText(timestamp: string, now: Date): string {
+  const date = new Date(timestamp)
+  return Number.isNaN(date.getTime()) ? timestamp : `${formatRelative(date, now)} · ${formatAbsolute(date, now)}`
 }
 
-/** Absolute last-seen time for the `title`: UTC, as the monolith (`AAAA-MM-JJ HH:MM:SS UTC`). */
-function lastSeenTitle(timestamp: string) {
-  const ms = Date.parse(timestamp)
-  return Number.isNaN(ms) ? timestamp : formatUtcInstant(ms)
+/** Tooltip: the full local ISO timestamp with its offset. */
+export function lastSeenTitle(timestamp: string) {
+  const date = new Date(timestamp)
+  return Number.isNaN(date.getTime()) ? timestamp : formatLocalIso(date)
 }
 
 function SelectButton({ device, selectedChipId, onSelect }: SelectProps & { device: Position }) {
@@ -89,7 +96,8 @@ function LastSeen({ device, className }: { device: Position; className?: string 
       title={lastSeenTitle(device.timestamp)}
       className={cn('text-muted-foreground', className)}
     >
-      {lastSeenLabel(device)}
+      <span className="sr-only">Dernière position connue : </span>
+      {lastSeenText(device.timestamp, new Date())}
     </span>
   )
 }
@@ -215,7 +223,7 @@ export function DeviceList({ devices, selectedChipId, onSelect }: SelectProps & 
   )
 }
 
-function DeviceStatusDot({ device }: { device: Position }) {
+export function DeviceStatusDot({ device }: { device: Position }) {
   const status: DeviceStatus = device.timestamp ? 'ok' : 'offline'
   return <StatusDot status={status} label={device.timestamp ? 'Position connue' : 'Aucune position'} />
 }

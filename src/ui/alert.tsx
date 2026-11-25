@@ -13,7 +13,7 @@ const alertVariants = cva(
         warning: "border-warning/40 bg-warning-soft text-warning",
         danger: "border-danger/40 bg-danger-soft text-danger",
         destructive: "border-danger/40 bg-danger-soft text-danger",
-        /* Brand "note": quote box, inset bg-muted + orange left border (D-brand) */
+        /* Brand "note": quote box, inset bg-muted + cyan left border (D-brand) */
         note: "rounded-l-none border-0 border-l-4 border-l-primary bg-muted text-foreground",
       },
     },

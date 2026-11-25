@@ -7,9 +7,10 @@ import { Calendar } from '@/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover'
 import { ToggleGroup, ToggleGroupItem } from '@/ui/toggle-group'
 
-export type TimePreset = '30m' | '1h' | '6h' | '24h' | '7d' | '30d'
+export type TimePreset = '30m' | '1h' | '6h' | '24h' | '7d' | '15d' | '30d'
 
-export const TIME_PRESETS: { value: TimePreset; label: string; ms: number }[] = [
+/** The picker's own buttons (`15d` is not one of them: it is the shared period control's, see `PERIOD_PRESETS`). */
+export const TIME_PRESETS: { value: Exclude<TimePreset, '15d'>; label: string; ms: number }[] = [
   { value: '30m', label: '30 min', ms: 30 * 60_000 },
   { value: '1h', label: '1 h', ms: 60 * 60_000 },
   { value: '6h', label: '6 h', ms: 6 * 60 * 60_000 },
@@ -36,7 +37,7 @@ export interface TimePickerProps {
 /** Resolves a value to absolute bounds. */
 export function resolveRange(value: TimeRangeValue, now: Date = new Date()): { from: Date; to: Date } {
   if (value.preset === 'custom') return { from: value.from, to: value.to }
-  const ms = TIME_PRESETS.find((p) => p.value === value.preset)!.ms
+  const ms = value.preset === '15d' ? 15 * 24 * 60 * 60_000 : TIME_PRESETS.find((p) => p.value === value.preset)!.ms
   return { from: new Date(now.getTime() - ms), to: now }
 }
 

@@ -82,7 +82,7 @@ test.describe('KAN-227 pilotage', () => {
     await expect(page.getByTestId('pilotage-device-list')).toBeVisible()
   })
 
-  test('AC2 @SI-227-2 devices are kit DataTable rows: testid on the row, selection accent, absolute UTC time in title', async ({
+  test('AC2 @SI-227-2 devices are kit DataTable rows: testid on the row, picking one opens its own page', async ({
     page,
   }) => {
     await mockWorkspace(page)
@@ -91,19 +91,16 @@ test.describe('KAN-227 pilotage', () => {
     const row = page.getByTestId('pilotage-device-CHIP-000')
     await expect(row).toBeVisible()
     expect(await row.evaluate((el) => el.tagName)).toBe('TR')
-    // The first device is selected by default (KAN-163).
-    await expect(row).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByTestId('pilotage-device-CHIP-001')).toHaveAttribute('aria-selected', 'false')
-    await expect(page.getByTestId('pilotage-device-CHIP-000-last-seen')).toHaveText(
-      'Dernière position connue : 2026-10-10T08:00:05Z',
-    )
-    await expect(page.getByTestId('pilotage-device-CHIP-000-last-seen')).toHaveAttribute(
-      'title',
-      '2026-10-10 08:00:05 UTC',
-    )
+    await expect(page.getByTestId('pilotage-device-CHIP-000-last-seen')).toBeVisible()
     await expect(page.getByTestId('pilotage-device-CHIP-001-last-seen')).toHaveCount(0)
+
+    // Picking a device navigates to its own page (replaces the former right drawer).
     await page.getByTestId('pilotage-device-CHIP-001-select').click()
-    await expect(page.getByTestId('pilotage-device-CHIP-001')).toHaveAttribute('aria-selected', 'true')
+    await expect(page).toHaveURL(/\/pilotage\/CHIP-001$/)
+    await expect(page.getByTestId('pilotage-device-title')).toHaveText('CHIP-001')
+    await page.getByTestId('pilotage-device-back').click()
+    await expect(page).toHaveURL(/\/pilotage$/)
+    await expect(page.getByTestId('pilotage-device-list')).toBeVisible()
   })
 
   test('AC3 @SI-227-3 above 50 devices the table is virtualized and still reaches the last row', async ({ page }) => {
@@ -166,6 +163,10 @@ test.describe('KAN-227 pilotage', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await openContract12(page)
 
+    // The transfer form lives on the device's own page now, not inline in the list.
+    await page.getByTestId('pilotage-device-CHIP-000-select').click()
+    await expect(page).toHaveURL(/\/pilotage\/CHIP-000$/)
+
     await page.getByTestId('transfer-field-target').click()
     await page.getByTestId('transfer-target-option-34').click()
     await expect(page.getByTestId('transfer-field-target')).toHaveText(/REF-034-STD/)
@@ -178,7 +179,8 @@ test.describe('KAN-227 pilotage', () => {
     await expect(page.getByTestId('transfer-flash-ok')).toContainText('en cours')
     expect(bodies).toEqual([{ targetContractId: 34, startDate: '2026-06-10T08:30', endDate: null }])
 
-    // History: kit ActivityTimeline item with the ongoing Badge.
+    // History: back on the list page, the session log (kit ActivityTimeline) has the ongoing Badge.
+    await page.getByTestId('pilotage-device-back').click()
     const item = page.getByTestId('transfer-history-row-CHIP-000-0')
     await expect(item).toBeVisible()
     expect(await item.evaluate((el) => el.closest('[data-slot="activity-timeline"]') !== null)).toBe(true)

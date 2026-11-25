@@ -1,9 +1,10 @@
-import { EllipsisVertical, LogOut, Settings, type LucideIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { EllipsisVertical, LogOut, Menu, Settings, type LucideIcon } from 'lucide-react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTheme } from '@/app/theme'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Avatar, AvatarFallback } from '@/ui/avatar'
+import { Button } from '@/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,11 +26,11 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
-  SidebarTrigger,
   useSidebar,
 } from '@/ui/sidebar'
-import { ThemeToggle, type ThemeToggleLabels } from '@/ui/patterns/theme-toggle'
+import { ThemeChoiceControl, type ThemeChoiceLabels } from '@/ui/patterns/theme-toggle'
 import { MOBILE_FRAME_WIDTH, useViewport } from '@/ui/patterns/viewport-toggle'
+import { ShellSlotsContext, type ShellSlots } from '@/ui/patterns/shell-title'
 
 /** One sidebar link. `testId` is rendered as data-testid on the link. */
 export interface ShellNavItem {
@@ -90,11 +91,29 @@ export interface AppShellProps {
   navTestId?: string
   /** aria-label of the sidebar collapse/open button. */
   sidebarTriggerLabel?: string
-  /** Copy of the theme control (partial override of the defaults). */
-  themeLabels?: Partial<ThemeToggleLabels>
+  /** Copy of the user menu's theme choice (partial override of the defaults). */
+  themeLabels?: Partial<ThemeChoiceLabels>
+  /**
+   * Controlled nav state from 768 px: `true` = expanded (~256 px, labels), `false` = the icon rail (56 px,
+   * tooltips). Absent = the kit's own state (expanded by default).
+   */
+  navOpen?: boolean
+  onNavOpenChange?: (open: boolean) => void
 }
 
+/** The icon rail's width (56 px): room for the 32 px icon squares with a 12 px gutter each side. */
+const RAIL_STYLE = { '--sidebar-width-icon': '3.5rem' } as CSSProperties
+
 const MAIN_ID = 'main-content'
+
+/**
+ * Nav row, full bleed (edge to edge, square, h-10). Inactive: --text-secondary, hover --surface-subtle.
+ * Active (spec 2026-11-25): --surface-subtle, --text at 600, and a full-height 3px --signal bar on the left
+ * edge (3.01:1 on the subtle surface in light). The collapsed icon rail keeps the kit's rounded 32px squares.
+ * Focus ring is inset so the scroll container never clips it.
+ */
+const NAV_ITEM_CLASS =
+  'relative h-10 gap-3 rounded-none px-4 focus-visible:ring-inset [&_svg]:size-[18px] group-data-[collapsible=icon]:rounded-md group-data-[collapsible=icon]:[&_svg]:size-4 data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground data-[active=true]:before:absolute data-[active=true]:before:inset-y-0 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:bg-signal group-data-[collapsible=icon]:data-[active=true]:before:hidden'
 
 function isActivePath(pathname: string, to: string) {
   return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
@@ -120,7 +139,7 @@ function SkipLink({ label }: { label: string }) {
   )
 }
 
-function UserMenu({ menu }: { menu: ShellUserMenu }) {
+function UserMenu({ menu, themeLabels }: { menu: ShellUserMenu; themeLabels?: Partial<ThemeChoiceLabels> }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const { withViewport } = useViewport()
   const navigate = useNavigate()
@@ -140,7 +159,16 @@ function UserMenu({ menu }: { menu: ShellUserMenu }) {
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={isMobile ? 'top' : 'right'} align="end" className="w-56">
-        <DropdownMenuLabel>{menu.caption}</DropdownMenuLabel>
+        {/* Pulse layout v2 §3: name + role, the theme (Clair | Sombre | Système), then the account and sign out. */}
+        <DropdownMenuLabel className="flex min-w-0 flex-col" data-testid="user-menu-identity">
+          <span className="truncate">{menu.name}</span>
+          <span className="truncate text-xs font-normal text-muted-foreground">{menu.caption}</span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="flex flex-col gap-1.5 px-2 py-1.5" data-testid="user-menu-theme">
+          <span className="text-xs font-medium text-muted-foreground">{themeLabels?.group ?? 'Thème'}</span>
+          <ThemeChoiceControl labels={themeLabels} />
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to={withViewport(menu.account.to)} data-testid={menu.account.testId} onClick={() => setOpenMobile(false)}>
@@ -166,7 +194,7 @@ function UserMenu({ menu }: { menu: ShellUserMenu }) {
 
 type AppSidebarProps = Pick<
   AppShellProps,
-  'sections' | 'userMenu' | 'logo' | 'clientLogo' | 'sidebarTop' | 'navigationLabel' | 'sidebarTestId' | 'navTestId'
+  'sections' | 'userMenu' | 'logo' | 'clientLogo' | 'sidebarTop' | 'navigationLabel' | 'sidebarTestId' | 'navTestId' | 'themeLabels'
 >
 
 function AppSidebar({
@@ -178,6 +206,7 @@ function AppSidebar({
   navigationLabel,
   sidebarTestId = 'app-sidebar',
   navTestId = 'app-nav',
+  themeLabels,
 }: AppSidebarProps) {
   const { pathname } = useLocation()
   const { withViewport } = useViewport()
@@ -190,7 +219,7 @@ function AppSidebar({
       <SidebarContent data-testid={navTestId}>
         {sidebarTop}
         {sections.map((section) => (
-          <SidebarGroup key={section.title} role="group" aria-label={section.title}>
+          <SidebarGroup key={section.title} role="group" aria-label={section.title} className="px-0 pt-0 group-data-[collapsible=icon]:px-3">
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((item) => {
@@ -201,7 +230,7 @@ function AppSidebar({
                         asChild
                         isActive={active}
                         tooltip={item.label}
-                        className="relative data-[active=true]:before:absolute data-[active=true]:before:inset-y-1 data-[active=true]:before:left-0 data-[active=true]:before:w-0.5 data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary"
+                        className={NAV_ITEM_CLASS}
                       >
                         <Link
                           to={withViewport(item.to)}
@@ -221,12 +250,32 @@ function AppSidebar({
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter>
+      {/* Rail: the avatar (initials) stays at the bottom, centred; a click opens the user menu. */}
+      <SidebarFooter className="group-data-[collapsible=icon]:px-3">
         {clientLogo && <div className="flex justify-center px-1 pb-1 group-data-[collapsible=icon]:hidden">{clientLogo}</div>}
-        <UserMenu menu={userMenu} />
+        <UserMenu menu={userMenu} themeLabels={themeLabels} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  )
+}
+
+/** ☰: toggles the expanded nav and the icon rail (the drawer below 768 px). */
+function NavToggle({ label }: { label: string }) {
+  const { toggleSidebar, open, openMobile, isMobile } = useSidebar()
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={label}
+      title={label}
+      aria-expanded={isMobile ? openMobile : open}
+      onClick={toggleSidebar}
+      data-testid="nav-toggle"
+      data-sidebar="trigger"
+    >
+      <Menu aria-hidden />
+    </Button>
   )
 }
 
@@ -267,14 +316,23 @@ export function AppShell({
   navigationLabel = 'Navigation principale',
   sidebarTestId,
   navTestId,
-  sidebarTriggerLabel = 'Réduire ou ouvrir le menu',
+  sidebarTriggerLabel = 'Réduire ou déplier le menu',
   themeLabels,
+  navOpen,
+  onNavOpenChange,
 }: AppShellProps) {
   const { mode, isFrame } = useViewport()
   const isMobile = useIsMobile()
   const framed = mode === 'mobile' && !isFrame && !isMobile
+  const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null)
+  const [refreshSlot, setRefreshSlot] = useState<HTMLElement | null>(null)
+  const slots = useMemo<ShellSlots>(
+    () => ({ title: titleSlot, actions: actionsSlot, refresh: refreshSlot }),
+    [titleSlot, actionsSlot, refreshSlot],
+  )
   return (
-    <SidebarProvider>
+    <SidebarProvider open={navOpen} onOpenChange={onNavOpenChange} style={RAIL_STYLE}>
       <SkipLink label={skipToContentLabel} />
       <AppSidebar
         sections={sections}
@@ -285,27 +343,36 @@ export function AppShell({
         navigationLabel={navigationLabel}
         sidebarTestId={sidebarTestId}
         navTestId={navTestId}
+        themeLabels={themeLabels}
       />
       <SidebarInset
         id={MAIN_ID}
         tabIndex={-1}
         className="min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
+        {/*
+          The context bar, one row on every page: ☰, the page's breadcrumb (left, shrinks first), its global
+          controls, then last update + refresh (right). The theme lives in the user menu (Pulse layout v2 §3). Pages fill the three slots
+          through ShellPageTitle / ShellPageActions / ShellPageRefresh. z-20 + the pages' isolated map
+          stacking context keep this bar's popovers and menus above the Leaflet panes (z 400–1000).
+        */}
         <div className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background pl-3 pr-4 md:pr-6" data-testid="shell-toolbar">
-          <SidebarTrigger aria-label={sidebarTriggerLabel} />
-          {!isFrame && (
-            <>
-              <div className="ml-auto flex items-center gap-2">
-                <ThemeToggle labels={themeLabels} />
-              </div>
-            </>
-          )}
+          <NavToggle label={sidebarTriggerLabel} />
+          <div ref={setTitleSlot} data-testid="shell-title" className="flex min-w-0 flex-1 items-center gap-3 text-sm" />
+          <div
+            ref={setActionsSlot}
+            data-testid="shell-actions"
+            className="flex min-w-0 shrink items-center gap-2 overflow-x-auto empty:hidden max-md:no-scrollbar"
+          />
+          <div ref={setRefreshSlot} data-testid="shell-refresh-slot" className="flex shrink-0 items-center empty:hidden" />
         </div>
         {framed ? (
           <MobileFrame />
         ) : (
           <div className="min-w-0 flex-1">
-            <Outlet />
+            <ShellSlotsContext.Provider value={slots}>
+              <Outlet />
+            </ShellSlotsContext.Provider>
           </div>
         )}
       </SidebarInset>

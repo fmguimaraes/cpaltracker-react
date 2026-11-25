@@ -5,20 +5,20 @@ import { Slot } from "radix-ui"
 import { Spinner } from "@/ui/spinner"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-busy:disabled:opacity-100 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-signal-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-busy:disabled:opacity-100 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-primary font-semibold text-primary-foreground hover:bg-primary/90",
         outline:
-          "border-input bg-transparent text-foreground shadow-xs hover:bg-muted aria-expanded:bg-muted",
+          "border-border bg-transparent text-foreground hover:bg-muted aria-expanded:bg-muted",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-accent aria-expanded:bg-accent",
         ghost:
           "text-foreground hover:bg-muted aria-expanded:bg-muted",
         destructive:
           "bg-destructive text-status-foreground hover:bg-destructive/90 focus-visible:border-destructive",
-        link: "h-auto rounded-sm px-0.5 text-foreground underline underline-offset-4 hover:text-muted-foreground",
+        link: "h-auto rounded-sm px-0.5 text-primary-text underline underline-offset-4 hover:text-foreground",
       },
       size: {
         default:

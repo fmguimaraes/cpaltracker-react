@@ -12,10 +12,11 @@ type SearchInputProps = Omit<React.ComponentProps<"input">, "type" | "value" | "
 }
 
 /** Bordered search field: leading icon, clear button when filled, Escape clears. */
-function SearchInput({ value, onValueChange, label = "Search", className, placeholder = "Search…", onKeyDown, ...props }: SearchInputProps) {
+function SearchInput({ value, onValueChange, label = "Rechercher", className, placeholder = "Rechercher…", onKeyDown, ...props }: SearchInputProps) {
   return (
     <InputGroup className={cn("max-w-sm", className)} data-slot="search-input">
-      <InputGroupAddon>
+      {/* pr-1: 10 px between the icon and the text/caret (the group's 6 px left the caret against the icon). */}
+      <InputGroupAddon className="pr-1">
         <SearchIcon aria-hidden="true" />
       </InputGroupAddon>
       <InputGroupInput
@@ -37,7 +38,7 @@ function SearchInput({ value, onValueChange, label = "Search", className, placeh
       />
       {value && (
         <InputGroupAddon align="inline-end">
-          <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => onValueChange("")}>
+          <InputGroupButton size="icon-xs" aria-label="Effacer la recherche" onClick={() => onValueChange("")}>
             <XIcon aria-hidden="true" />
           </InputGroupButton>
         </InputGroupAddon>

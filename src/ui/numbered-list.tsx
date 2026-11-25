@@ -6,13 +6,13 @@ export interface NumberedItem {
   description?: React.ReactNode
 }
 
-/** DAT-LIST (brand numbered list): big orange Georgia number, bold title, description, separators. */
+/** DAT-LIST (brand numbered list): big cyan Montserrat ExtraBold number, bold title, description, separators. */
 function NumberedList({ items, className }: { items: NumberedItem[]; className?: string }) {
   return (
     <ol data-slot="numbered-list" className={cn("flex flex-col divide-y divide-border", className)}>
       {items.map((it, i) => (
         <li key={it.title} className="flex gap-4 py-4 first:pt-0 last:pb-0">
-          <span aria-hidden className="w-10 shrink-0 font-serif text-4xl leading-none text-primary-text tabular-nums">
+          <span aria-hidden className="w-10 shrink-0 font-display font-extrabold text-4xl leading-none text-primary-text tabular-nums">
             {i + 1}
           </span>
           <div className="min-w-0">

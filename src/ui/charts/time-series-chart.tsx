@@ -34,8 +34,8 @@ export function TimeSeriesChart({ series, threshold, unit = '°C', label, classN
     ? [
         { type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: threshold.max, y1: hi, fillcolor: t.danger, opacity: 0.14, line: { width: 0 }, layer: 'below' },
         { type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: lo, y1: threshold.min, fillcolor: t.danger, opacity: 0.14, line: { width: 0 }, layer: 'below' },
-        { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: threshold.max, y1: threshold.max, line: { color: t.warning, width: 1, dash: 'dot' } },
-        { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: threshold.min, y1: threshold.min, line: { color: t.warning, width: 1, dash: 'dot' } },
+        { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: threshold.max, y1: threshold.max, line: { color: t.danger, width: 1, dash: 'dash' } },
+        { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: threshold.min, y1: threshold.min, line: { color: t.danger, width: 1, dash: 'dash' } },
       ]
     : []
   if (cursor != null) {

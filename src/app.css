@@ -49,6 +49,17 @@
 }
 
 /*
+ * Pulse anomalies drawer (owner redesign 2026-11-25): from 768 px the expanded drawer is
+ * clamp(320px, 22vw, 400px) wide — 320 px at 1366 px, 400 px at 2560 px. Collapsed, the drawer uses
+ * the spacing scale (`md:w-12`, 48 px) instead of this class. Below 768 px the page stacks.
+ */
+@media (min-width: 768px) {
+  .pulse-drawer-width {
+    width: clamp(320px, 22vw, 400px);
+  }
+}
+
+/*
  * KAN-252 — Plotly's rangeslider drag (`plotly.js`'s `components/dragelement`) appends a
  * transient full-viewport `.dragcover` div straight onto `<body>` for the duration of a drag, to
  * keep receiving mousemove/mouseup even once the cursor leaves the handle. Radix `Dialog`

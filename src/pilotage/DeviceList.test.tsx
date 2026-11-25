@@ -84,8 +84,11 @@ describe('DeviceList (KAN-159 FR5, FR6)', () => {
     render(<DeviceList devices={[device]} />)
 
     const lastSeen = screen.getByTestId('pilotage-device-CHIP-001-last-seen')
-    expect(lastSeen).toHaveTextContent('Dernière position connue : 2026-10-10T08:00:05Z')
-    expect(lastSeen.textContent).not.toMatch(/calibration/i)
+    // Local relative + absolute time (unified shell §1.4); never the raw UTC/ISO text on screen.
+    expect(lastSeen).toHaveTextContent(/^Dernière position connue : il y a .+ · 10 oct\.( 2026)? \d{2}:\d{2}$/)
+    expect(lastSeen.textContent).not.toMatch(/2026-10-10|UTC|calibration/i)
+    // The exact instant, with the browser's offset, is the tooltip.
+    expect(lastSeen.getAttribute('title')).toMatch(/^2026-10-10T\d{2}:00:05[+-]\d{2}:\d{2}$/)
   })
 
   it('omits the last-known position line for a device with no timestamp, rather than showing a blank', () => {

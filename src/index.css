@@ -4,13 +4,21 @@
 @import 'leaflet/dist/leaflet.css';
 @import './styles/tokens.css';
 
-/* Dark is the default theme (D7); the `dark:` variant follows data-theme, never a class */
+/* Montserrat (the charter's typeface), self-hosted: same-origin font files, CSP unchanged.
+   Weights used by the kit: 400 text, 500 labels, 600 titles, 700 headings, 800 key numbers */
+@import '@fontsource/montserrat/400.css';
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
+@import '@fontsource/montserrat/800.css';
+
+/* The theme follows the OS by default (D7, 2026-11-25); the `dark:` variant follows data-theme, never a class */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /* Token → Tailwind utility mapping. No values here: every value lives in styles/tokens.css */
 @theme inline {
   --font-sans: var(--font-sans);
-  --font-serif: var(--font-serif);
+  --font-display: var(--font-display);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
 
@@ -25,6 +33,11 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-text: var(--primary-text);
   --color-primary-soft: var(--primary-soft);
+  --color-signal: var(--signal);
+  --color-on-signal: var(--on-signal);
+  --color-signal-ring: var(--signal-ring);
+  --color-brand: var(--brand);
+  --color-faint: var(--faint);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -39,6 +52,7 @@
 
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
+  --color-danger-mark: var(--danger-mark);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
   --color-success: var(--success);
@@ -57,6 +71,18 @@
   --color-chart-axis: var(--chart-axis);
   --color-chart-grid: var(--chart-grid);
 
+  --color-map-water: var(--map-water);
+  --color-map-land: var(--map-land);
+  --color-map-road: var(--map-road);
+
+  --color-load-1: var(--load-1);
+  --color-load-2: var(--load-2);
+  --color-load-3: var(--load-3);
+  --color-load-4: var(--load-4);
+  --color-load-5: var(--load-5);
+
+  --spacing-page: var(--page-height);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -69,7 +95,7 @@
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-xl: calc(var(--radius) * 1.25); /* 10 px: popovers, menus, cards */
   --radius-2xl: calc(var(--radius) * 1.8);
 
   --shadow-overlay: var(--shadow-overlay);
@@ -85,6 +111,8 @@
   }
   body {
     @apply bg-background text-body antialiased;
+    /* Tabular figures everywhere: numbers in tables, cards and charts line up */
+    font-feature-settings: 'tnum';
   }
   h1, h2, h3, h4 {
     @apply text-foreground;
@@ -101,8 +129,8 @@
 .leaflet-tile-pane {
   filter: var(--map-tile-filter);
 }
-/* OSM attribution (required, kept visible): Leaflet's default is #0078A8 on 80 % white over the tiles
-   (3.2:1). An opaque card backdrop makes the text independent of whatever tile is underneath */
+/* Basemap attribution (OpenStreetMap, required, kept visible): Leaflet's default is #0078A8 on 80 % white over
+   the tiles (3.2:1). An opaque card backdrop makes the text independent of whatever tile is underneath */
 .leaflet-container .leaflet-control-attribution {
   @apply bg-card text-body;
 }
@@ -110,7 +138,7 @@
   @apply text-primary-text;
 }
 
-/* Media frame (map): dark in both themes until light tiles paint over it, so focus uses its own ring */
+/* Media frame (map): map-land under the tiles; focus uses its own ring token */
 .bg-media {
   --ring: var(--ring-media);
 }
@@ -119,7 +147,7 @@
   outline-offset: -2px;
 }
 
-/* Muted text fails on the orange tint (4.15 to 4.41:1): inside the primary soft fill it reads as body */
+/* Muted text has no margin on the primary tint: inside the primary soft fill it reads as body */
 .bg-primary-soft {
   --muted-foreground: var(--body);
 }

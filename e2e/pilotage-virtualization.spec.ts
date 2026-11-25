@@ -110,11 +110,12 @@ for (const theme of ['dark', 'light'] as const) {
       await expect(page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}`)).toHaveCount(0)
       await shot(page, `pilotage-virtualized-${theme}-1440`)
 
-      // Selection: the first device is selected by default, picking another moves the accent.
-      await expect(page.getByTestId(`pilotage-device-${chipId(0)}`)).toHaveAttribute('aria-selected', 'true')
+      // Picking a device navigates to its own page (replaces the former in-place selection/drawer).
       await page.getByTestId(`pilotage-device-${chipId(5)}-select`).click()
-      await expect(page.getByTestId(`pilotage-device-${chipId(5)}`)).toHaveAttribute('aria-selected', 'true')
-      await expect(page.getByTestId(`pilotage-device-${chipId(0)}`)).toHaveAttribute('aria-selected', 'false')
+      await expect(page).toHaveURL(new RegExp(`/pilotage/${chipId(5)}$`))
+      await expect(page.getByTestId('pilotage-device-title')).toHaveText(chipId(5))
+      await page.getByTestId('pilotage-device-back').click()
+      await expect(page).toHaveURL(/\/pilotage$/)
 
       // Scroll the table's own container in steps and sample frame times while it moves.
       const smoothness = await page.locator(scroller).evaluate(async (el) => {
@@ -164,11 +165,9 @@ for (const theme of ['dark', 'light'] as const) {
       await expect(page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}`)).toBeVisible()
       expect(await page.locator(rowSelector).count()).toBeLessThan(100)
 
-      // The earlier selection survives scrolling away and back.
       await page.locator(scroller).evaluate((el) => {
         el.scrollTop = 0
       })
-      await expect(page.getByTestId(`pilotage-device-${chipId(5)}`)).toHaveAttribute('aria-selected', 'true')
 
       // Sorting: "Device" descending puts the last id first, ascending puts the first id back.
       const header = page.getByRole('columnheader', { name: /Device/ })
@@ -204,10 +203,6 @@ for (const theme of ['dark', 'light'] as const) {
       expect(initial).toBeLessThan(60)
       await expect(page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}`)).toHaveCount(0)
       await shot(page, `pilotage-virtualized-${theme}-390`)
-
-      // Selection works on a card.
-      await page.getByTestId(`pilotage-device-${chipId(2)}-select`).click()
-      await expect(page.getByTestId(`pilotage-device-${chipId(2)}-select`)).toHaveAttribute('aria-pressed', 'true')
 
       // Scroll the page (whichever ancestor scrolls) in steps to the end of the list, sampling the
       // mounted-card count on the way: it stays bounded, the last device is reached by scrolling.
@@ -247,9 +242,10 @@ for (const theme of ['dark', 'light'] as const) {
       await expect(page.getByTestId(`pilotage-device-${chipId(0)}`)).toHaveCount(0)
       await shot(page, `pilotage-virtualized-end-${theme}-390`)
 
-      // Selecting the last device works; the earlier selection moves (one device selected).
+      // Picking the last (visible) device navigates to its own page.
       await page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}-select`).click()
-      await expect(page.getByTestId(`pilotage-device-${chipId(DEVICE_COUNT - 1)}-select`)).toHaveAttribute('aria-pressed', 'true')
+      await expect(page).toHaveURL(new RegExp(`/pilotage/${chipId(DEVICE_COUNT - 1)}$`))
+      await expect(page.getByTestId('pilotage-device-title')).toHaveText(chipId(DEVICE_COUNT - 1))
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
       expect(overflow).toBeLessThanOrEqual(0)

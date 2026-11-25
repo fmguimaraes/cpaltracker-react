@@ -39,9 +39,11 @@ export function DonutChart({ slices, centerLabel, label, className }: Props) {
     margin: { l: 8, r: 8, t: 8, b: 8 },
     showlegend: true,
     legend: { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.05, font: { color: t.foreground, family: t.fontSans } },
+    // Number anchored by its bottom, label by its top, around the hole's centre: they never overlap,
+    // whatever the chart height or the display font's glyph height.
     annotations: [
-      { text: String(total), x: 0.5, y: 0.54, xref: 'paper', yref: 'paper', showarrow: false, font: { family: t.fontSerif, size: 34, color: t.foreground } },
-      { text: centerLabel, x: 0.5, y: 0.42, xref: 'paper', yref: 'paper', showarrow: false, font: { family: t.fontSans, size: 12, color: t.axis } },
+      { text: String(total), x: 0.5, y: 0.49, yanchor: 'bottom', xref: 'paper', yref: 'paper', showarrow: false, font: { family: t.fontDisplay, weight: 800, size: 34, color: t.foreground } },
+      { text: centerLabel, x: 0.5, y: 0.47, yanchor: 'top', xref: 'paper', yref: 'paper', showarrow: false, font: { family: t.fontSans, size: 12, color: t.axis } },
     ],
   }
   return <Plot label={label} className={className ?? 'h-72 w-full'} data={data} layout={layout} />

@@ -11,8 +11,18 @@ vi.mock('react-plotly.js/factory', () => ({ default: () => () => <div data-testi
 // stand-in renders one `.leaflet-marker-icon` per device handed to the kit map
 // (the real markers/clusters are covered by e2e/live-tracking.spec.ts).
 vi.mock('@/ui/map', () => ({
-  FleetMap: ({ devices, labels }: { devices: Array<{ id: string; name: string; status: string }>; labels: { region: string } }) => (
-    <div role="region" aria-label={labels.region}>
+  FleetMap: ({ devices, labels, emptyFit, trails }: {
+    devices: Array<{ id: string; name: string; status: string }>
+    labels: { region: string }
+    emptyFit?: Array<[number, number]>
+    trails?: Array<{ id: string }>
+  }) => (
+    <div
+      role="region"
+      aria-label={labels.region}
+      data-empty-fit={emptyFit ? JSON.stringify(emptyFit) : 'none'}
+      data-trails={trails ? trails.map((t) => t.id).join(',') : 'none'}
+    >
       {devices.map((d) => (
         <span key={d.id} className="leaflet-marker-icon" data-marker-id={d.id} title={`${d.id} – ${d.name} (${d.status})`} />
       ))}
@@ -108,6 +118,24 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     render(<ContractPositions contractId={12} />)
 
     await waitFor(() => expect(screen.getByTestId('positions-empty')).toBeInTheDocument())
+    // Live Tracking (no `keepMapWhenEmpty`): the empty block replaces the map.
+    expect(screen.queryByRole('region', { name: 'Carte de la flotte' })).not.toBeInTheDocument()
+  })
+
+  it('with `keepMapWhenEmpty`, an empty contract keeps the map (default centre) with the notice on it', async () => {
+    stubFetch(new Response(JSON.stringify({ positions: [] }), { status: 200 }))
+
+    render(<ContractPositions contractId={12} keepMapWhenEmpty />)
+
+    const notice = await screen.findByTestId('positions-empty')
+    expect(notice).toHaveTextContent('Aucune position disponible pour ce contrat.')
+    expect(notice).toHaveAttribute('data-overlay', 'map')
+    expect(notice).toHaveAttribute('role', 'status')
+    const map = screen.getByRole('region', { name: 'Carte de la flotte' })
+    expect(screen.getByTestId('live-split')).toContainElement(notice)
+    // Nothing to frame on: the kit keeps its default centre.
+    expect(map).toHaveAttribute('data-empty-fit', '[]')
+    expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(0)
   })
 
   it('with a period, hides devices whose latest report is outside it and shows a French empty message when none remain', async () => {
@@ -139,6 +167,58 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     expect(screen.getByTestId('positions-period-empty')).toHaveTextContent(
       "Aucun appareil n'a émis de position sur cette période.",
     )
+    expect(screen.getByTestId('positions-period-empty')).not.toHaveAttribute('data-overlay')
+    expect(screen.queryByRole('region', { name: 'Carte de la flotte' })).not.toBeInTheDocument()
+  })
+
+  it('with `keepMapWhenEmpty`, an empty period keeps the map, framed on the last known positions, with the notice on it', async () => {
+    const recent = new Date(Date.now() - 60 * 60_000).toISOString()
+    stubFetch(
+      new Response(
+        JSON.stringify({
+          positions: [
+            { ...onePosition, chipId: 'CHIP-NEW', timestamp: recent },
+            { ...onePosition, chipId: 'CHIP-OLD', timestamp: '2020-01-01T00:00:00Z', latitude: 45.76, longitude: 4.83 },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+    const empty = { preset: 'custom' as const, from: new Date('2019-01-01'), to: new Date('2019-01-02') }
+
+    const { rerender } = render(<ContractPositions contractId={12} period={{ preset: '24h' }} keepMapWhenEmpty />)
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
+    expect(screen.queryByTestId('positions-period-empty')).not.toBeInTheDocument()
+
+    rerender(<ContractPositions contractId={12} period={empty} keepMapWhenEmpty />)
+    const notice = screen.getByTestId('positions-period-empty')
+    expect(notice).toHaveTextContent("Aucun appareil n'a émis de position sur cette période.")
+    expect(notice).toHaveAttribute('data-overlay', 'map')
+    const map = screen.getByRole('region', { name: 'Carte de la flotte' })
+    expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(0)
+    // Every last known position of the contract, whatever the period: the kit's fallback frame.
+    expect(JSON.parse(map.getAttribute('data-empty-fit')!)).toEqual([
+      [48.8566, 2.3522],
+      [45.76, 4.83],
+    ])
+    // The refresh stays available.
+    expect(screen.getByTestId('positions-refresh')).toBeInTheDocument()
+
+    // Something drawn (e.g. a playback instant) hides the notice.
+    rerender(<ContractPositions contractId={12} period={empty} keepMapWhenEmpty mapPositions={[{ ...onePosition, lot: null }]} />)
+    expect(screen.queryByTestId('positions-period-empty')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1)
+  })
+
+  it('passes `trails` to the map only when given (Live Tracking draws none)', async () => {
+    stubFetch(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+    const { rerender } = render(<ContractPositions contractId={12} />)
+    const map = await screen.findByRole('region', { name: 'Carte de la flotte' })
+    expect(map).toHaveAttribute('data-trails', 'none')
+    expect(map).toHaveAttribute('data-empty-fit', 'none')
+
+    rerender(<ContractPositions contractId={12} trails={[{ id: 'CHIP-001', points: [[48, 2], [48.8, 2.3]] }]} />)
+    expect(screen.getByRole('region', { name: 'Carte de la flotte' })).toHaveAttribute('data-trails', 'CHIP-001')
   })
 
   it('shows a generic error on a service failure, never raw backend text', async () => {

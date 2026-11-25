@@ -32,7 +32,7 @@ function HealthGrid<D extends StatusDevice = StatusDevice>({
                     aria-label={`${d.id}, ${d.name}, ${labels[d.status]}`}
                     onClick={() => onSelect?.(d)}
                     className={cn(
-                      "flex size-7 items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
+                      "flex size-7 items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-signal-ring",
                       statusTone[d.status].text,
                     )}
                   >

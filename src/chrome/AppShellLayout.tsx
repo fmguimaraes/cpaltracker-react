@@ -1,12 +1,9 @@
-import { Activity, Clock, Home, MapPin, SlidersHorizontal, TrendingUp } from 'lucide-react'
+import { Activity, SlidersHorizontal, TrendingUp } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
   CHANGE_PASSWORD_PATH,
   DEVICE_PILOTAGE_PATH,
-  HISTORY_DASHBOARD_PATH,
-  HOME_PATH,
-  LIVE_TRACKING_PATH,
   PULSE_PATH,
   TRENDS_PATH,
 } from '../auth/paths'
@@ -15,34 +12,23 @@ import { AppShell, type ShellNavSection } from '@/ui/patterns/app-shell'
 import { ContractProvider } from '../contracts/ContractContext'
 import { ContractSelect } from '../contracts/ContractSelect'
 import { CpalBrandMark } from './CpalBrandMark'
+import { RailMark } from '@/ui/patterns/rail-mark'
 import { ShellClientLogo } from './ShellClientLogo'
+import { useNavState } from './navState'
 
 /** Labels are kept exactly as the app showed them before the shell (no translation). */
 const SECTIONS: ShellNavSection[] = [
   {
     title: 'Navigation',
     items: [
-      { to: HOME_PATH, label: 'Accueil', icon: Home, testId: 'nav-home' },
       { to: PULSE_PATH, label: 'Pulse', icon: Activity, testId: 'nav-pulse' },
-      {
-        to: LIVE_TRACKING_PATH,
-        label: 'Suivi en direct',
-        icon: MapPin,
-        testId: 'nav-live-tracking',
-      },
-      {
-        to: HISTORY_DASHBOARD_PATH,
-        label: 'Historique',
-        icon: Clock,
-        testId: 'nav-history',
-      },
+      { to: TRENDS_PATH, label: 'Tendances', icon: TrendingUp, testId: 'nav-trends' },
       {
         to: DEVICE_PILOTAGE_PATH,
         label: 'Pilotage',
         icon: SlidersHorizontal,
         testId: 'nav-pilotage',
       },
-      { to: TRENDS_PATH, label: 'Tendances', icon: TrendingUp, testId: 'nav-trends' },
     ],
   },
 ]
@@ -64,6 +50,8 @@ export function AppShellLayout() {
   const name = `${prenom} ${nom}`.trim() || mail
   const isMobile = useIsMobile()
   const [loggingOut, setLoggingOut] = useState(false)
+  // ☰: expanded nav or icon rail (rail by default on the map pages); the user's choice is remembered.
+  const [navOpen, setNavOpen] = useNavState()
 
   /**
    * Guard against a double POST (KAN-156 review): the entry is disabled while the logout is in
@@ -102,11 +90,9 @@ export function AppShellLayout() {
         sections={SECTIONS}
         logo={
           isMobile ? null : (
-            <div className="flex items-center gap-2">
+            <div className="flex w-full items-center justify-center">
               <CpalBrandMark />
-              <span className="text-sm font-bold tracking-tight text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
-                c-PAL Tracker
-              </span>
+              <RailMark data-testid="cpal-rail-mark" />
             </div>
           )
         }
@@ -129,13 +115,11 @@ export function AppShellLayout() {
             testId: 'logout-button',
           },
         }}
+        navOpen={navOpen}
+        onNavOpenChange={setNavOpen}
         skipToContentLabel="Aller au contenu"
         navigationLabel="Navigation principale"
-        themeLabels={{
-          group: 'Thème',
-          toLight: 'Passer au thème clair',
-          toDark: 'Passer au thème sombre',
-        }}
+        themeLabels={{ group: 'Thème', light: 'Clair', dark: 'Sombre', system: 'Système' }}
       />
     </ContractProvider>
   )

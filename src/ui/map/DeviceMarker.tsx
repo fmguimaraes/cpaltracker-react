@@ -7,13 +7,17 @@ import { deviceIcon } from './markers'
 interface DeviceMarkerProps {
   device: MapDevice
   selected: boolean
+  /** Optional hover cue from outside the map (e.g. a list row); off by default. */
+  highlighted?: boolean
   onSelect?: (id: string) => void
   labels: MapLabels
+  /** Optional compact style (see `deviceIcon`); hovering raises it above its neighbours so its label stays readable. */
+  compact?: boolean
 }
 
-/** Marker options are read once by the cluster group; carry the status on them (typed). */
-function statusOptions(status: MapDevice['status']): L.MarkerOptions {
-  return { status } as L.MarkerOptions
+/** Marker options are read once by the cluster group; carry the status (and the id, to find a marker) on them. */
+function statusOptions(status: MapDevice['status'], id: string, load?: MapDevice['load']): L.MarkerOptions {
+  return { status, deviceId: id, load } as L.MarkerOptions
 }
 
 function syncPressed(marker: L.Marker | null, selected: boolean, id: string) {
@@ -24,7 +28,7 @@ function syncPressed(marker: L.Marker | null, selected: boolean, id: string) {
 }
 
 /** Select via mouse, Enter or Space; mirrors selection to aria-pressed. */
-export function DeviceMarker({ device, selected, onSelect, labels }: DeviceMarkerProps) {
+export function DeviceMarker({ device, selected, highlighted = false, onSelect, labels, compact = false }: DeviceMarkerProps) {
   const ref = useRef<L.Marker | null>(null)
   // runs after Marker's own effect, so it sees the element created by setIcon
   useEffect(() => syncPressed(ref.current, selected, device.id))
@@ -32,10 +36,11 @@ export function DeviceMarker({ device, selected, onSelect, labels }: DeviceMarke
     <Marker
       ref={ref}
       // status in the key: marker options are read once, so a state change remounts the marker
-      key={`${device.id}:${device.status}:${device.series ?? ''}`}
+      key={`${device.id}:${device.status}:${device.series ?? ''}:${device.load ?? ''}`}
       position={[device.lat, device.lng]}
-      icon={deviceIcon(device, selected, labels.status[device.status])}
-      zIndexOffset={selected ? 1000 : 0}
+      icon={deviceIcon(device, selected, labels.status[device.status], highlighted, compact)}
+      riseOnHover={compact}
+      zIndexOffset={selected || highlighted ? 1000 : 0}
       title={`${device.id} – ${device.name} (${labels.status[device.status]})`}
       eventHandlers={{
         click: () => onSelect?.(device.id),
@@ -48,7 +53,7 @@ export function DeviceMarker({ device, selected, onSelect, labels }: DeviceMarke
           }
         },
       }}
-      {...statusOptions(device.status)}
+      {...statusOptions(device.status, device.id, device.load)}
     />
   )
 }

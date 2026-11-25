@@ -47,7 +47,9 @@ describe('TransferHistory (KAN-169 FR18, CB29)', () => {
       />,
     )
 
-    expect(screen.getByTestId('transfer-history-row-CHIP-001-0')).toHaveTextContent('2026-07-01')
+    // French local days, never the API's ISO text (unified shell §1.4).
+    expect(screen.getByTestId('transfer-history-row-CHIP-001-0')).toHaveTextContent('10 juin 2026 – 1 juil. 2026')
+    expect(screen.getByTestId('transfer-history-row-CHIP-001-0')).not.toHaveTextContent('2026-07-01')
     expect(
       screen.queryByTestId('transfer-history-row-CHIP-001-0-ongoing'),
     ).not.toBeInTheDocument()

@@ -1,6 +1,9 @@
 import { Moon, Sun } from 'lucide-react'
-import { useTheme } from '@/app/theme'
+import { useTheme, type ThemeChoice } from '@/app/theme'
 import { Button } from '@/ui/button'
+import { ToggleGroup, ToggleGroupItem } from '@/ui/toggle-group'
+import { SELECTED_TOGGLE } from '@/ui/patterns/period-control'
+import { cn } from '@/lib/utils'
 
 /** Copy of the theme control; the app overrides it to keep the language of its pages. */
 export interface ThemeToggleLabels {
@@ -19,9 +22,9 @@ export const DEFAULT_THEME_LABELS: ThemeToggleLabels = {
 }
 
 /**
- * Global theme control. The main button (data-testid="theme-toggle") flips the resolved theme
- * light <-> dark in a single click (and stores that explicit choice). It is the only theme control:
- * there is no "system" button (a stored "system" value still resolves through the provider).
+ * One-click theme flip (data-testid="theme-toggle"): flips the resolved theme light <-> dark and stores that
+ * explicit choice. No longer in the app shell's top bar (Pulse layout v2: the theme lives in the user menu,
+ * `ThemeChoiceControl`); kept for pages outside the shell.
  * `labels` overrides the aria-labels (partial).
  */
 export function ThemeToggle({ labels }: { labels?: Partial<ThemeToggleLabels> }) {
@@ -41,5 +44,50 @@ export function ThemeToggle({ labels }: { labels?: Partial<ThemeToggleLabels> })
         {resolved === 'dark' ? <Sun /> : <Moon />}
       </Button>
     </div>
+  )
+}
+
+/** Copy of the 3-way theme choice of the user menu. */
+export interface ThemeChoiceLabels {
+  group: string
+  light: string
+  dark: string
+  system: string
+}
+
+export const DEFAULT_THEME_CHOICE_LABELS: ThemeChoiceLabels = {
+  group: 'Thème',
+  light: 'Clair',
+  dark: 'Sombre',
+  system: 'Système',
+}
+
+const THEME_CHOICES: ThemeChoice[] = ['light', 'dark', 'system']
+
+/**
+ * The user menu's theme control (Pulse layout v2 §3): a segmented Clair | Sombre | Système, the stored
+ * choice selected (default Système, which follows the OS). Items: `theme-light`, `theme-dark`, `theme-system`.
+ */
+export function ThemeChoiceControl({ labels, className }: { labels?: Partial<ThemeChoiceLabels>; className?: string }) {
+  const { theme, setTheme } = useTheme()
+  const l = { ...DEFAULT_THEME_CHOICE_LABELS, ...labels }
+  return (
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      spacing={0}
+      value={theme}
+      onValueChange={(next) => next && setTheme(next as ThemeChoice)}
+      aria-label={l.group}
+      data-testid="theme-choice"
+      className={cn('w-full', className)}
+    >
+      {THEME_CHOICES.map((choice) => (
+        <ToggleGroupItem key={choice} value={choice} className={cn('flex-1', SELECTED_TOGGLE)} data-testid={`theme-${choice}`}>
+          {l[choice]}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   )
 }

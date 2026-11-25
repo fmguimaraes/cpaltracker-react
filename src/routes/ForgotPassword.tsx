@@ -95,7 +95,11 @@ export function ForgotPassword() {
               {FORGOT_PASSWORD_MESSAGES[outcome]}
             </AlertDescription>
           </Alert>
-          <AuthLink to={LOGIN_PATH} data-testid="forgot-password-back-to-login">
+          <AuthLink
+            to={LOGIN_PATH}
+            className="self-center text-sm text-muted-foreground"
+            data-testid="forgot-password-back-to-login"
+          >
             Retour à la connexion
           </AuthLink>
         </div>
@@ -105,7 +109,7 @@ export function ForgotPassword() {
 
   return (
     <AuthLayout {...layoutProps}>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 py-6">
         <p className="text-sm text-muted-foreground">
           Saisissez votre adresse e-mail et nous vous enverrons un lien de
           réinitialisation.
@@ -132,7 +136,9 @@ export function ForgotPassword() {
               }}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Adresse e-mail</FormLabel>
+                  <FormLabel className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Adresse e-mail
+                  </FormLabel>
                   <FormControl>
                     <Input
                       {...field}
@@ -161,6 +167,7 @@ export function ForgotPassword() {
 
             <AuthLink
               to={LOGIN_PATH}
+              className="self-center text-sm text-muted-foreground"
               data-testid="forgot-password-back-to-login"
             >
               Retour à la connexion

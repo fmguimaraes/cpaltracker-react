@@ -17,15 +17,15 @@ describe('DocumentTitle', () => {
     document.title = ''
   })
   it('names a known route', () => {
-    expect(titleAt('/login')).toBe('Sign in · cpaltracker-react')
+    expect(titleAt('/login')).toBe('Sign in · cPal')
   })
   it('ignores a trailing slash', () => {
-    expect(titleAt('/login/')).toBe('Sign in · cpaltracker-react')
+    expect(titleAt('/login/')).toBe('Sign in · cPal')
   })
   it('uses the bare app name at the root', () => {
-    expect(titleAt('/')).toBe('cpaltracker-react')
+    expect(titleAt('/')).toBe('cPal')
   })
   it('titles an unknown path as the 404', () => {
-    expect(titleAt('/nope')).toBe('404 — Page not found · cpaltracker-react')
+    expect(titleAt('/nope')).toBe('404 — Page not found · cPal')
   })
 })

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -75,12 +75,12 @@ function stubEnv(
   )
 }
 
-function renderShell(opts: Parameters<typeof stubEnv>[0] = {}) {
+function renderShell(opts: Parameters<typeof stubEnv>[0] & { path?: string } = {}) {
   stubEnv(opts)
   return render(
     <ThemeProvider>
       <TooltipProvider>
-        <MemoryRouter initialEntries={['/live-tracking']}>
+        <MemoryRouter initialEntries={[opts.path ?? '/live-tracking']}>
           <AuthProvider>
             <Routes>
               <Route element={<AppShellLayout />}>
@@ -88,6 +88,7 @@ function renderShell(opts: Parameters<typeof stubEnv>[0] = {}) {
                   path="/live-tracking"
                   element={<div data-testid="page-content">page content</div>}
                 />
+                <Route path="/pilotage" element={<div data-testid="page-content">pilotage</div>} />
               </Route>
             </Routes>
           </AuthProvider>
@@ -108,22 +109,19 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders sidebar, brand mark, the four nav links with the existing labels, and the routed page', async () => {
+  it('renders sidebar, brand mark, the nav links (Pulse, Tendances, Pilotage), and the routed page', async () => {
     renderShell()
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('cpal-brand-mark')).toBeInTheDocument()
     expect(screen.getByTestId('app-nav')).toBeInTheDocument()
-    expect(screen.getByTestId('nav-home')).toHaveTextContent('Accueil')
-    expect(screen.getByTestId('nav-live-tracking')).toHaveTextContent(
-      'Suivi en direct',
-    )
-    expect(screen.getByTestId('nav-history')).toHaveTextContent('Historique')
+    // No "Accueil" item: "/" redirects to Pulse, the landing page
+    expect(screen.queryByTestId('nav-home')).not.toBeInTheDocument()
+    // Suivi en direct and Historique are no longer in the menu (owner 2026-11-25); their routes remain.
+    expect(screen.queryByTestId('nav-live-tracking')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('nav-history')).not.toBeInTheDocument()
     expect(screen.getByTestId('nav-pilotage')).toHaveTextContent('Pilotage')
+    expect(screen.getByTestId('nav-trends')).toHaveTextContent('Tendances')
     expect(screen.getByTestId('nav-pulse')).toHaveTextContent('Pulse')
-    expect(screen.getByTestId('nav-live-tracking')).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
     expect(screen.getByTestId('page-content')).toHaveTextContent('page content')
     expect(screen.getAllByRole('main')).toHaveLength(1)
   })
@@ -135,13 +133,26 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
     )
   })
 
-  it('flips the theme in a single click and has no system button', async () => {
+  it('the theme is a Clair | Sombre | Système choice in the user menu (default Système), not in the top bar', async () => {
     const user = userEvent.setup()
     renderShell()
+    expect(within(await screen.findByTestId('shell-toolbar')).queryByTestId('theme-toggle')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('theme-toggle')).not.toBeInTheDocument()
+    await user.click(await screen.findByTestId('user-menu'))
+    // Name, then the role.
+    expect(await screen.findByTestId('user-menu-identity')).toHaveTextContent(/Demo.*Client$/)
+    const choice = screen.getByTestId('theme-choice')
+    expect(within(choice).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Clair', 'Sombre', 'Système'])
+    expect(screen.getByTestId('theme-system')).toHaveAttribute('data-state', 'on')
+    // The selection reads as in every segmented control of the app: the primary fill.
+    expect(screen.getByTestId('theme-system')).toHaveClass('data-[state=on]:bg-primary', 'data-[state=on]:text-primary-foreground')
+    await user.click(screen.getByTestId('theme-dark'))
     expect(document.documentElement.dataset.theme).toBe('dark')
-    await user.click(screen.getByTestId('theme-toggle'))
+    expect(localStorage.getItem('cpaltracker:theme')).toBe('dark')
+    expect(screen.getByTestId('theme-dark')).toHaveAttribute('data-state', 'on')
+    await user.click(screen.getByTestId('theme-light'))
     expect(document.documentElement.dataset.theme).toBe('light')
-    expect(screen.queryByTestId('theme-system')).not.toBeInTheDocument()
+    expect(localStorage.getItem('cpaltracker:theme')).toBe('light')
   })
 
   it('exposes sign out (logout-button) in the user menu', async () => {
@@ -201,6 +212,37 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
   it('below 768 px renders the brand mark once, outside the closed drawer', async () => {
     renderShell({ mobile: true })
     expect(await screen.findAllByTestId('cpal-brand-mark')).toHaveLength(1)
-    expect(screen.queryByTestId('nav-history')).toBeNull()
+    expect(screen.queryByTestId('nav-pulse')).toBeNull()
+  })
+  it('nav: rail by default on a map page, expanded elsewhere; ☰ toggles it and the choice is remembered', async () => {
+    const user = userEvent.setup()
+    const { unmount } = renderShell({ path: '/live-tracking' })
+    const sidebarState = () => document.querySelector('[data-slot="sidebar"][data-state]')?.getAttribute('data-state')
+    const toggle = screen.getByTestId('nav-toggle')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(sidebarState()).toBe('collapsed')
+    // The avatar menu stays reachable in the rail, at the bottom.
+    expect(screen.getByTestId('user-menu')).toBeInTheDocument()
+
+    await user.click(toggle)
+    expect(screen.getByTestId('nav-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(sidebarState()).toBe('expanded')
+    expect(localStorage.getItem('cpal.shell.nav')).toBe('expanded')
+    unmount()
+
+    // The choice now overrides the map page default…
+    renderShell({ path: '/live-tracking' })
+    expect(screen.getByTestId('nav-toggle')).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('nav: a non-map page opens expanded; folding it to the rail is remembered', async () => {
+    const user = userEvent.setup()
+    const { unmount } = renderShell({ path: '/pilotage' })
+    expect(screen.getByTestId('nav-toggle')).toHaveAttribute('aria-expanded', 'true')
+    await user.click(screen.getByTestId('nav-toggle'))
+    expect(localStorage.getItem('cpal.shell.nav')).toBe('rail')
+    unmount()
+    renderShell({ path: '/pilotage' })
+    expect(screen.getByTestId('nav-toggle')).toHaveAttribute('aria-expanded', 'false')
   })
 })

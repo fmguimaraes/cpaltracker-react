@@ -23,9 +23,9 @@ test('renders a labeled, keyboard-accessible login form at /login (FR1, NFR5)', 
 }) => {
   await page.goto('/login')
 
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-  await expect(page.getByLabel('Email')).toBeVisible()
-  await expect(page.getByLabel('Password')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
+  await expect(page.getByLabel('Adresse e-mail')).toBeVisible()
+  await expect(page.getByLabel('Mot de passe')).toBeVisible()
   await expect(page.getByTestId('login-submit')).toBeVisible()
 })
 
@@ -37,10 +37,10 @@ test('blocks submission and shows inline errors when email/password are empty (F
   await page.getByTestId('login-submit').click()
 
   await expect(page.getByTestId('login-email-error')).toHaveText(
-    'Email is required.',
+    'Adresse e-mail requise.',
   )
   await expect(page.getByTestId('login-password-error')).toHaveText(
-    'Password is required.',
+    'Mot de passe requis.',
   )
   // still on the login screen — no request was issued, no navigation occurred
   await expect(page).toHaveURL(/\/login$/)
@@ -66,8 +66,8 @@ test('shows the mapped generic rejection message, never the raw backend body, on
   )
 
   await page.goto('/login')
-  await page.getByLabel('Email').fill('demo@cpal.test')
-  await page.getByLabel('Password').fill('wrong-password')
+  await page.getByLabel('Adresse e-mail').fill('demo@cpal.test')
+  await page.getByLabel('Mot de passe').fill('wrong-password')
   await page.getByTestId('login-submit').click()
 
   const errorNode = page.getByTestId('login-error')
@@ -94,8 +94,8 @@ test('shows the neutral per-IP throttle message on a 429 rate_limited response, 
   )
 
   await page.goto('/login')
-  await page.getByLabel('Email').fill('demo@cpal.test')
-  await page.getByLabel('Password').fill('anything')
+  await page.getByLabel('Adresse e-mail').fill('demo@cpal.test')
+  await page.getByLabel('Mot de passe').fill('anything')
   await page.getByTestId('login-submit').click()
 
   const errorNode = page.getByTestId('login-error')
@@ -125,8 +125,8 @@ test('shows the service-unavailable message on a 503 (DB outage) response (FR7)'
   )
 
   await page.goto('/login')
-  await page.getByLabel('Email').fill('demo@cpal.test')
-  await page.getByLabel('Password').fill('anything')
+  await page.getByLabel('Adresse e-mail').fill('demo@cpal.test')
+  await page.getByLabel('Mot de passe').fill('anything')
   await page.getByTestId('login-submit').click()
 
   await expect(page.getByTestId('login-error')).toHaveText(

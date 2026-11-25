@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Alert } from '@/ui/alert'
-import { PageHeader } from '@/ui/patterns/page-header'
-import { TimePicker, type TimeRangeValue } from '@/ui/patterns/time-picker'
+import { PeriodControl, type PeriodPreset } from '@/ui/patterns/period-control'
+import { ShellBreadcrumb } from '@/ui/patterns/shell-breadcrumb'
+import { ShellPageActions, ShellPageTitle } from '@/ui/patterns/shell-title'
+import { resolveRange, type TimeRangeValue } from '@/ui/patterns/time-picker'
 import { useContracts } from '../contracts/ContractContext'
 import { HistoryAccessGate } from '../history/HistoryAccessGate'
 import { validateDateRangeInputs } from '../history/dateRange'
@@ -45,15 +47,23 @@ type ReadyState = Extract<DefaultDateRangeState, { status: 'ready' }>
  * param-driven deep link into an inaccessible contract behaves identically
  * to clicking an inaccessible one in the selector).
  */
+/**
+ * @deprecated Unified shell 2026-11-25: Pulse now carries this page's features (period statistics and lot
+ * attach history in the pallet drawer, replay on the map). Kept, with its nav entry, until its removal is
+ * confirmed.
+ */
 export function HistoryDashboard() {
   // Operator decision 2026-10-29: the contract list/selection is global (`ContractProvider`, picker in the
   // sidebar; `?contrat_id=` deep links and the remembered default are handled there).
   const { contracts, loadState, selectedId, accessError, rejectContract } = useContracts()
   const [timeRangeError, setTimeRangeError] = useState<string | null>(null)
+  // The applied range is day-granular (always "custom" for the API): remember which shared preset produced it.
+  const [preset, setPreset] = useState<PeriodPreset | null>(null)
 
   // A new contract starts without the previous contract's period error.
   useEffect(() => {
     setTimeRangeError(null)
+    setPreset(null)
   }, [selectedId])
 
   // FR25/NFR5: the provider clears the selection and the remembered value, and exposes the same
@@ -122,29 +132,39 @@ export function HistoryDashboard() {
 
   return (
     <div className="flex flex-col" data-testid="history-page">
-      <PageHeader
-        // Operator decision 2026-10-29: no visible title — the row holds the contract Select and the
-        // TimePicker; the h1 stays for assistive tech and document structure (sr-only, out of the flex flow).
-        title="Historique"
-        className="[&_h1]:sr-only"
-        chips={renderHeaderFilters()}
-        actions={
-          state?.status === 'ready' ? (
-            <TimePicker
-              value={timePickerValueFromDays(state.start, state.end)}
-              onChange={(value) => applyTimePickerValue(state, value)}
+      {/* Unified shell: the title is the top bar's breadcrumb (no H1 band); device filter and period are its
+          global controls. The h1 stays for assistive tech and document structure. */}
+      <h1 className="sr-only">Historique</h1>
+      <ShellPageTitle>
+        <ShellBreadcrumb levels={[{ label: 'Historique' }]} />
+      </ShellPageTitle>
+      <ShellPageActions>
+        <div className="flex items-center gap-2" data-testid="history-header">
+          {renderHeaderFilters()}
+          {state?.status === 'ready' && (
+            <PeriodControl
+              preset={preset}
+              range={resolveRange(timePickerValueFromDays(state.start, state.end))}
+              onPreset={(next) => {
+                setPreset(next)
+                applyTimePickerValue(state, { preset: next })
+              }}
+              onCustom={(from, to) => {
+                setPreset(null)
+                applyTimePickerValue(state, { preset: 'custom', from, to })
+              }}
+              testId="time"
             />
-          ) : undefined
-        }
-      >
+          )}
+        </div>
+      </ShellPageActions>
+
+      <div className="flex flex-col gap-4 p-4 md:p-6">
         {state?.status === 'ready' && timeRangeError && (
           <Alert variant="danger" data-testid="history-time-range-error">
             {timeRangeError}
           </Alert>
         )}
-      </PageHeader>
-
-      <div className="flex flex-col gap-4 p-4 md:p-6">
         {renderContractSection()}
         {selectedId !== null && (
           <HistoryAccessGate

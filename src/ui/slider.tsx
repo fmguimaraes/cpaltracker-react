@@ -13,6 +13,7 @@ function Slider({
   "aria-labelledby": ariaLabelledby,
   "aria-describedby": ariaDescribedby,
   "aria-invalid": ariaInvalid,
+  "aria-valuetext": ariaValuetext,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
   const _values = React.useMemo(
@@ -44,7 +45,7 @@ function Slider({
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className="absolute bg-primary select-none data-horizontal:h-full data-vertical:w-full"
+          className="absolute bg-signal select-none data-horizontal:h-full data-vertical:w-full"
         />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
@@ -56,7 +57,8 @@ function Slider({
           aria-labelledby={ariaLabelledby}
           aria-describedby={ariaDescribedby}
           aria-invalid={ariaInvalid}
-          className="block size-4 shrink-0 rounded-full border-2 border-primary-text bg-background shadow-sm ring-ring/50 transition-[color,box-shadow] select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+          aria-valuetext={ariaValuetext}
+          className="block size-4 shrink-0 rounded-full border-2 border-signal bg-background shadow-sm ring-signal-ring transition-[color,box-shadow] select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
         />
       ))}
     </SliderPrimitive.Root>

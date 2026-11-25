@@ -2,7 +2,7 @@ import { ArrowDownIcon, ArrowUpIcon, MinusIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
- * DAT-STAT: Georgia big number, unit, label, trend arrow + % vs previous.
+ * DAT-STAT: Montserrat ExtraBold big number, unit, label, trend arrow + % vs previous.
  * `goodDirection` says which way is good (fewer excursions = "down"), so the trend is colored by
  * outcome, not by sign. Direction is also carried by the arrow and the screen-reader text.
  */
@@ -26,7 +26,7 @@ function Stat({
   change?: number | null
   goodDirection?: "up" | "down"
   comparison?: string
-  /** Orange key number (use for the one key figure of a view). */
+  /** Cyan key number (use for the one key figure of a view). */
   accent?: boolean
   className?: string
   /** Hide the visible label text while keeping it available to assistive tech via aria-label. */
@@ -48,7 +48,7 @@ function Stat({
       {!hideLabel && <p className="truncate text-sm text-muted-foreground">{label}</p>}
       <span
         className={cn(
-          "font-serif text-4xl leading-none tabular-nums",
+          "font-display font-extrabold text-4xl leading-none tabular-nums",
           accent ? "text-primary-text" : "text-foreground",
           valueClassName,
         )}

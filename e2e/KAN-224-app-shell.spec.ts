@@ -47,7 +47,8 @@ test.describe('KAN-224 app shell', () => {
   test('AC2 @SI-224-2 nav labels are unchanged and the active item has aria-current', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/live-tracking')
-    await expect(page.getByTestId('nav-home')).toHaveText('Accueil')
+    // No "Accueil" item: "/" redirects to Pulse, the landing page
+    await expect(page.getByTestId('nav-home')).toHaveCount(0)
     await expect(page.getByTestId('nav-live-tracking')).toHaveText('Suivi en direct')
     await expect(page.getByTestId('nav-history')).toHaveText('Historique')
     await expect(page.getByTestId('nav-pilotage')).toHaveText('Pilotage')
@@ -75,12 +76,12 @@ test.describe('KAN-224 app shell', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/live-tracking')
     const html = page.locator('html')
-    // Dark is the default choice (D7).
-    await expect(html).toHaveAttribute('data-theme', 'dark')
-    await page.getByTestId('theme-toggle').click()
+    // The default follows the OS (D7, 2026-11-25): light here.
     await expect(html).toHaveAttribute('data-theme', 'light')
     await page.getByTestId('theme-toggle').click()
     await expect(html).toHaveAttribute('data-theme', 'dark')
+    await page.getByTestId('theme-toggle').click()
+    await expect(html).toHaveAttribute('data-theme', 'light')
     // No "system" button: the toggle is the only theme control.
     await expect(page.getByTestId('theme-system')).toHaveCount(0)
   })

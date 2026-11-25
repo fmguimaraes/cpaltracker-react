@@ -85,10 +85,10 @@ describe("Login", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    expect(screen.getByLabelText("Email")).toBeVisible();
-    expect(screen.getByLabelText("Password")).toBeVisible();
+    expect(screen.getByLabelText("Adresse e-mail")).toBeVisible();
+    expect(screen.getByLabelText("Mot de passe")).toBeVisible();
     expect(screen.getByTestId("login-submit")).toBeVisible();
-    expect(screen.getByLabelText("Password")).toHaveAttribute(
+    expect(screen.getByLabelText("Mot de passe")).toHaveAttribute(
       "type",
       "password",
     );
@@ -108,10 +108,10 @@ describe("Login", () => {
     await user.click(screen.getByTestId("login-submit"));
 
     expect(await screen.findByTestId("login-email-error")).toHaveTextContent(
-      "Email is required.",
+      "Adresse e-mail requise.",
     );
     expect(screen.getByTestId("login-password-error")).toHaveTextContent(
-      "Password is required.",
+      "Mot de passe requis.",
     );
     // no additional request beyond the bootstrap call was issued
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -142,8 +142,8 @@ describe("Login", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    await user.type(screen.getByLabelText("Email"), "demo@cpal.test");
-    await user.type(screen.getByLabelText("Password"), "correct-horse");
+    await user.type(screen.getByLabelText("Adresse e-mail"), "demo@cpal.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "correct-horse");
     await user.click(screen.getByTestId("login-submit"));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -179,8 +179,8 @@ describe("Login", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    await user.type(screen.getByLabelText("Email"), "demo@cpal.test");
-    await user.type(screen.getByLabelText("Password"), "wrong-password");
+    await user.type(screen.getByLabelText("Adresse e-mail"), "demo@cpal.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "wrong-password");
     await user.click(screen.getByTestId("login-submit"));
 
     // KAN-155: the mapped French copy, not the raw backend message — this
@@ -222,8 +222,8 @@ describe("Login", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    await user.type(screen.getByLabelText("Email"), "demo@cpal.test");
-    await user.type(screen.getByLabelText("Password"), "wrong-password");
+    await user.type(screen.getByLabelText("Adresse e-mail"), "demo@cpal.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "wrong-password");
     await user.click(screen.getByTestId("login-submit"));
 
     const errorNode = await screen.findByTestId("login-error");
@@ -250,8 +250,8 @@ describe("Login", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    await user.type(screen.getByLabelText("Email"), "demo@cpal.test");
-    await user.type(screen.getByLabelText("Password"), "anything");
+    await user.type(screen.getByLabelText("Adresse e-mail"), "demo@cpal.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "anything");
     await user.click(screen.getByTestId("login-submit"));
 
     const errorNode = await screen.findByTestId("login-error");
@@ -284,8 +284,8 @@ describe("Login", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    await user.type(screen.getByLabelText("Email"), "demo@cpal.test");
-    await user.type(screen.getByLabelText("Password"), "anything");
+    await user.type(screen.getByLabelText("Adresse e-mail"), "demo@cpal.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "anything");
     await user.click(screen.getByTestId("login-submit"));
 
     expect(await screen.findByTestId("login-error")).toHaveTextContent(
@@ -337,10 +337,10 @@ describe("Login", () => {
     // userEvent.type with {skipClick:false} + a spaces-padded value defeats
     // the browser's own type="email" value trimming, so this exercises
     // setValueAs specifically rather than relying on input sanitization.
-    const emailInput = screen.getByLabelText("Email") as HTMLInputElement;
+    const emailInput = screen.getByLabelText("Adresse e-mail") as HTMLInputElement;
     await user.click(emailInput);
     await user.paste("  demo@cpal.test  ");
-    await user.type(screen.getByLabelText("Password"), "correct-horse");
+    await user.type(screen.getByLabelText("Mot de passe"), "correct-horse");
     await user.click(screen.getByTestId("login-submit"));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -377,8 +377,8 @@ describe("Login", () => {
     renderLogin({ withStatusProbe: true });
 
     // submit login before the bootstrap /account.php call has resolved
-    await user.type(screen.getByLabelText("Email"), "demo@cpal.test");
-    await user.type(screen.getByLabelText("Password"), "wrong-password");
+    await user.type(screen.getByLabelText("Adresse e-mail"), "demo@cpal.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "wrong-password");
     await user.click(screen.getByTestId("login-submit"));
 
     expect(await screen.findByTestId("login-error")).toHaveTextContent(
@@ -422,8 +422,8 @@ describe("Login", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    await user.type(screen.getByLabelText("Email"), "demo@cpal.test");
-    await user.type(screen.getByLabelText("Password"), "correct-horse");
+    await user.type(screen.getByLabelText("Adresse e-mail"), "demo@cpal.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "correct-horse");
     await user.click(screen.getByTestId("login-submit"));
 
     await waitFor(() =>

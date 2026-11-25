@@ -85,7 +85,7 @@ test.describe('KAN-223 theme before first paint', () => {
     expect(await page.locator('script:not([src])').count()).toBe(0)
   })
 
-  test('AC2 @SI-223-2 without a stored choice the default dark theme is applied before React mounts', async ({
+  test('AC2 @SI-223-2 without a stored choice the OS theme is applied before React mounts', async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -100,12 +100,14 @@ test.describe('KAN-223 theme before first paint', () => {
       })
       observer.observe(document, { childList: true, subtree: true })
     })
+    // The default follows the OS (D7, 2026-11-25). index.html ships data-theme="dark", so the OS asks for light:
+    // "light" at mount can only come from theme-init.js resolving "system".
     await page.emulateMedia({ colorScheme: 'light' })
     await page.goto('/live-tracking')
     await expect(page.getByTestId('app-sidebar')).toBeVisible()
     const atReactMount = await page.evaluate(
       () => (window as unknown as { __themeProbe: { atReactMount: string | null } }).__themeProbe.atReactMount,
     )
-    expect(atReactMount).toBe('dark')
+    expect(atReactMount).toBe('light')
   })
 })

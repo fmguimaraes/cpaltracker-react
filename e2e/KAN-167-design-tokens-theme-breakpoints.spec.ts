@@ -45,7 +45,7 @@ test('switches every color token to its dark-theme value via one data-theme chan
       const styles = getComputedStyle(document.documentElement)
       return {
         bg: styles.getPropertyValue('--background').trim(),
-        primary: styles.getPropertyValue('--primary').trim(),
+        card: styles.getPropertyValue('--card').trim(),
         primaryText: styles.getPropertyValue('--primary-text').trim(),
       }
     })
@@ -58,7 +58,9 @@ test('switches every color token to its dark-theme value via one data-theme chan
 
   await expect.poll(async () => (await readTokens()).bg).not.toBe(lightTokens.bg)
   const darkTokens = await readTokens()
-  expect(darkTokens.primary).not.toBe(lightTokens.primary)
+  // The cyan fill (--primary) is the same in both themes by design (blue charter); surfaces and the
+  // text cyan are what the theme switch changes.
+  expect(darkTokens.card).not.toBe(lightTokens.card)
   expect(darkTokens.primaryText).not.toBe(lightTokens.primaryText)
 })
 

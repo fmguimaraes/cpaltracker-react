@@ -49,7 +49,7 @@ function BreadcrumbLink({
   return (
     <Comp
       data-slot="breadcrumb-link"
-      className={cn("underline underline-offset-4 transition-colors hover:text-foreground", className)}
+      className={cn("text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground", className)}
       {...props}
     />
   )
@@ -62,7 +62,7 @@ function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
       role="link"
       aria-disabled="true"
       aria-current="page"
-      className={cn("font-normal text-foreground", className)}
+      className={cn("font-semibold text-foreground", className)}
       {...props}
     />
   )
@@ -78,7 +78,7 @@ function BreadcrumbSeparator({
       data-slot="breadcrumb-separator"
       role="presentation"
       aria-hidden="true"
-      className={cn("[&>svg]:size-3.5", className)}
+      className={cn("text-faint [&>svg]:size-3.5", className)}
       {...props}
     >
       {children ?? (

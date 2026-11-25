@@ -15,7 +15,14 @@ export interface MapDevice {
    * When set, the marker carries a swatch: --chart-1..5 colour, shape changes per cycle (K-7).
    */
   series?: number
+  /**
+   * Optional remaining-load level, 1 (empty) … 5 (full load). When set, the marker's ring and dot use the
+   * --load-1..5 ramp instead of the state colours (the state stays in the title and screen-reader text).
+   */
+  load?: MapLoadLevel
 }
+
+export type MapLoadLevel = 1 | 2 | 3 | 4 | 5
 
 /** Human labels of the four states (kept in sync with the status vocabulary). */
 export const MAP_STATUS_LABEL: Record<MapDeviceStatus, string> = {
@@ -23,6 +30,20 @@ export const MAP_STATUS_LABEL: Record<MapDeviceStatus, string> = {
   warning: 'Warning',
   alert: 'Alert',
   offline: 'Not reporting',
+}
+
+/** The map's visible bounds, in degrees (reported by `FleetMap`'s `onViewportChange`). */
+export interface MapViewport {
+  north: number
+  south: number
+  east: number
+  west: number
+}
+
+/** A path already travelled by one device (`[lat, lng]` points, oldest first), drawn under the markers. */
+export interface MapTrail {
+  id: string
+  points: Array<[number, number]>
 }
 
 /** One point of a recorded track (K-8). `t` is an ISO timestamp. */

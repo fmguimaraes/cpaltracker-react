@@ -19,6 +19,8 @@ export interface AnomalyRow {
   label: string
   threshold: number | null
   value: number | null
+  /** value − threshold, signed, computed server-side; null for a geofence or a missing value. */
+  excess: number | null
   unit: string
   eventDate: string
   detectedAt: string
@@ -26,6 +28,7 @@ export interface AnomalyRow {
   lot: AnomalyLot | null
 }
 
+/** A status change, or a comment saved without one (`from` = `to`, see `isCommentEntry`). */
 export interface AnomalyHistoryEntry {
   at: string
   from: AnomalyStatus
@@ -47,6 +50,7 @@ export interface AnomalyDetail extends Omit<AnomalyRow, 'status'> {
   position: { lat: number; lng: number } | null
   referencePoint: { lat: number; lng: number } | null
   status: AnomalyStatus
+  /** The last status change (comment-only entries excluded). */
   lastChange: { at: string; by: AnomalyHistoryEntry['by'] } | null
   history: AnomalyHistoryEntry[]
   /** Computed by the server only (KAN-263): what this user may do now, and why nothing when empty. */
@@ -77,4 +81,17 @@ export function postAnomalyTransition(
     contractId,
     ...input,
   })
+}
+
+/** True for a history entry that is a comment saved without a status change. */
+export function isCommentEntry(entry: AnomalyHistoryEntry): boolean {
+  return entry.from === entry.to
+}
+
+/** `POST /api/v1/anomalies/comment.php/{anomalyKey}?contractId=`: saves a comment, status unchanged; 201 = updated detail. */
+export function postAnomalyComment(contractId: number, anomalyKey: string, comment: string): Promise<AnomalyDetail> {
+  return apiClient.post<AnomalyDetail>(
+    `/anomalies/comment.php/${encodeURIComponent(anomalyKey)}?contractId=${contractId}`,
+    { comment },
+  )
 }

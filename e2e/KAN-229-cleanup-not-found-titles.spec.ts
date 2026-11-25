@@ -54,15 +54,15 @@ test.describe('KAN-229 cleanup', () => {
   test('AC3 @SI-229-3 document.title names a known route, each in its own language', async ({ page }) => {
     await mockSignedIn(page)
     await page.goto('/live-tracking')
-    await expect(page).toHaveTitle('Suivi en direct · cpaltracker-react')
+    await expect(page).toHaveTitle('Suivi en direct · cPal')
     await page.goto('/history')
-    await expect(page).toHaveTitle('Historique · cpaltracker-react')
+    await expect(page).toHaveTitle('Historique · cPal')
   })
 
   test('AC4 @SI-229-4 document.title on an unknown route is the 404 title', async ({ page }) => {
     await mockSignedIn(page)
     await page.goto('/no-such-page')
-    await expect(page).toHaveTitle('404 — Page not found · cpaltracker-react')
+    await expect(page).toHaveTitle('404 — Page not found · cPal')
   })
 
   test('AC5 @SI-229-5 auth-loading shows a spinner while the session resolves', async ({ page }) => {

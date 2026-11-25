@@ -39,6 +39,11 @@ export const HISTORY_DASHBOARD_PATH = '/history'
  */
 export const DEVICE_PILOTAGE_PATH = '/pilotage'
 
+/** One device's own information page, replacing the KAN-227 drawer — a child route of `DEVICE_PILOTAGE_PATH`. */
+export function devicePilotagePath(chipId: string): string {
+  return `${DEVICE_PILOTAGE_PATH}/${encodeURIComponent(chipId)}`
+}
+
 /** KAN-272 — Pulse: Live Tracking plus each device's lot (route `routes/Pulse.tsx`). */
 export const PULSE_PATH = '/pulse'
 /** KAN-256 — Trends (risk quadrant + lot table). */

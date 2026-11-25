@@ -35,7 +35,7 @@ test('redirects an anonymous visit to the protected home route to /login, preser
   await page.goto('/')
 
   await expect(page).toHaveURL(/\/login\?suite=%2F$/)
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
 })
 
 test('redirects an already-authenticated visit to /login away to home (FR2)', async ({
@@ -51,8 +51,9 @@ test('redirects an already-authenticated visit to /login away to home (FR2)', as
 
   await page.goto('/login')
 
-  await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('heading', { name: 'cpaltracker-react' })).toBeVisible()
+  // "/" redirects to the landing page, Pulse
+  await expect(page).toHaveURL(/\/pulse$/)
+  await expect(page.getByTestId('nav-pulse')).toHaveAttribute('aria-current', 'page')
 })
 
 test('ignores a dot-segment open-redirect suite value and lands on home with no page error (FR3, review gate KAN-149 round 2)', async ({
@@ -71,8 +72,9 @@ test('ignores a dot-segment open-redirect suite value and lands on home with no 
 
   await page.goto('/login?suite=' + encodeURIComponent('/.//evil.example.com/phish'))
 
-  await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('heading', { name: 'cpaltracker-react' })).toBeVisible()
+  // "/" redirects to the landing page, Pulse
+  await expect(page).toHaveURL(/\/pulse$/)
+  await expect(page.getByTestId('nav-pulse')).toHaveAttribute('aria-current', 'page')
   expect(pageErrors).toHaveLength(0)
 })
 

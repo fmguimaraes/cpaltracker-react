@@ -1,75 +1,48 @@
 import { describe, expect, it } from 'vitest'
 import type { Position } from '../api/positions'
-import { formatPositionTooltip } from './positionTooltip'
+import { formatPlace, formatPositionCard } from './positionTooltip'
 
 const basePosition: Position = {
   contractId: 12,
   chipId: 'CHIP-001',
-  timestamp: '2026-10-10T08:00:05Z',
-  latitude: 48.8566,
-  longitude: 2.3522,
-  ambientTemperature: 19.1,
+  timestamp: '2026-11-15T11:00:00Z',
+  latitude: 49.5,
+  longitude: 3,
+  ambientTemperature: 22,
   humidity: 55,
-  mass: 420,
+  mass: 9000,
   mpuTemperature: 21.5,
-  accelG: 1.02,
+  accelG: 1,
 }
 
-describe('formatPositionTooltip (KAN-160 FR7)', () => {
-  it('formats the date explicitly as UTC', () => {
-    const fields = formatPositionTooltip(basePosition)
-    expect(fields.find((f) => f.label === 'Date')?.value).toBe('10/10/2026 08:00 UTC')
+const NOW = new Date('2026-11-24T12:00:00Z')
+
+describe('formatPositionCard (KAN-160 FR7, Pulse layout v2 §4)', () => {
+  it('titles the card with the chip ID; local time with the relative age, never UTC', () => {
+    const card = formatPositionCard(basePosition, NOW)
+    expect(card.title).toBe('CHIP-001')
+    expect(card.when).toMatch(/^15\snov\.\s\d{2}:00 · il\sy\sa\s9\sj$/)
+    expect(card.when).not.toMatch(/UTC|2026-/)
   })
 
-  it('formats position as "latitude, longitude"', () => {
-    const fields = formatPositionTooltip(basePosition)
-    expect(fields.find((f) => f.label === 'Position')?.value).toBe('48.8566, 2.3522')
+  it('shows the position with 4 decimals in fr-FR', () => {
+    expect(formatPositionCard(basePosition, NOW).place).toBe('49,5000, 3,0000')
+    expect(formatPlace(48.85661, 2.35222)).toBe('48,8566, 2,3522')
   })
 
-  it('renders every numeric field with its unit', () => {
-    const fields = formatPositionTooltip(basePosition)
-    expect(fields.find((f) => f.label === 'Température ambiante')?.value).toBe('19.1 °C')
-    expect(fields.find((f) => f.label === 'Humidité')?.value).toBe('55 %')
-    expect(fields.find((f) => f.label === 'Masse')?.value).toBe('420 kg')
-    expect(fields.find((f) => f.label === 'Accélération')?.value).toBe('1.02 g')
-    expect(fields.find((f) => f.label === 'Température MPU')?.value).toBe('21.5 °C')
+  it('lays the four readings out as fr-FR measures, without the MPU temperature', () => {
+    const { metrics } = formatPositionCard(basePosition, NOW)
+    expect(metrics.map((m) => m.key)).toEqual(['temperature', 'humidity', 'acceleration', 'weight'])
+    expect(metrics.map((m) => m.value.replace(/\s/g, ' '))).toEqual(['22 °C', '55 %HR', '1 g', '9 000 kg'])
+    expect(JSON.stringify(metrics)).not.toMatch(/MPU|21,5/)
   })
 
-  it('renders every field as a non-empty, never-null string, even when every value is null', () => {
-    const empty: Position = {
-      contractId: 12,
-      chipId: 'CHIP-002',
-      timestamp: null,
-      latitude: null,
-      longitude: null,
-      ambientTemperature: null,
-      humidity: null,
-      mass: null,
-      mpuTemperature: null,
-      accelG: null,
-    }
-    const fields = formatPositionTooltip(empty)
-    expect(fields).toHaveLength(7)
-    for (const field of fields) {
-      expect(typeof field.value).toBe('string')
-      expect(field.value.length).toBeGreaterThan(0)
-    }
-  })
-
-  it('never produces an unparseable-date crash, falling back to a placeholder', () => {
-    const fields = formatPositionTooltip({ ...basePosition, timestamp: 'not-a-date' })
-    expect(fields.find((f) => f.label === 'Date')?.value).toBe('Inconnu(e)')
-  })
-
-  it('appends the lot lines only when the position carries a lot (KAN-272)', () => {
-    expect(formatPositionTooltip(basePosition).some((f) => f.label === 'Lot client')).toBe(false)
-    const withLot: Position = {
-      ...basePosition,
-      lot: { cpalLot: 'LOT-A', custLotNumber: 'L-001', productName: 'Doliprane', expiryDate: '2027-05-31', status: 'created' },
-    }
-    const fields = formatPositionTooltip(withLot)
-    expect(fields.find((f) => f.label === 'Lot client')?.value).toBe('L-001')
-    expect(fields.find((f) => f.label === 'Produit')?.value).toBe('Doliprane')
-    expect(fields.find((f) => f.label === 'Péremption')?.value).toBe('2027-05-31')
+  it('leaves out every line without data', () => {
+    const card = formatPositionCard(
+      { ...basePosition, timestamp: null, latitude: null, longitude: null, ambientTemperature: null, humidity: null, mass: null, accelG: null },
+      NOW,
+    )
+    expect(card).toEqual({ title: 'CHIP-001', when: null, place: null, metrics: [] })
+    expect(formatPositionCard({ ...basePosition, timestamp: 'not-a-date' }, NOW).when).toBeNull()
   })
 })

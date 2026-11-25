@@ -4,9 +4,9 @@ import { test, expect } from '@playwright/test'
  * `/` is a protected route (KAN-149, FR13) — an anonymous visit now redirects
  * to `/login` before this screen ever renders (see protected-routes.spec.ts).
  * This spec mocks an authenticated `/account.php` response via `page.route`
- * so the home-screen content itself stays covered.
+ * so the redirect to the landing page (Pulse) stays covered.
  */
-test('loads the hello-world screen and toggles theme for an authenticated session', async ({
+test('"/" redirects to Pulse (the landing page) and the theme toggles for an authenticated session', async ({
   page,
 }) => {
   await page.route('**/account.php', (route) =>
@@ -31,8 +31,8 @@ test('loads the hello-world screen and toggles theme for an authenticated sessio
 
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: 'cpaltracker-react' })).toBeVisible()
-  await expect(page.getByTestId('connectivity-status')).toBeVisible()
+  await expect(page).toHaveURL(/\/pulse$/)
+  await expect(page.getByTestId('nav-pulse')).toHaveAttribute('aria-current', 'page')
 
   const toggle = page.getByTestId('theme-toggle')
   await expect(toggle).toBeVisible()

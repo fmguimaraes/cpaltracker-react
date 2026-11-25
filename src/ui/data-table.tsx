@@ -61,7 +61,7 @@ function TruncatedCell({ children, className }: { children: string; className?: 
       <TooltipTrigger asChild>
         {/* Focusable so keyboard users can open the tooltip holding the full text (EC5) */}
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-        <span tabIndex={0} className={cn("block max-w-48 truncate rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50", className)}>
+        <span tabIndex={0} className={cn("block max-w-48 truncate rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-signal-ring", className)}>
           {children}
         </span>
       </TooltipTrigger>
@@ -70,7 +70,7 @@ function TruncatedCell({ children, className }: { children: string; className?: 
   )
 }
 
-/** Visible and aria strings; every key is optional and defaults to English. */
+/** Visible and aria strings; every key is optional and defaults to French (the app's language). */
 export interface DataTableLabels {
   selectAll?: string
   selectRow?: string
@@ -89,16 +89,16 @@ export interface DataTableLabels {
 }
 
 const DEFAULT_LABELS: Required<DataTableLabels> = {
-  selectAll: "Select all rows on this page",
-  selectRow: "Select row",
+  selectAll: "Sélectionner toutes les lignes de la page",
+  selectRow: "Sélectionner la ligne",
   actions: "Actions",
-  rowActions: "Row actions",
-  previousPage: "Previous page",
-  nextPage: "Next page",
-  selected: (n) => `${n} selected`,
-  rows: (n) => `${n} rows`,
-  range: (from, to, total) => `${from}–${to} of ${total}`,
-  page: (page, pages) => `Page ${page} of ${pages}`,
+  rowActions: "Actions de la ligne",
+  previousPage: "Page précédente",
+  nextPage: "Page suivante",
+  selected: (n) => `${n} ${n > 1 ? "sélectionnées" : "sélectionnée"}`,
+  rows: (n) => `${n} ${n > 1 ? "lignes" : "ligne"}`,
+  range: (from, to, total) => `${from}–${to} sur ${total}`,
+  page: (page, pages) => `Page ${page} sur ${pages}`,
 }
 
 interface DataTableProps<T extends RowData> {
@@ -121,7 +121,7 @@ interface DataTableProps<T extends RowData> {
   /** Max height of the scroll area when stickyHeader is set. */
   maxHeightClassName?: string
   emptyMessage?: string
-  /** Localised strings (partial; missing keys fall back to English). */
+  /** Localised strings (partial; missing keys fall back to the French defaults). */
   labels?: DataTableLabels
   /** Extra attributes per row (e.g. the caller's own data-testid, aria-selected or a selection class). Applied after the
    * defaults, so they win (`className` is merged with the table's own row classes). */
@@ -277,7 +277,7 @@ function DataTable<T extends RowData>({
                         type="button"
                         onClick={h.column.getToggleSortingHandler()}
                         className={cn(
-                          "-mx-1 inline-flex items-center gap-1 rounded-sm px-1 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50",
+                          "-mx-1 inline-flex items-center gap-1 rounded-sm px-1 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-signal-ring",
                           meta?.numeric && "flex-row-reverse",
                         )}
                       >
@@ -340,7 +340,8 @@ function DataTable<T extends RowData>({
           {selectable && selectedCount ? `${L.selected(selectedCount)} · ` : ""}
           {virtual ? L.rows(total) : L.range(from, to, total)}
         </span>
-        {virtual ? null : <div className="flex items-center gap-2">
+        {/* The page controls only when there is more than one page ("hide pagination when everything fits"). */}
+        {virtual || table.getPageCount() <= 1 ? null : <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} aria-label={L.previousPage}>
             <ChevronLeftIcon aria-hidden />
           </Button>

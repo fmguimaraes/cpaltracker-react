@@ -1,22 +1,27 @@
 import L from 'leaflet'
-import { DEFAULT_MAP_LABELS, MAP_STATUS_LABEL as statusLabel, type MapDevice, type MapDeviceStatus as DeviceStatus } from './types'
+import {
+  DEFAULT_MAP_LABELS,
+  MAP_STATUS_LABEL as statusLabel,
+  type MapDevice,
+  type MapDeviceStatus as DeviceStatus,
+  type MapLoadLevel,
+} from './types'
 
 /** Severity order: higher = worse. Cluster ring shows the worst child state. */
 export const STATUS_RANK: Record<DeviceStatus, number> = { ok: 0, offline: 1, warning: 2, alert: 3 }
 
 /* Full literal class strings so Tailwind's scanner emits them (colors only via token utilities). */
-const RING: Record<DeviceStatus, string> = {
-  ok: 'ring-success',
-  warning: 'ring-warning',
-  alert: 'ring-danger',
-  offline: 'ring-offline',
-}
+/* The outline is --signal (spec 2026-11-25); the state is the dot, never the outline */
 const DOT: Record<DeviceStatus, string> = {
   ok: 'bg-success',
   warning: 'bg-warning',
-  alert: 'bg-danger',
+  alert: 'bg-danger-mark',
   offline: 'bg-offline',
 }
+
+/* Remaining-load ramp, index = level - 1 (empty → full load). */
+const LOAD_RING = ['ring-load-1', 'ring-load-2', 'ring-load-3', 'ring-load-4', 'ring-load-5']
+export const LOAD_DOT = ['bg-load-1', 'bg-load-2', 'bg-load-3', 'bg-load-4', 'bg-load-5']
 
 const TRUCK_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>'
@@ -58,22 +63,51 @@ function swatch(series: number | undefined) {
 
 const iconCache = new Map<string, L.DivIcon>()
 
-/** Memoised per (id, status, selected) so re-renders do not call setIcon on every marker. */
+/**
+ * Memoised per (id, status, selected, highlighted, compact) so re-renders do not call setIcon on every marker.
+ * `highlighted` (optional, off by default): an app-side hover cue, e.g. a list row pointing at this device.
+ * `compact` (optional, off by default): the id label next to a load/state dot, without the truck icon and
+ * with tighter padding (owner 2026-11-25: the label is always shown, not only on hover). With a load level,
+ * the load dot carries a small state badge (unified shell, Live Tracking's state dots ported to Pulse).
+ */
 export function deviceIcon(
-  d: Pick<MapDevice, 'id' | 'status' | 'series'>,
+  d: Pick<MapDevice, 'id' | 'status' | 'series' | 'load'>,
   selected: boolean,
   statusText: string = statusLabel[d.status],
+  highlighted = false,
+  compact = false,
 ): L.DivIcon {
-  const key = `${d.id}|${d.status}|${d.series ?? ''}|${selected}|${statusText}`
+  const key = `${d.id}|${d.status}|${d.series ?? ''}|${d.load ?? ''}|${selected}|${statusText}|${highlighted}|${compact}`
   const hit = iconCache.get(key)
   if (hit) return hit
+  // Theming spec 2026-11-25: marker = page surface, 1.5px --signal outline, --text label 12px 600, state dot;
+  // selected = --signal fill, --on-signal label, --signal-ring halo. No shadow.
   const sel = selected
-    ? 'bg-primary-soft text-primary-text ring-[3px] scale-110 shadow-overlay'
-    : 'bg-card text-foreground ring-2 shadow-media'
-  const html =
-    `<div class="absolute top-0 left-0 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium tabular-nums transition-transform group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring ${RING[d.status]} ${sel}">` +
-    `${swatch(d.series)}${TRUCK_SVG}<span>${esc(d.id)}<span class="sr-only">, ${esc(statusText)}</span></span>` +
-    `<span class="${DOT[d.status]} flex size-4 items-center justify-center rounded-full text-card" aria-hidden="true">${GLYPH[d.status]}</span></div>`
+    ? 'bg-signal text-on-signal ring-[1.5px] ring-signal shadow-[0_0_0_6px_var(--signal-ring)] scale-110'
+    : 'bg-background text-foreground ring-[1.5px]'
+  const hl = highlighted ? ' scale-125 shadow-overlay outline-2 outline-offset-2 outline-ring' : ''
+  // With a load level the ring and dot follow the load ramp (a plain swatch, no state glyph).
+  // The outline is --signal; with a load level it carries the load ramp instead (data color).
+  const ring = d.load ? LOAD_RING[d.load - 1] : 'ring-signal'
+  // Compact + load: a small state badge (8 px, state colour, card-coloured ring) on the load dot's top-right
+  // edge, so the state (OK / Avertissement / Alerte / Hors ligne) stays visible without losing the load colour.
+  const badge =
+    d.load && compact
+      ? `<span class="${DOT[d.status]} absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card" data-status-badge="${d.status}" aria-hidden="true"></span>`
+      : ''
+  const dot = d.load
+    ? `<span class="${LOAD_DOT[d.load - 1]} relative size-4 shrink-0 rounded-full ring-1 ring-border" aria-hidden="true">${badge}</span>`
+    : `<span class="${DOT[d.status]} flex size-4 shrink-0 items-center justify-center rounded-full text-card" aria-hidden="true">${GLYPH[d.status]}</span>`
+  const frame =
+    'absolute top-0 left-0 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-full text-xs font-semibold tabular-nums transition-transform group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring'
+  const text = `${esc(d.id)}<span class="sr-only">, ${esc(statusText)}</span>`
+  // Compact: the label is always shown (inner nowrap span so it never wraps; the dots never shrink).
+  const compactLabel = 'pl-1'
+  const html = compact
+    ? `<div class="${frame} p-1 ${ring} ${sel}${hl}">${swatch(d.series)}<span class="${compactLabel}"><span class="whitespace-nowrap">${text}</span></span>${dot}</div>`
+    : `<div class="${frame} px-2 py-1 ${ring} ${sel}${hl}">` +
+      `${swatch(d.series)}${TRUCK_SVG}<span>${text}</span>` +
+      `${dot}</div>`
   const icon = L.divIcon({
     html,
     className: 'group bg-transparent border-0 outline-none',
@@ -89,8 +123,12 @@ export function clusterIcon(
   count: number,
   status: DeviceStatus,
   ariaLabel: string = DEFAULT_MAP_LABELS.cluster(count, statusLabel[status]),
+  /** Optional: the children's average load level, ringed in the load ramp instead of the worst state. */
+  load?: MapLoadLevel,
 ): L.DivIcon {
-  const html = `<div class="flex size-full items-center justify-center rounded-full bg-card text-sm font-semibold tabular-nums text-foreground ring-4 shadow-media ${RING[status]}" role="img" aria-label="${esc(ariaLabel)}">${count}</div>`
+  // Cluster: 2px --signal outline (the load ramp when given); the worst state stays in the aria-label.
+  const ring = load ? LOAD_RING[load - 1] : 'ring-signal'
+  const html = `<div class="flex size-full items-center justify-center rounded-full bg-background text-sm font-bold tabular-nums text-foreground ring-2 ${ring}" role="img" aria-label="${esc(ariaLabel)}">${count}</div>`
   const size = count < 10 ? 36 : count < 50 ? 42 : 48
   return L.divIcon({ html, className: 'group bg-transparent border-0 outline-none', iconSize: L.point(size, size) })
 }

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError } from '../api/client'
 import { fetchPositions, type Position } from '../api/positions'
 import { DeviceFilter } from './DeviceFilter'
 import { useDeviceVisibilityStore } from './deviceVisibilityStore'
 import { PositionsMap } from './PositionsMap'
+import type { FleetMapFitControl, MapTrail, MapViewport } from '@/ui/map'
 import { FleetPanel } from './FleetPanel'
 import { massStatus } from './markerStyle'
 import { Alert } from '@/ui/alert'
@@ -13,6 +14,8 @@ import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { Skeleton } from '@/ui/skeleton'
 import type { TimeRangeValue } from '@/ui/patterns/time-picker'
 import { filterByLastReport } from './lastReportFilter'
+import { ShellPageRefresh } from '@/ui/patterns/shell-title'
+import { ShellRefreshButton } from '@/ui/patterns/shell-refresh'
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
@@ -53,21 +56,57 @@ function formatLastUpdated(date: Date): string {
  * mounts), not a contract-authorization signal, so folding it in here would
  * mislabel it as "this contract isn't available."
  */
+/** What a page needs to draw its own freshness control (see `onRefreshState`). */
+export interface PositionsRefreshState {
+  lastUpdated: Date | null
+  refreshing: boolean
+  /** The last refresh failed (the map keeps the last known positions). */
+  failed: boolean
+  refresh: () => void
+}
+
 export function ContractPositions({
   contractId,
   onUnauthorized,
   actionsSlot,
+  footerSlot,
   period,
   load = fetchPositions,
   filter,
+  showFleetPanel = true,
+  selectedChipId,
+  onSelectDevice,
+  focus,
+  highlightedChipId,
+  reveal,
+  mapPositions,
+  onViewportChange,
+  fitKey,
+  loadMax,
+  fitRequest,
+  fitControl,
+  markerStyle,
+  onMapClick,
+  keepMapWhenEmpty = false,
+  trails,
+  refreshInShell = false,
+  onRefreshState,
+  emptyNotice,
 }: {
   contractId: number
   onUnauthorized?: () => void
   /**
    * FR8: the page header's actions slot (last updated + refresh). `undefined`
    * renders them inline above the map; `null` means the slot is not mounted yet.
+   * Ignored when `footerSlot` is set.
    */
   actionsSlot?: HTMLElement | null
+  /**
+   * KAN-272 (Pulse): alternative portal target for the actions (last updated + refresh),
+   * rendered below the map instead of in the header. Takes precedence over `actionsSlot`
+   * whenever it is passed at all (including `null`, meaning "not mounted yet").
+   */
+  footerSlot?: HTMLElement | null
   /**
    * Operator decision 2026-10-29 ("filter by last report"): when set, only devices whose latest position
    * timestamp falls inside the period are shown (map, fleet panel, device list). Client-side only.
@@ -77,6 +116,61 @@ export function ContractPositions({
   load?: (contractId: number) => Promise<Position[]>
   /** KAN-272 (Pulse): extra client-side predicate (lot filter) applied after `period`. */
   filter?: (position: Position) => boolean
+  /** KAN-272 (Pulse): `false` hides the fleet panel (and its device list); Live Tracking keeps it. */
+  showFleetPanel?: boolean
+  /** Pulse: controlled marker selection, passed to `PositionsMap` (Live Tracking leaves it internal). */
+  selectedChipId?: string | null
+  /** Pulse: notified of every marker selection change (`null` = deselected). */
+  onSelectDevice?: (chipId: string | null) => void
+  /** Pulse: a point (anomaly position) the map zooms onto and marks. */
+  focus?: { lat: number; lng: number } | null
+  /** Pulse: a device to emphasise on the map (anomaly card hover), passed to `PositionsMap`. */
+  highlightedChipId?: string | null
+  /** Pulse: a device to pan/zoom onto (anomaly card click), passed to `PositionsMap`. */
+  reveal?: { chipId: string; tick: number; minZoom?: number } | null
+  /**
+   * Pulse timeline: when set, the map draws exactly these (playback positions, pallet chips) instead of the
+   * filtered snapshot; loading/error/empty states still follow the snapshot, `period` and `filter`.
+   */
+  mapPositions?: Position[]
+  /** Pulse: the map's visible bounds, on mount and after every pan/zoom (passed to `PositionsMap`). */
+  onViewportChange?: (viewport: MapViewport) => void
+  /** Pulse: the map auto-frames only when this key changes (passed to `PositionsMap`). */
+  fitKey?: string
+  /** Pulse: colour markers by remaining load against this weight and show the load legend (see `PositionsMap`). */
+  loadMax?: number | null
+  /** Pulse: bump to frame every pallet on the map ("Tout afficher"), passed to `PositionsMap`. */
+  fitRequest?: number
+  /** Pulse: the map's fit control overrides ("Vue d'ensemble"), passed to `PositionsMap`. */
+  fitControl?: FleetMapFitControl
+  /** Pulse: compact markers (labels on hover/selection), passed to `PositionsMap`. */
+  markerStyle?: 'pill' | 'compact'
+  /** Pulse: click on the map background, passed to `PositionsMap`. */
+  onMapClick?: () => void
+  /**
+   * Pulse: when the period/filter (or the contract) leaves no position, keep the map (tiles and controls)
+   * with a small notice on it instead of replacing it with the empty block (Live Tracking's default). The
+   * map keeps its view, or opens on the contract's last known positions, or on the default centre.
+   */
+  keepMapWhenEmpty?: boolean
+  /** Pulse playback: paths travelled so far, passed to `PositionsMap`. */
+  trails?: MapTrail[]
+  /**
+   * Unified shell: last update + "↻" at the right end of the top bar (`ShellPageRefresh`), the time in the
+   * button's tooltip. Takes precedence over `footerSlot` / `actionsSlot`.
+   */
+  refreshInShell?: boolean
+  /**
+   * Pulse layout v2: the page draws its own freshness control (top-bar chip). Notified of the last update,
+   * the refresh in flight, a failed refresh and a stable `refresh`; this component then renders no refresh
+   * control and no inline refresh error. Takes precedence over `refreshInShell` / `footerSlot` / `actionsSlot`.
+   */
+  onRefreshState?: (state: PositionsRefreshState) => void
+  /**
+   * With `keepMapWhenEmpty`: the page's own message for an empty map (e.g. Pulse's "Aucune palette
+   * sélectionnée" + "Tout sélectionner"), shown in place of the period/contract message.
+   */
+  emptyNotice?: ReactNode
 }) {
   const [state, setState] = useState<LoadState>('loading')
   const [allPositions, setPositions] = useState<Position[]>([])
@@ -141,6 +235,17 @@ export function ContractPositions({
       })
   }
 
+  // Pulse: report the refresh state upwards; `refresh` stays referentially stable.
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
+  const stableRefresh = useCallback(() => refreshRef.current(), [])
+  const onRefreshStateRef = useRef(onRefreshState)
+  onRefreshStateRef.current = onRefreshState
+  const failed = refreshError !== null
+  useEffect(() => {
+    onRefreshStateRef.current?.({ lastUpdated, refreshing, failed, refresh: stableRefresh })
+  }, [lastUpdated, refreshing, failed, stableRefresh])
+
   // Hooks stay above the early returns below.
   const positions = useMemo(() => {
     const inPeriod = period ? filterByLastReport(allPositions, period) : allPositions
@@ -150,6 +255,14 @@ export function ContractPositions({
   const statusByChip = useMemo(
     () => Object.fromEntries(positions.map((p) => [p.chipId, massStatus(p.mass)])),
     [positions],
+  )
+  // Pulse's empty map opens on every last known position of the contract (period and filter ignored).
+  const emptyFit = useMemo(
+    () =>
+      keepMapWhenEmpty
+        ? allPositions.flatMap((p) => (p.latitude !== null && p.longitude !== null ? [[p.latitude, p.longitude] as [number, number]] : []))
+        : undefined,
+    [keepMapWhenEmpty, allPositions],
   )
 
   if (state === 'loading') {
@@ -172,6 +285,14 @@ export function ContractPositions({
   }
 
   const visiblePositions = positions.filter((p) => !hiddenChipIds.has(p.chipId))
+  // What the map draws; with `keepMapWhenEmpty`, its notice shows whenever this is empty (e.g. not during a
+  // playback that has pallets to show).
+  const drawn = mapPositions ?? visiblePositions
+  const emptyTestId = allPositions.length === 0 ? 'positions-empty' : 'positions-period-empty'
+  const emptyMessage =
+    allPositions.length === 0
+      ? 'Aucune position disponible pour ce contrat.'
+      : "Aucun appareil n'a émis de position sur cette période."
 
   const actions = (
     <>
@@ -186,14 +307,28 @@ export function ContractPositions({
     </>
   )
   let actionsNode: ReactNode = null
-  if (actionsSlot === undefined) actionsNode = <div className="flex items-center gap-3 px-4 md:px-6">{actions}</div>
+  if (onRefreshState) actionsNode = null
+  else if (refreshInShell)
+    actionsNode = (
+      <ShellPageRefresh>
+        <ShellRefreshButton
+          lastUpdated={lastUpdated}
+          onRefresh={refresh}
+          refreshing={refreshing}
+          testId="positions-refresh"
+          lastUpdatedTestId="positions-last-updated"
+        />
+      </ShellPageRefresh>
+    )
+  else if (footerSlot !== undefined) actionsNode = footerSlot ? createPortal(actions, footerSlot) : null
+  else if (actionsSlot === undefined) actionsNode = <div className="flex items-center gap-3 px-4 md:px-6">{actions}</div>
   else if (actionsSlot) actionsNode = createPortal(actions, actionsSlot)
 
   return (
     <div className="flex flex-col gap-4 md:min-h-0 md:flex-1">
       {actionsNode}
 
-      {refreshError && (
+      {refreshError && !onRefreshState && (
         <div className="px-4 pt-4 md:px-6">
           <Alert variant="danger" data-testid="positions-refresh-error">
             {refreshError}
@@ -201,26 +336,55 @@ export function ContractPositions({
         </div>
       )}
 
-      {positions.length === 0 ? (
+      {positions.length === 0 && !keepMapWhenEmpty ? (
         <div className="px-4 md:px-6">
-          <Empty data-testid={allPositions.length === 0 ? 'positions-empty' : 'positions-period-empty'}>
+          <Empty data-testid={emptyTestId}>
             <EmptyHeader>
-              <EmptyDescription>
-                {allPositions.length === 0
-                  ? 'Aucune position disponible pour ce contrat.'
-                  : "Aucun appareil n'a émis de position sur cette période."}
-              </EmptyDescription>
+              <EmptyDescription>{emptyMessage}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         </div>
       ) : (
         <div className="relative flex flex-col md:block md:min-h-0 md:flex-1" data-testid="live-split">
           <div className="h-96 md:h-full">
-            <PositionsMap positions={visiblePositions} />
+            <PositionsMap
+              positions={drawn}
+              selectedChipId={selectedChipId}
+              onSelectDevice={onSelectDevice}
+              focus={focus}
+              highlightedChipId={highlightedChipId}
+              reveal={reveal}
+              onViewportChange={onViewportChange}
+              fitKey={fitKey}
+              // Without the fleet panel (Pulse) the corner is free of context: show the card by its marker.
+              anchorTooltip={!showFleetPanel}
+              loadMax={loadMax}
+              fitRequest={fitRequest}
+              fitControl={fitControl}
+              markerStyle={markerStyle}
+              onMapClick={onMapClick}
+              trails={trails}
+              emptyFit={emptyFit}
+            />
+            {keepMapWhenEmpty && drawn.length === 0 && (
+              // A message centred on the map (Pulse layout v2 §5), clear of the zoom/fit controls (top right).
+              <div
+                role="status"
+                data-testid={emptyNotice ? 'positions-notice' : emptyTestId}
+                data-overlay="map"
+                className="pointer-events-none absolute inset-0 z-1000 flex items-center justify-center px-16"
+              >
+                <div className="pointer-events-auto flex max-w-sm flex-col items-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-center text-sm text-muted-foreground shadow-overlay">
+                  {emptyNotice ?? <p>{emptyMessage}</p>}
+                </div>
+              </div>
+            )}
           </div>
-          <FleetPanel statuses={fleetStatuses}>
-            <DeviceFilter chipIds={positions.map((p) => p.chipId)} statuses={statusByChip} />
-          </FleetPanel>
+          {showFleetPanel && (
+            <FleetPanel statuses={fleetStatuses}>
+              <DeviceFilter chipIds={positions.map((p) => p.chipId)} statuses={statusByChip} />
+            </FleetPanel>
+          )}
         </div>
       )}
     </div>

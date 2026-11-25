@@ -155,14 +155,15 @@ describe('HistoryDashboard (KAN-172 FR1, FR2, FR25, NFR5)', () => {
     expect(screen.getByTestId('contract-option-13')).toHaveTextContent('REF-013')
   })
 
-  it('has no visible page title, only an sr-only h1 "Historique" (operator decision 2026-10-29)', async () => {
+  it('has no visible page title, only an sr-only h1 "Historique"; the breadcrumb names the page (unified shell)', async () => {
     stubFetch(contractsBody(12))
 
     renderHistoryDashboard()
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Historique' })
-    expect(within(screen.getByTestId('page-header')).getByRole('heading', { level: 1 })).toBe(heading)
-    expect(screen.getByTestId('page-header')).toHaveClass('[&_h1]:sr-only')
+    expect(heading).toHaveClass('sr-only')
+    expect(screen.queryByTestId('page-header')).not.toBeInTheDocument()
+    expect(screen.getByTestId('shell-breadcrumb')).toHaveTextContent('Historique')
   })
 
   it('treats zero contracts as an explicit empty state, no selector (FR2)', async () => {
@@ -261,12 +262,12 @@ describe('HistoryDashboard (KAN-172 FR1, FR2, FR25, NFR5)', () => {
     await chooseContract(13)
 
     await waitFor(() => expect(screen.getByTestId('history-dashboard-ready')).toBeInTheDocument())
-    // Operator decision 2026-10-29: one control per concern, both in the header — the contract Select shows
-    // the choice and the TimePicker is the only period control (no typed Du/Au entry, no period sentence).
-    const header = within(screen.getByTestId('page-header'))
+    // Operator decision 2026-10-29: one control per concern, both in the top bar — the contract Select shows
+    // the choice and the shared period control is the only period control (no typed Du/Au entry, no sentence).
+    const header = within(screen.getByTestId('history-header'))
     await waitFor(() => expect(screen.getByTestId('contract-selector')).toHaveTextContent('REF-013'))
     expect(window.sessionStorage.getItem(STORAGE_KEY)).toBe('13')
-    expect(header.getByTestId('time-picker')).toBeInTheDocument()
+    expect(header.getByTestId('time-30d')).toBeInTheDocument()
     // The device FilterBar sits in the header row (the contract Select now lives in the sidebar).
     expect(header.getByTestId('history-header-filters')).toContainElement(screen.getByTestId('filter-bar'))
     expect(screen.queryByRole('radiogroup', { name: 'Sélection du contrat' })).not.toBeInTheDocument()
