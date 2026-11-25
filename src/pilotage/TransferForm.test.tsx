@@ -6,9 +6,17 @@ import * as transferApi from '../api/transfer'
 import * as transferTargetsModule from './transferTargets'
 import { TransferForm } from './TransferForm'
 
+const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
+vi.mock('sonner', () => ({ toast: toastMock }))
+
+const contractsMock = vi.hoisted(() => ({
+  value: { selectedId: 12 as number | null, loadState: 'loaded' as 'loading' | 'loaded' | 'error' },
+}))
+vi.mock('../contracts/ContractContext', () => ({ useContracts: () => contractsMock.value }))
+
 const targets = [
-  { contractId: 34, contractRef: 'REF-034-STD', contractType: 'STD' },
-  { contractId: 56, contractRef: 'REF-056-STD', contractType: 'STD' },
+  { contractId: 34, contractRef: 'REF-034-STD', clientName: 'Sous-client A', start: null, end: null },
+  { contractId: 56, contractRef: 'REF-056-STD', clientName: null, start: null, end: null },
 ]
 
 type User = ReturnType<typeof userEvent.setup>
@@ -32,6 +40,10 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
     Element.prototype.releasePointerCapture ??= () => undefined
     Element.prototype.scrollIntoView ??= () => undefined
     // Only Date is faked, so the calendars open on June 2026 while timers and user-event stay real.
+    contractsMock.value = { selectedId: 12, loadState: 'loaded' }
+    toastMock.success.mockClear()
+    toastMock.error.mockClear()
+    toastMock.info.mockClear()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 5, 1, 12, 0))
   })
@@ -52,8 +64,16 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
     await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
 
     await userEvent.setup().click(screen.getByTestId('transfer-field-target'))
-    expect(await screen.findByTestId('transfer-target-option-34')).toHaveTextContent('REF-034-STD')
+    expect(await screen.findByTestId('transfer-target-option-34')).toHaveTextContent('REF-034-STD · Sous-client A')
     expect(screen.getByTestId('transfer-target-option-56')).toHaveTextContent('REF-056-STD')
+  })
+
+  it('loads the targets of the selected MAIN contract', async () => {
+    const spy = vi.spyOn(transferTargetsModule, 'fetchTransferTargets').mockResolvedValue(targets)
+    render(<TransferForm deviceId="CHIP-001" />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+    expect(spy).toHaveBeenCalledWith(12)
   })
 
   it('shows an explicit empty state when no STD contract is available (FR14 gap)', async () => {
@@ -78,6 +98,67 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
         'La date de début est obligatoire.',
       ),
     )
+  })
+
+  it('requires a target, shows every error on submit and focuses the first invalid field', async () => {
+    stubTargets()
+    const postSpy = vi.spyOn(transferApi, 'postDeviceTransfer')
+    const user = userEvent.setup()
+    render(<TransferForm deviceId="CHIP-001" />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('transfer-form-submit'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('transfer-field-target-error')).toHaveTextContent(
+        'Sélectionnez un contrat destinataire.',
+      ),
+    )
+    expect(screen.getByTestId('transfer-field-startDate-error')).toHaveTextContent('La date de début est obligatoire.')
+    expect(screen.getByTestId('transfer-field-target')).toHaveFocus()
+    expect(postSpy).not.toHaveBeenCalled()
+  })
+
+  it('focuses the start date when it is the first invalid field', async () => {
+    stubTargets()
+    const user = userEvent.setup()
+    render(<TransferForm deviceId="CHIP-001" />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+
+    await pickTarget(user, 34)
+    await user.click(screen.getByTestId('transfer-form-submit'))
+
+    await waitFor(() => expect(screen.getByLabelText('Date de début (jour)')).toHaveFocus())
+  })
+
+  it('shows the target error on blur, before any submit', async () => {
+    stubTargets()
+    const user = userEvent.setup()
+    render(<TransferForm deviceId="CHIP-001" />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('transfer-field-target'))
+    await user.keyboard('{Escape}')
+    await user.tab()
+
+    await waitFor(() => expect(screen.getByTestId('transfer-field-target-error')).toBeInTheDocument())
+  })
+
+  it('clears the start error once a date is picked', async () => {
+    stubTargets()
+    const user = userEvent.setup()
+    render(<TransferForm deviceId="CHIP-001" />)
+
+    await waitFor(() => expect(screen.getByTestId('transfer-form')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('transfer-form-submit'))
+    await waitFor(() => expect(screen.getByTestId('transfer-field-startDate-error')).toBeInTheDocument())
+
+    await pickJune2026Day(user, 'transfer-field-startDate', 10)
+    await waitFor(() => expect(screen.queryByTestId('transfer-field-startDate-error')).not.toBeInTheDocument())
   })
 
   it('rejects an end date that is not strictly after the start date client-side (FR16, CB24)', async () => {
@@ -127,7 +208,7 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
         endDate: null,
       }),
     )
-    await waitFor(() => expect(screen.getByTestId('transfer-flash-ok')).toHaveTextContent('en cours'))
+    await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining('en cours')))
     expect(onTransferred).toHaveBeenCalledTimes(1)
   })
 
@@ -179,8 +260,8 @@ describe('TransferForm (KAN-169 FR14-FR17)', () => {
     await user.click(screen.getByTestId('transfer-form-submit'))
 
     await waitFor(() =>
-      expect(screen.getByTestId('transfer-flash-ko')).toHaveTextContent(
-        "Ce device fait déjà l'objet d'un transfert",
+      expect(toastMock.error).toHaveBeenCalledWith(
+        expect.stringContaining("Ce device fait déjà l'objet d'un transfert"),
       ),
     )
   })

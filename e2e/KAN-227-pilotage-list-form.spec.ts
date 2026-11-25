@@ -66,6 +66,8 @@ async function openContract12(page: Page) {
   await pickContract(page, 12)
 }
 
+test.use({ locale: 'fr-FR', timezoneId: 'Europe/Paris' })
+
 test.describe('KAN-227 pilotage', () => {
   test('AC1 @SI-227-1 the contract choice is the global Select in the sidebar (operator decision 2026-10-29)', async ({ page }) => {
     await mockWorkspace(page)
@@ -144,6 +146,19 @@ test.describe('KAN-227 pilotage', () => {
     await page.clock.setFixedTime(new Date('2026-06-01T12:00:00'))
     await mockWorkspace(page)
     const bodies: unknown[] = []
+    const targetRequests: string[] = []
+    await page.route('**/contracts/transfer-targets.php/**', (route) => {
+      targetRequests.push(new URL(route.request().url()).pathname)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          targets: [
+            { contractId: 34, contractRef: 'REF-034-STD', clientName: 'Sous-client', start: null, end: null },
+          ],
+        }),
+      })
+    })
     await page.route('**/devices/transfer.php**', (route) => {
       bodies.push(route.request().postDataJSON())
       return route.fulfill({
@@ -169,14 +184,15 @@ test.describe('KAN-227 pilotage', () => {
 
     await page.getByTestId('transfer-field-target').click()
     await page.getByTestId('transfer-target-option-34').click()
-    await expect(page.getByTestId('transfer-field-target')).toHaveText(/REF-034-STD/)
+    await expect(page.getByTestId('transfer-field-target')).toHaveText(/REF-034-STD · Sous-client/)
+    expect(targetRequests).toEqual([expect.stringMatching(/\/contracts\/transfer-targets\.php\/12$/)])
     await page.getByTestId('transfer-field-startDate').getByRole('button', { name: 'Date de début (jour)' }).click()
     await page.getByRole('button', { name: /June 10th, 2026/ }).click()
     await expect(page.getByTestId('transfer-field-startDate').getByRole('button')).toHaveText(/2026-06-10/)
     await page.getByLabel('Date de début (heure)').fill('08:30')
     await page.getByTestId('transfer-form-submit').click()
 
-    await expect(page.getByTestId('transfer-flash-ok')).toContainText('en cours')
+    await expect(page.locator('[data-sonner-toast]')).toContainText('Transfert enregistré (en cours, sans date de fin).')
     expect(bodies).toEqual([{ targetContractId: 34, startDate: '2026-06-10T08:30', endDate: null }])
 
     // History: back on the list page, the session log (kit ActivityTimeline) has the ongoing Badge.
@@ -186,6 +202,7 @@ test.describe('KAN-227 pilotage', () => {
     expect(await item.evaluate((el) => el.closest('[data-slot="activity-timeline"]') !== null)).toBe(true)
     await expect(item).toContainText('CHIP-000 → contrat #34')
     await expect(page.getByTestId('transfer-history-row-CHIP-000-0-ongoing')).toHaveText('en cours')
-    await expect(item.locator('time')).toHaveText('2026-06-10 08:30 UTC')
+    // The history shows the API's UTC instant in the browser's zone, French ("10 juin 10:30" in Paris).
+    await expect(item.locator('time')).toHaveText('10 juin 10:30')
   })
 })

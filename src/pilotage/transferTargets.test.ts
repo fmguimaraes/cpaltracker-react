@@ -1,29 +1,40 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as contractsApi from '../api/contracts'
-import { fetchTransferTargets } from './transferTargets'
+import { fetchTransferTargets, transferTargetLabel } from './transferTargets'
+
+const target = {
+  contractId: 34,
+  contractRef: 'REF-034',
+  clientName: 'Sous-client',
+  start: '2026-01-01 00:00:00',
+  end: null,
+}
 
 describe('fetchTransferTargets (KAN-169 FR14)', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('keeps only STD contracts from the visible-contracts list', async () => {
-    vi.spyOn(contractsApi, 'fetchContracts').mockResolvedValue([
-      { contractId: 12, contractRef: 'REF-012', contractType: 'MAIN' },
-      { contractId: 34, contractRef: 'REF-034', contractType: 'STD' },
-      { contractId: 56, contractRef: 'REF-056', contractType: 'STD' },
-    ])
+  it('asks the API for the STD children of the given MAIN contract and returns them as is', async () => {
+    const spy = vi.spyOn(contractsApi, 'fetchContractTransferTargets').mockResolvedValue([target])
 
-    const targets = await fetchTransferTargets()
-
-    expect(targets.map((t) => t.contractId)).toEqual([34, 56])
+    expect(await fetchTransferTargets(12)).toEqual([target])
+    expect(spy).toHaveBeenCalledWith(12)
   })
 
-  it('returns an empty list when the caller has no visible STD contracts', async () => {
-    vi.spyOn(contractsApi, 'fetchContracts').mockResolvedValue([
-      { contractId: 12, contractRef: 'REF-012', contractType: 'MAIN' },
-    ])
+  it('returns an empty list when the MAIN contract has no STD child', async () => {
+    vi.spyOn(contractsApi, 'fetchContractTransferTargets').mockResolvedValue([])
 
-    expect(await fetchTransferTargets()).toEqual([])
+    expect(await fetchTransferTargets(12)).toEqual([])
+  })
+})
+
+describe('transferTargetLabel', () => {
+  it('shows "REF · client name"', () => {
+    expect(transferTargetLabel(target)).toBe('REF-034 · Sous-client')
+  })
+
+  it('falls back to the reference alone without a client name', () => {
+    expect(transferTargetLabel({ ...target, clientName: null })).toBe('REF-034')
   })
 })

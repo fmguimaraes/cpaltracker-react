@@ -23,9 +23,8 @@ test.beforeEach(async ({ page }) => {
  * `POST /devices/transfer.php` is the real endpoint confirmed against
  * `cpaltracker.web/api/openapi.yaml` and `api/v1/devices/transfer.php` —
  * see `src/api/transfer.ts`'s doc comment. The STD target list (FR14) is
- * sourced from `GET /contracts/list.php` filtered to `contractType ===
- * 'STD'` (`src/pilotage/transferTargets.ts`'s doc comment) — a documented
- * gap, not an invented endpoint.
+ * `GET /contracts/transfer-targets.php/{mainContractId}`
+ * (`src/pilotage/transferTargets.ts`); outcomes are sonner toasts.
  */
 
 const account = {
@@ -42,18 +41,21 @@ const account = {
 
 async function mockEligibleWorkspace(
   page: import('@playwright/test').Page,
-  options: { contracts?: Array<{ contractId: number; contractRef: string; contractType: string }> } = {},
+  options: { targets?: Array<{ contractId: number; contractRef: string; clientName: string | null }> } = {},
 ) {
-  const contracts = options.contracts ?? [
-    { contractId: 12, contractRef: 'REF-012', contractType: 'MAIN' },
-    { contractId: 34, contractRef: 'REF-034-STD', contractType: 'STD' },
-  ]
+  const targets = (options.targets ?? [{ contractId: 34, contractRef: 'REF-034-STD', clientName: 'Sous-client' }]).map(
+    (target) => ({ ...target, start: null, end: null }),
+  )
+  const contracts = [{ contractId: 12, contractRef: 'REF-012', contractType: 'MAIN' }]
 
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
   )
   await page.route('**/contracts/list.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contracts }) }),
+  )
+  await page.route('**/contracts/transfer-targets.php/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ targets }) }),
   )
   await page.route('**/devices/positions.php**', (route) =>
     route.fulfill({
@@ -93,13 +95,15 @@ test('offers only the API-provided STD contracts as transfer targets, never a fr
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The transfer form lives on the device's own page.
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('transfer-field-target').click()
-  await expect(page.getByTestId('transfer-target-option-34')).toHaveText('REF-034-STD')
+  await expect(page.getByTestId('transfer-target-option-34')).toHaveText('REF-034-STD · Sous-client')
   await expect(page.getByTestId('transfer-field-target')).toBeVisible()
 })
 
-test('submits an open-ended transfer and renders it as "en cours" in both the flash and the history panel (FR15, FR17, FR18, CB23, CB29)', async ({
+test('submits an open-ended transfer and renders it as "en cours" in both the toast and the history panel (FR15, FR17, FR18, CB23, CB29)', async ({
   page,
 }) => {
   await mockEligibleWorkspace(page)
@@ -121,6 +125,8 @@ test('submits an open-ended transfer and renders it as "en cours" in both the fl
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The transfer form lives on the device's own page.
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('transfer-field-target').click()
 
@@ -128,7 +134,9 @@ test('submits an open-ended transfer and renders it as "en cours" in both the fl
   await pickJune2026Day(page, 'transfer-field-startDate', 10)
   await page.getByTestId('transfer-form-submit').click()
 
-  await expect(page.getByTestId('transfer-flash-ok')).toContainText('en cours')
+  await expect(page.locator('[data-sonner-toast]')).toContainText('en cours')
+  // The history is on the list page.
+  await page.getByTestId('pilotage-device-back').click()
   await expect(page.getByTestId('transfer-history-row-CHIP-001-0')).toContainText('en cours')
   await expect(page.getByTestId('transfer-history-row-CHIP-001-0')).not.toContainText('9999-12-31')
 })
@@ -145,6 +153,8 @@ test('rejects an end date that is not strictly after the start date, client-side
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The transfer form lives on the device's own page.
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('transfer-field-target').click()
 
@@ -179,6 +189,8 @@ test("surfaces the API's own rejection (e.g. overlap) verbatim, never a client-g
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The transfer form lives on the device's own page.
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('transfer-field-target').click()
 
@@ -186,9 +198,7 @@ test("surfaces the API's own rejection (e.g. overlap) verbatim, never a client-g
   await pickJune2026Day(page, 'transfer-field-startDate', 10)
   await page.getByTestId('transfer-form-submit').click()
 
-  await expect(page.getByTestId('transfer-flash-ko')).toContainText(
-    "Ce device fait déjà l'objet d'un transfert",
-  );
+  await expect(page.locator('[data-sonner-toast]')).toContainText("Ce device fait déjà l'objet d'un transfert")
 })
 
 test('disables the submit control after a 409 contract_inactive rejection (FR4/FR17 shared signal)', async ({
@@ -207,6 +217,8 @@ test('disables the submit control after a 409 contract_inactive rejection (FR4/F
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The transfer form lives on the device's own page.
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('transfer-field-target').click()
 
@@ -218,15 +230,17 @@ test('disables the submit control after a 409 contract_inactive rejection (FR4/F
   await expect(page.getByTestId('transfer-form-submit')).toBeDisabled()
 })
 
-test('shows an explicit empty state when the account has no visible STD contract (FR14 gap)', async ({
+test('shows an explicit empty state when the account has no STD sub-contract (FR14)', async ({
   page,
 }) => {
   await mockEligibleWorkspace(page, {
-    contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'MAIN' }],
+    targets: [],
   })
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The transfer form lives on the device's own page.
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await expect(page.getByTestId('transfer-targets-empty')).toBeVisible()
 })
