@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Outlet, useNavigate, useParams } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Alert, AlertDescription } from '@/ui/alert'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { ShellBreadcrumb, type ShellBreadcrumbLevel } from '@/ui/patterns/shell-breadcrumb'
 import { ShellPageTitle } from '@/ui/patterns/shell-title'
 import { Skeleton } from '@/ui/skeleton'
 import { useContracts } from '../contracts/ContractContext'
-import { DEVICE_PILOTAGE_PATH } from '../auth/paths'
+import { DEVICE_PILOTAGE_PATH, devicePilotagePath, deviceReadingsPath } from '../auth/paths'
 import { DeviceList } from '../pilotage/DeviceList'
 import { loadPilotageWorkspace } from '../pilotage/loadPilotageWorkspace'
 import type { Position } from '../api/positions'
@@ -61,6 +61,7 @@ export function DevicePilotage() {
   const { contracts, loadState: state, selectedId, accessError, rejectContract } = useContracts()
   const { chipId } = useParams<{ chipId?: string }>()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   const [workspace, setWorkspace] = useState<WorkspaceState>({ phase: 'loading' })
   const [transferHistory, setTransferHistory] = useState<TransferResult[]>([])
@@ -112,12 +113,18 @@ export function DevicePilotage() {
     if (previous !== null && previous !== selectedId && chipId) navigate(DEVICE_PILOTAGE_PATH, { replace: true })
   }, [selectedId, chipId, navigate])
 
+  // "Pilotage › CHIP" on the device page; "Pilotage › CHIP › Relevés" on its readings page, where the
+  // chip level links back to the device page.
+  const onReadings = chipId !== undefined && pathname.replace(/\/+$/, '') === deviceReadingsPath(chipId)
   const levels: ShellBreadcrumbLevel[] =
     chipId === undefined
       ? [{ label: 'Pilotage', testId: 'breadcrumb-pilotage' }]
       : [
           { label: 'Pilotage', to: DEVICE_PILOTAGE_PATH, testId: 'breadcrumb-pilotage' },
-          { label: chipId, testId: 'breadcrumb-device' },
+          onReadings
+            ? { label: chipId, to: devicePilotagePath(chipId), testId: 'breadcrumb-device' }
+            : { label: chipId, testId: 'breadcrumb-device' },
+          ...(onReadings ? [{ label: 'Relevés', testId: 'breadcrumb-readings' }] : []),
         ]
 
   return (

@@ -51,6 +51,9 @@ async function mockWorkspace(page: Page) {
   await page.route('**/devices/config.php**', (route) =>
     route.fulfill(json({ deviceId: chipId(0), contractId: 12, reglageId: 1, updatedAt: null, config: {} })),
   )
+  // The device page also loads the device's open alerts and the transfer targets.
+  await page.route('**/anomalies/list.php/**', (route) => route.fulfill(json({ anomalies: [] })))
+  await page.route('**/contracts/transfer-targets.php/**', (route) => route.fulfill(json({ targets: [] })))
   await page.route('**/messages/global.php', (route) => route.fulfill(json({ message: null })))
   await page.route('**/messages/contract.php**', (route) => route.fulfill(json({ message: null })))
   await page.route('**/clients/logo.php/**', (route) =>

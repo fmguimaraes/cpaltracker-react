@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { AppShellLayout } from './chrome/AppShellLayout'
 import {
+  ALERTS_PATH,
   CHANGE_PASSWORD_PATH,
   DEVICE_PILOTAGE_PATH,
   FORGOT_PASSWORD_PATH,
@@ -15,6 +16,9 @@ import { DocumentTitle } from '@/chrome/DocumentTitle'
 import { ThemeProvider } from '@/app/theme'
 import { TooltipProvider } from '@/ui/tooltip'
 import { Account } from './routes/Account'
+import { AlertDetail } from './routes/AlertDetail'
+import { Alerts } from './routes/Alerts'
+import { DeviceReadings } from './routes/DeviceReadings'
 import { AccountLayout } from './routes/AccountLayout'
 import { DevicePilotage } from './routes/DevicePilotage'
 import { PilotageDeviceDetail } from './routes/PilotageDeviceDetail'
@@ -58,8 +62,11 @@ export function App() {
                 <Route path={DEVICE_PILOTAGE_PATH} element={<DevicePilotage />}>
                   <Route index element={<PilotageDeviceList />} />
                   <Route path=":chipId" element={<PilotageDeviceDetail />} />
+                  <Route path=":chipId/releves" element={<DeviceReadings />} />
                 </Route>
                 <Route path={TRENDS_PATH} element={<Trends />} />
+                <Route path={ALERTS_PATH} element={<Alerts />} />
+                <Route path={`${ALERTS_PATH}/:anomalyKey`} element={<AlertDetail />} />
               </Route>
               <Route path="/login" element={<Login />} />
               <Route path={FORGOT_PASSWORD_PATH} element={<ForgotPassword />} />

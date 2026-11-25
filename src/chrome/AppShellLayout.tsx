@@ -1,7 +1,8 @@
-import { Activity, SlidersHorizontal, TrendingUp } from 'lucide-react'
+import { Activity, BellRing, SlidersHorizontal, TrendingUp } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
+  ALERTS_PATH,
   CHANGE_PASSWORD_PATH,
   DEVICE_PILOTAGE_PATH,
   PULSE_PATH,
@@ -14,6 +15,7 @@ import { ContractSelect } from '../contracts/ContractSelect'
 import { CpalBrandMark } from './CpalBrandMark'
 import { RailMark } from '@/ui/patterns/rail-mark'
 import { ShellClientLogo } from './ShellClientLogo'
+import { Toaster } from '@/ui/sonner'
 import { useNavState } from './navState'
 
 /** Labels are kept exactly as the app showed them before the shell (no translation). */
@@ -23,6 +25,7 @@ const SECTIONS: ShellNavSection[] = [
     items: [
       { to: PULSE_PATH, label: 'Pulse', icon: Activity, testId: 'nav-pulse' },
       { to: TRENDS_PATH, label: 'Tendances', icon: TrendingUp, testId: 'nav-trends' },
+      { to: ALERTS_PATH, label: 'Alertes', icon: BellRing, testId: 'nav-alerts' },
       {
         to: DEVICE_PILOTAGE_PATH,
         label: 'Pilotage',
@@ -121,6 +124,8 @@ export function AppShellLayout() {
         navigationLabel="Navigation principale"
         themeLabels={{ group: 'Thème', light: 'Clair', dark: 'Sombre', system: 'Système' }}
       />
+      {/* FBK-TOAST: one toaster for every page's action outcome, centred at the top. */}
+      <Toaster position="top-center" />
     </ContractProvider>
   )
 }

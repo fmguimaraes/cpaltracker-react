@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
+  ALERTS_PATH,
   CHANGE_PASSWORD_PATH,
   DEVICE_PILOTAGE_PATH,
   FORGOT_PASSWORD_PATH,
@@ -26,13 +27,16 @@ const ROUTE_TITLES: Record<string, string> = {
   [HISTORY_DASHBOARD_PATH]: 'Historique',
   [DEVICE_PILOTAGE_PATH]: 'Pilotage des devices',
   [TRENDS_PATH]: 'Tendances',
+  [ALERTS_PATH]: 'Alertes',
   [HOME_PATH]: '',
 }
 
 /** Page name of a pathname; unknown paths are the 404 screen. */
 function titleFor(pathname: string) {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
-  const name = ROUTE_TITLES[path] ?? '404 — Page not found'
+  // A sub-page (`/pilotage/CHIP-001`, `/alertes/…`) takes its section's name.
+  const section = Object.keys(ROUTE_TITLES).find((key) => key.length > 1 && path.startsWith(`${key}/`))
+  const name = ROUTE_TITLES[path] ?? (section ? ROUTE_TITLES[section] : '404 — Page not found')
   return name ? `${name} · ${APP_NAME}` : APP_NAME
 }
 
