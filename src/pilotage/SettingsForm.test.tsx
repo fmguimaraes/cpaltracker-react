@@ -3,11 +3,24 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import * as deviceConfigApi from '../api/deviceConfig'
+import { toast } from 'sonner'
 import { SettingsForm } from './SettingsForm'
+
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+    dismiss: vi.fn(),
+  }),
+}))
 
 describe('SettingsForm (KAN-163 FR7-FR10, FR12)', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.mocked(toast.success).mockClear()
+    vi.mocked(toast.info).mockClear()
+    vi.mocked(toast.error).mockClear()
   })
 
   function stubConfig(config: Record<string, string | null>) {
@@ -71,8 +84,12 @@ describe('SettingsForm (KAN-163 FR7-FR10, FR12)', () => {
 
     await waitFor(() => expect(screen.getByTestId('settings-form')).toBeInTheDocument())
 
-    expect(screen.getByTestId('settings-field-FREQ_MESURE_CL-hint')).toHaveTextContent(
-      'laissez vide pour conserver la valeur actuelle (3)',
+    // The rule is stated once for the form and attached to every input; each hint shows the value kept.
+    expect(screen.getByTestId('settings-keep-note')).toHaveTextContent('Laissez un champ vide pour conserver sa valeur actuelle.')
+    expect(screen.getByTestId('settings-field-FREQ_MESURE_CL-hint')).toHaveTextContent('valeur actuelle : 3')
+    expect(screen.getByTestId('settings-field-FREQ_MESURE_CL')).toHaveAttribute(
+      'aria-describedby',
+      'settings-keep-note settings-field-FREQ_MESURE_CL-hint',
     )
   })
 
@@ -134,6 +151,9 @@ describe('SettingsForm (KAN-163 FR7-FR10, FR12)', () => {
 describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.mocked(toast.success).mockClear()
+    vi.mocked(toast.info).mockClear()
+    vi.mocked(toast.error).mockClear()
   })
 
   function stubConfig(config: Record<string, string | null>) {
@@ -164,7 +184,7 @@ describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
     )
   })
 
-  it('on acceptance shows a success flash and refreshes the displayed current config (FR11, FR13)', async () => {
+  it('on acceptance shows a success toast and refreshes the displayed current config (FR11, FR13)', async () => {
     vi.spyOn(deviceConfigApi, 'fetchDeviceConfig')
       .mockResolvedValueOnce({
         deviceId: 'CHIP-001',
@@ -190,7 +210,10 @@ describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
     await user.click(screen.getByTestId('settings-form-submit'))
 
     await waitFor(() =>
-      expect(screen.getByTestId('settings-form-flash')).toHaveTextContent('Réglages enregistrés'),
+      expect(toast.success).toHaveBeenCalledWith(
+        'Réglages enregistrés. Ils seront transmis au device lors de sa prochaine remontée sur le port 3.',
+        expect.anything(),
+      ),
     )
     await waitFor(() =>
       expect((screen.getByTestId('settings-field-FREQ_MESURE_CL') as HTMLInputElement).placeholder).toBe(
@@ -216,8 +239,9 @@ describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
     await user.click(screen.getByTestId('settings-form-submit'))
 
     await waitFor(() =>
-      expect(screen.getByTestId('settings-form-flash')).toHaveTextContent(
-        "Ce contrat n'est pas actif aujourd'hui",
+      expect(toast.error).toHaveBeenCalledWith(
+        "Ce contrat n'est pas actif aujourd'hui : aucun réglage ne peut être envoyé.",
+        expect.anything(),
       ),
     )
     expect(refetchSpy).toHaveBeenCalledTimes(1) // only the initial mount load, no post-failure refresh
@@ -227,7 +251,7 @@ describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
     expect(screen.getByTestId('settings-form-submit')).toBeDisabled()
   })
 
-  it('on a 400 "no values changed" response, shows the API message as an informational flash (FR11)', async () => {
+  it('on a 400 "no values changed" response, shows the API message as an info toast (FR11)', async () => {
     stubConfig({ FREQ_MESURE_CL: '3' })
     const onSubmit = vi
       .fn()
@@ -242,12 +266,16 @@ describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
     await user.type(screen.getByTestId('settings-field-FREQ_MESURE_CL'), '3')
     await user.click(screen.getByTestId('settings-form-submit'))
 
-    const flash = await screen.findByTestId('settings-form-flash')
-    expect(flash).toHaveTextContent('Aucune valeur modifiée')
-    expect(flash).toHaveAttribute('data-flash-kind', 'info')
+    await waitFor(() =>
+      expect(toast.info).toHaveBeenCalledWith(
+        "Aucune valeur modifiée : la ligne n'a pas été créée.",
+        expect.anything(),
+      ),
+    )
+    expect(screen.queryByTestId('settings-form-flash')).not.toBeInTheDocument()
   })
 
-  it('switching to a new device clears a previous flash (FR20)', async () => {
+  it('switching to a new device dismisses a previous result toast (FR20)', async () => {
     stubConfig({})
     const onSubmit = vi.fn().mockRejectedValue(new ApiError(500, 'boom'))
     const user = userEvent.setup()
@@ -256,11 +284,12 @@ describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
     await waitFor(() => expect(screen.getByTestId('settings-form')).toBeInTheDocument())
     await user.type(screen.getByTestId('settings-field-FREQ_MESURE_CL'), '10')
     await user.click(screen.getByTestId('settings-form-submit'))
-    await waitFor(() => expect(screen.getByTestId('settings-form-flash')).toBeInTheDocument())
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
+    vi.mocked(toast.dismiss).mockClear()
 
     rerender(<SettingsForm deviceId="CHIP-002" onSubmit={onSubmit} />)
 
-    await waitFor(() => expect(screen.queryByTestId('settings-form-flash')).not.toBeInTheDocument())
+    await waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith('settings-result'))
   })
 
   it('drops a stale submit result once the operator has switched devices (FR20)', async () => {
@@ -290,6 +319,122 @@ describe('SettingsForm submit (KAN-166 FR11, FR13, FR20)', () => {
     })
 
     // The stale CHIP-001 success must never surface once CHIP-002 is shown.
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+})
+
+describe('SettingsForm controls and validation', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function stubConfig(config: Record<string, string | null>) {
+    vi.spyOn(deviceConfigApi, 'fetchDeviceConfig').mockResolvedValue({
+      deviceId: 'CHIP-001',
+      contractId: 12,
+      reglageId: 1,
+      updatedAt: null,
+      config,
+    })
+  }
+
+  async function renderReady(onSubmit = vi.fn().mockResolvedValue(undefined)) {
+    const user = userEvent.setup()
+    render(<SettingsForm deviceId="CHIP-001" onSubmit={onSubmit} />)
+    await waitFor(() => expect(screen.getByTestId('settings-form')).toBeInTheDocument())
+    return { user, onSubmit }
+  }
+
+  it('renders no flash alert and only the submit button in the action bar', async () => {
+    stubConfig({})
+    await renderReady()
     expect(screen.queryByTestId('settings-form-flash')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-form-submit')).toHaveTextContent('Enregistrer')
+  })
+
+  it('shows unit suffixes next to the numeric inputs', async () => {
+    stubConfig({})
+    await renderReady()
+    expect(screen.getByTestId('settings-field-Seuil_TEMPAMB_CL').closest('[data-slot="input-group"]')).toHaveTextContent('°C')
+    expect(screen.getByTestId('settings-field-Seuil_HRAMB_CL').closest('[data-slot="input-group"]')).toHaveTextContent('% HR')
+    expect(screen.getByTestId('settings-field-Seuil_MASSE_CL').closest('[data-slot="input-group"]')).toHaveTextContent('kg')
+    expect(screen.getByTestId('settings-field-Seuil_TEMPMPU_CL').closest('[data-slot="input-group"]')).toHaveTextContent('V')
+    expect(screen.getByTestId('settings-field-WAKEUP_ESP_CL').closest('[data-slot="input-group"]')).toHaveTextContent('min')
+  })
+
+  it('steps the measurement frequency with the - / + buttons, clamped to 0-255', async () => {
+    stubConfig({ FREQ_MESURE_CL: '3' })
+    const { user } = await renderReady()
+    const input = screen.getByTestId('settings-field-FREQ_MESURE_CL') as HTMLInputElement
+
+    await user.click(screen.getByTestId('settings-field-FREQ_MESURE_CL-increment'))
+    expect(input.value).toBe('4')
+    await user.click(screen.getByTestId('settings-field-FREQ_MESURE_CL-decrement'))
+    await user.click(screen.getByTestId('settings-field-FREQ_MESURE_CL-decrement'))
+    expect(input.value).toBe('2')
+
+    await user.clear(input)
+    await user.type(input, '255')
+    await user.click(screen.getByTestId('settings-field-FREQ_MESURE_CL-increment'))
+    expect(input.value).toBe('255')
+    await user.clear(input)
+    await user.type(input, '0')
+    await user.click(screen.getByTestId('settings-field-FREQ_MESURE_CL-decrement'))
+    expect(input.value).toBe('0')
+  })
+
+  it('starts the stepper from the hardware default when nothing is known', async () => {
+    stubConfig({})
+    const { user } = await renderReady()
+    await user.click(screen.getByTestId('settings-field-FREQ_MESURE_CL-increment'))
+    expect((screen.getByTestId('settings-field-FREQ_MESURE_CL') as HTMLInputElement).value).toBe('1')
+  })
+
+  it('fills the wake-up duration from a preset and shows a live human readout', async () => {
+    stubConfig({ WAKEUP_ESP_CL: '90' })
+    const { user } = await renderReady()
+    const input = screen.getByTestId('settings-field-WAKEUP_ESP_CL') as HTMLInputElement
+
+    expect(screen.getByTestId('settings-field-WAKEUP_ESP_CL-hint')).toHaveTextContent('valeur actuelle : 90 (= 1 h 30 min)')
+    await user.click(screen.getByRole('radio', { name: '6 h' }))
+    expect(input.value).toBe('360')
+    expect(screen.getByTestId('settings-field-WAKEUP_ESP_CL-readout')).toHaveTextContent('= 6 h')
+
+    await user.clear(input)
+    await user.type(input, '1500')
+    expect(screen.getByTestId('settings-field-WAKEUP_ESP_CL-readout')).toHaveTextContent('= 1 j 1 h')
+  })
+
+  it('validates a field on blur', async () => {
+    stubConfig({})
+    const { user } = await renderReady()
+    await user.type(screen.getByTestId('settings-field-Seuil_HRAMB_CL'), '120')
+    await user.tab()
+    expect(await screen.findByTestId('settings-field-Seuil_HRAMB_CL-error')).toHaveTextContent('entre 0 et 100 % HR')
+    expect(screen.getByTestId('settings-field-Seuil_HRAMB_CL')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('rejects out-of-range latitude/longitude and negative mass on submit, without calling onSubmit', async () => {
+    stubConfig({})
+    const { user, onSubmit } = await renderReady()
+    await user.type(screen.getByTestId('settings-field-Seuil_LAT_CL'), '91')
+    await user.type(screen.getByTestId('settings-field-Seuil_LONG_CL'), '-181')
+    await user.type(screen.getByTestId('settings-field-Seuil_MASSE_CL'), '-1')
+    await user.click(screen.getByTestId('settings-form-submit'))
+
+    expect(await screen.findByTestId('settings-field-Seuil_LAT_CL-error')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-field-Seuil_LONG_CL-error')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-field-Seuil_MASSE_CL-error')).toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('focuses the first invalid field on submit', async () => {
+    stubConfig({})
+    const { user } = await renderReady()
+    await user.type(screen.getByTestId('settings-field-Seuil_HRAMB_CL'), '101')
+    await user.type(screen.getByTestId('settings-field-SeuilG_CL'), 'abc')
+    await user.click(screen.getByTestId('settings-form-submit'))
+    await waitFor(() => expect(screen.getByTestId('settings-field-Seuil_HRAMB_CL')).toHaveFocus())
   })
 })

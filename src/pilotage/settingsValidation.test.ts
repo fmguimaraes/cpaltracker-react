@@ -73,4 +73,66 @@ describe('validateSettingsField (KAN-163 FR9, FR10; CB13, CB14)', () => {
       expect(validateSettingsField(long, floatField)).toHaveProperty('error')
     })
   })
+
+  describe('physical bounds', () => {
+    const humidity: SettingsFieldDef = { name: 'Seuil_HRAMB_CL', label: 'Seuil humidité relative', type: 'float', hint: '', unit: '% HR', min: 0, max: 100 }
+    const temperature: SettingsFieldDef = { name: 'Seuil_TEMPAMB_CL', label: 'Seuil température ambiante', type: 'float', hint: '', unit: '°C', min: -50, max: 100 }
+    const latitude: SettingsFieldDef = { name: 'Seuil_LAT_CL', label: 'Seuil latitude', type: 'float', hint: '', unit: '°', min: -90, max: 90 }
+    const longitude: SettingsFieldDef = { name: 'Seuil_LONG_CL', label: 'Seuil longitude', type: 'float', hint: '', unit: '°', min: -180, max: 180 }
+    const mass: SettingsFieldDef = { name: 'Seuil_MASSE_CL', label: 'Seuil de masse', type: 'float', hint: '', unit: 'kg', min: 0 }
+
+    it.each([
+      [humidity, '0', true],
+      [humidity, '100', true],
+      [humidity, '100,5', false],
+      [humidity, '-0,1', false],
+      [temperature, '-50', true],
+      [temperature, '100', true],
+      [temperature, '-50,1', false],
+      [temperature, '100.1', false],
+      [latitude, '-90', true],
+      [latitude, '90', true],
+      [latitude, '90,01', false],
+      [longitude, '-180', true],
+      [longitude, '180', true],
+      [longitude, '-180,5', false],
+      [mass, '0', true],
+      [mass, '12,5', true],
+      [mass, '-1', false],
+    ])('%o accepts or rejects %s', (def, raw, ok) => {
+      const result = validateSettingsField(raw, def)
+      expect('error' in result).toBe(!ok)
+    })
+
+    it('mentions the range and unit in the message', () => {
+      expect(validateSettingsField('101', humidity)).toEqual({
+        error: 'Seuil humidité relative : la valeur doit être comprise entre 0 et 100 % HR.',
+      })
+      expect(validateSettingsField('-3', mass)).toEqual({ error: 'Seuil de masse : la valeur minimale est 0 kg.' })
+    })
+
+    it('applies a field minimum to integers too, after the type range', () => {
+      const wakeup: SettingsFieldDef = { ...uint16Field, min: 1, unit: 'min' }
+      expect(validateSettingsField('0', wakeup)).toHaveProperty('error')
+      expect(validateSettingsField('70000', wakeup)).toEqual({ error: 'Réveil ESP : la valeur maximale est 65535.' })
+    })
+  })
+
+  describe('format', () => {
+    it('rejects malformed decimals', () => {
+      for (const bad of ['1e3', '1,2,3', '1.2.3', '12.', '--1', '0x10', '1 2', 'NaN', 'Infinity']) {
+        expect(validateSettingsField(bad, floatField)).toHaveProperty('error')
+      }
+    })
+
+    it('accepts signed and leading-dot decimals, trims, and strips a leading plus', () => {
+      expect(validateSettingsField(' -3,25 ', floatField)).toEqual({ value: '-3.25' })
+      expect(validateSettingsField('+4', floatField)).toEqual({ value: '4' })
+      expect(validateSettingsField(',5', floatField)).toEqual({ value: '.5' })
+    })
+
+    it('rejects values longer than 100 characters for integers as well', () => {
+      expect(validateSettingsField('1'.repeat(101), uint16Field)).toHaveProperty('error')
+    })
+  })
 })

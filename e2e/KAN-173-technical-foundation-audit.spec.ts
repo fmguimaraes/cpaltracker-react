@@ -133,16 +133,20 @@ test('the settings form is fully keyboard-navigable, with every field reachable 
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-000-select').click()
 
   await expect(page.getByTestId('settings-form')).toBeVisible()
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').focus()
   await expect(page.getByTestId('settings-field-FREQ_MESURE_CL')).toBeFocused()
 
-  // Tab through the remaining 9 fields across both labeled fieldsets
-  // (FR8/GAP6) to the submit button — every field is a real, focusable,
-  // labeled control (NFR8), never a div-as-button or an unlabeled input.
-  for (let i = 0; i < 10; i += 1) {
+  // Tab through every remaining control across both labeled fieldsets
+  // (FR8/GAP6) to the submit button: the stepper's + button, the wake-up
+  // input and its presets group (one roving tab stop), 3 more transmitted
+  // fields, 5 stored-only fields, then submit = 12 stops. Every control is a
+  // real, focusable, labeled element (NFR8).
+  for (let i = 0; i < 12; i += 1) {
     await page.keyboard.press('Tab')
   }
   await expect(page.getByTestId('settings-form-submit')).toBeFocused()

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
+import { MinusIcon, PlusIcon } from 'lucide-react'
 import {
   fetchDeviceConfig,
   isNoChangeError,
@@ -7,11 +9,15 @@ import {
   type DeviceConfig,
 } from '../api/deviceConfig'
 import { isContractInactiveError } from './activeState'
-import { STORED_ONLY_FIELDS, TRANSMITTED_FIELDS, type SettingsFieldDef } from './settingsFields'
+import {
+  STORED_ONLY_FIELDS,
+  TRANSMITTED_FIELDS,
+  formatMinutes,
+  type SettingsFieldDef,
+} from './settingsFields'
 import { validateSettingsField } from './settingsValidation'
 import { Alert, AlertDescription } from '@/ui/alert'
 import { Button } from '@/ui/button'
-import { Card, CardContent } from '@/ui/card'
 import {
   Field,
   FieldDescription,
@@ -21,12 +27,11 @@ import {
   FieldLegend,
   FieldSet,
 } from '@/ui/field'
-import { Input } from '@/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupText } from '@/ui/input-group'
 import { Skeleton } from '@/ui/skeleton'
+import { ToggleGroup, ToggleGroupItem } from '@/ui/toggle-group'
 
 type FormValues = Record<string, string>
-
-type Flash = { kind: 'success' | 'info' | 'error'; message: string }
 
 type Phase =
   | { status: 'loading' }
@@ -34,6 +39,11 @@ type Phase =
   | { status: 'ready'; config: DeviceConfig['config'] }
 
 /**
+ * Settings redesign: each field gets the control that fits it (numeric input with a unit suffix,
+ * integer stepper, duration with presets and a live readout), validation on blur and on submit
+ * (first invalid field focused), and the outcome of a save is a centred `sonner` toast instead of
+ * an inline flash. The one persistent problem (load error) stays an inline `Alert`.
+ *
  * KAN-227 (FR10): restyled as the reference's one-column PAT-FORM section
  * (<= 800 px, `Field*` + kit `Input`, `FieldError` under the field, action
  * bar with the submit and the flash). Logic, testids and copy unchanged.
@@ -101,14 +111,16 @@ export function SettingsForm({
   onSubmit?: (deviceId: string, changes: Record<string, string>) => Promise<void>
 }) {
   const [phase, setPhase] = useState<Phase>({ status: 'loading' })
-  const [flash, setFlash] = useState<Flash | null>(null)
   const [contractInactive, setContractInactive] = useState(false)
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>()
+  } = useForm<FormValues>({ mode: 'onBlur', reValidateMode: 'onChange', shouldFocusError: true })
+  const watched = watch()
 
   // FR20 — see this file's header comment: records the device actually
   // selected *now*, so a submit's async result (success or failure) can tell
@@ -119,7 +131,7 @@ export function SettingsForm({
   useEffect(() => {
     let cancelled = false
     setPhase({ status: 'loading' })
-    setFlash(null)
+    toast.dismiss(RESULT_TOAST_ID)
     setContractInactive(false)
     reset({})
     fetchDeviceConfig(deviceId)
@@ -172,37 +184,50 @@ export function SettingsForm({
     try {
       await onSubmit(submittedFor, changes)
       if (latestDeviceIdRef.current !== submittedFor) return // FR20 — stale, device switched meanwhile
-      setFlash({
-        kind: 'success',
-        message:
-          'Réglages enregistrés. Ils seront transmis au device lors de sa prochaine remontée sur le port 3.',
-      })
+      toast.success(
+        'Réglages enregistrés. Ils seront transmis au device lors de sa prochaine remontée sur le port 3.',
+        { id: RESULT_TOAST_ID },
+      )
       // FR13 — refresh the displayed current config so placeholders reflect
       // what was just saved. Best-effort: a failed refresh keeps showing the
       // (now slightly stale) previous config rather than hiding the success
-      // flash the write itself did get.
+      // toast the write itself did get.
       try {
         const result = await fetchDeviceConfig(submittedFor)
         if (latestDeviceIdRef.current !== submittedFor) return
         setPhase({ status: 'ready', config: result.config })
         reset({})
       } catch {
-        // see comment above — keep the success flash, keep the stale config.
+        // see comment above — keep the success toast, keep the stale config.
       }
     } catch (error) {
       if (latestDeviceIdRef.current !== submittedFor) return // FR20 — stale, device switched meanwhile
       if (isContractInactiveError(error)) {
         setContractInactive(true)
-        setFlash({ kind: 'error', message: (error as Error).message })
+        toast.error((error as Error).message, { id: RESULT_TOAST_ID })
       } else if (isNoChangeError(error)) {
-        setFlash({ kind: 'info', message: (error as Error).message })
+        toast.info((error as Error).message, { id: RESULT_TOAST_ID })
       } else {
-        setFlash({
-          kind: 'error',
-          message: "Impossible d'enregistrer les réglages. Réessayez plus tard.",
-        })
+        toast.error("Impossible d'enregistrer les réglages. Réessayez plus tard.", { id: RESULT_TOAST_ID })
       }
     }
+  }
+
+  /** Typed value as a non-negative integer, else the device's current value, else `null`. */
+  function stepBase(def: SettingsFieldDef): number | null {
+    const typed = (watched[def.name] ?? '').trim()
+    if (/^\d+$/.test(typed)) return Number(typed)
+    const current = config[def.name]
+    if (typed === '' && current && /^\d+$/.test(current)) return Number(current)
+    return null
+  }
+
+  function step(def: SettingsFieldDef, direction: 1 | -1) {
+    const base = stepBase(def)
+    const min = def.min ?? 0
+    const max = def.max ?? 255
+    const next = base === null ? (def.defaultValue ?? min) : Math.min(max, Math.max(min, base + direction))
+    setValue(def.name, String(next), { shouldValidate: true, shouldDirty: true })
   }
 
   function renderField(def: SettingsFieldDef) {
@@ -210,26 +235,99 @@ export function SettingsForm({
     const fieldError = errors[def.name]
     const hintId = `settings-field-${def.name}-hint`
     const errorId = `settings-field-${def.name}-error`
+    const control = def.control ?? 'number'
+    const signed = def.min !== undefined && def.min < 0
+    const typed = (watched[def.name] ?? '').trim()
+    const typedMinutes = control === 'duration' && /^\d+$/.test(typed) ? Number(typed) : null
+    const currentMinutes = control === 'duration' && currentValue && /^\d+$/.test(currentValue) ? Number(currentValue) : null
+
+    const inputProps = {
+      id: `settings-field-${def.name}`,
+      'data-testid': `settings-field-${def.name}`,
+      placeholder: currentValue ?? undefined,
+      autoComplete: 'off',
+      inputMode: control === 'number' ? (signed ? ('text' as const) : ('decimal' as const)) : ('numeric' as const),
+      'aria-describedby': [KEEP_NOTE_ID, hintId, fieldError && errorId].filter(Boolean).join(' '),
+      'aria-invalid': Boolean(fieldError),
+      ...register(def.name, {
+        validate: (value) => {
+          const result = validateSettingsField(value ?? '', def)
+          return 'error' in result ? result.error : true
+        },
+      }),
+    }
 
     return (
-      <Field key={def.name} data-invalid={fieldError ? true : undefined}>
+      <Field key={def.name} data-invalid={fieldError ? true : undefined} className="md:col-span-6">
         <FieldLabel htmlFor={`settings-field-${def.name}`}>{def.label}</FieldLabel>
-        <Input
-          id={`settings-field-${def.name}`}
-          data-testid={`settings-field-${def.name}`}
-          placeholder={currentValue ?? undefined}
-          aria-describedby={fieldError ? `${hintId} ${errorId}` : hintId}
-          aria-invalid={Boolean(fieldError)}
-          {...register(def.name, {
-            validate: (value) => {
-              const result = validateSettingsField(value ?? '', def)
-              return 'error' in result ? result.error : true
-            },
-          })}
-        />
+        {control === 'stepper' ? (
+          <InputGroup>
+            <InputGroupAddon align="inline-start">
+              <InputGroupButton
+                variant="outline"
+                size="icon-sm"
+                aria-label={`Diminuer : ${def.label}`}
+                data-testid={`settings-field-${def.name}-decrement`}
+                onClick={() => step(def, -1)}
+              >
+                <MinusIcon />
+              </InputGroupButton>
+            </InputGroupAddon>
+            <InputGroupInput {...inputProps} className="text-center tabular-nums" />
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                variant="outline"
+                size="icon-sm"
+                aria-label={`Augmenter : ${def.label}`}
+                data-testid={`settings-field-${def.name}-increment`}
+                onClick={() => step(def, 1)}
+              >
+                <PlusIcon />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+        ) : (
+          <InputGroup>
+            <InputGroupInput {...inputProps} />
+            {def.unit && (
+              <InputGroupAddon align="inline-end">
+                <InputGroupText>{def.unit}</InputGroupText>
+              </InputGroupAddon>
+            )}
+          </InputGroup>
+        )}
+        {control === 'duration' && def.presets && (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              spacing={1}
+              aria-label={`Durées courantes : ${def.label}`}
+              data-testid={`settings-field-${def.name}-presets`}
+              value={typedMinutes !== null && def.presets.some((p) => p.value === typedMinutes) ? String(typedMinutes) : ''}
+              onValueChange={(value) => setValue(def.name, value, { shouldValidate: true, shouldDirty: true })}
+            >
+              {def.presets.map((preset) => (
+                <ToggleGroupItem key={preset.value} value={String(preset.value)} aria-label={preset.label}>
+                  {preset.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <p
+              aria-live="polite"
+              data-testid={`settings-field-${def.name}-readout`}
+              className="text-sm font-medium text-foreground tabular-nums"
+            >
+              {typedMinutes !== null && !fieldError ? `= ${formatMinutes(typedMinutes)}` : ''}
+            </p>
+          </div>
+        )}
         <FieldDescription id={hintId} data-testid={`settings-field-${def.name}-hint`}>
-          {def.hint} — laissez vide pour conserver la valeur actuelle
-          {currentValue ? ` (${currentValue})` : ' (aucune valeur enregistrée)'}.
+          {def.hint} ·{' '}
+          {currentValue
+            ? `valeur actuelle : ${currentValue}${currentMinutes !== null && currentMinutes >= 60 ? ` (= ${formatMinutes(currentMinutes)})` : ''}`
+            : 'aucune valeur enregistrée'}
         </FieldDescription>
         {fieldError && (
           <FieldError id={errorId} data-testid={errorId} role="alert">
@@ -241,47 +339,43 @@ export function SettingsForm({
   }
 
   return (
-    <Card className="max-w-3xl">
-      <CardContent>
-        <form data-testid="settings-form" onSubmit={handleSubmit(onValid)} className="flex flex-col gap-6">
-          <FieldSet data-testid="settings-group-transmitted">
-            <FieldLegend>Transmises au device</FieldLegend>
-            <FieldGroup>{TRANSMITTED_FIELDS.map(renderField)}</FieldGroup>
-          </FieldSet>
+    <form data-testid="settings-form" onSubmit={handleSubmit(onValid)} className="flex flex-col gap-8">
+      {/* FR10: the "blank keeps the current value" rule, said once for every field (each input
+          points at it through aria-describedby) instead of repeated under each one. */}
+      <p id={KEEP_NOTE_ID} className="text-sm text-muted-foreground" data-testid="settings-keep-note">
+        Laissez un champ vide pour conserver sa valeur actuelle.
+      </p>
 
-          <FieldSet data-testid="settings-group-stored-only">
-            <FieldLegend>Conservées uniquement — jamais envoyées au device</FieldLegend>
-            <FieldGroup>{STORED_ONLY_FIELDS.map(renderField)}</FieldGroup>
-          </FieldSet>
+      <FieldSet data-testid="settings-group-transmitted">
+        <FieldLegend variant="label">Transmises au device</FieldLegend>
+        <FieldGroup className="grid gap-x-6 gap-y-5 md:grid-cols-12">{TRANSMITTED_FIELDS.map(renderField)}</FieldGroup>
+      </FieldSet>
 
-          <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center">
-            <Button
-              type="submit"
-              data-testid="settings-form-submit"
-              disabled={isSubmitting || contractInactive}
-              loading={isSubmitting}
-              className="focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring focus-visible:ring-0"
-            >
-              Enregistrer
-            </Button>
+      <FieldSet data-testid="settings-group-stored-only">
+        <FieldLegend variant="label">Conservées uniquement — jamais envoyées au device</FieldLegend>
+        <FieldGroup className="grid gap-x-6 gap-y-5 md:grid-cols-12">{STORED_ONLY_FIELDS.map(renderField)}</FieldGroup>
+      </FieldSet>
 
-            {flash && (
-              <Alert
-                variant={flash.kind === 'error' ? 'danger' : flash.kind === 'success' ? 'success' : 'info'}
-                data-testid="settings-form-flash"
-                data-flash-kind={flash.kind}
-                role={flash.kind === 'error' ? 'alert' : 'status'}
-                className="flex-1"
-              >
-                <AlertDescription>{flash.message}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+      <div className="flex justify-end border-t border-border pt-4">
+        <Button
+          type="submit"
+          data-testid="settings-form-submit"
+          disabled={isSubmitting || contractInactive}
+          loading={isSubmitting}
+          className="focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring focus-visible:ring-0"
+        >
+          Enregistrer
+        </Button>
+      </div>
+    </form>
   )
 }
+
+/** The form-level "blank keeps the current value" note (FR10), referenced by every input. */
+const KEEP_NOTE_ID = 'settings-keep-note'
+
+/** One id for every save outcome, so a new result replaces the previous toast (and a device switch dismisses it). */
+const RESULT_TOAST_ID = 'settings-result'
 
 const SETTINGS_FIELDS_FOR_SUBMIT: readonly SettingsFieldDef[] = [
   ...TRANSMITTED_FIELDS,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SETTINGS_FIELDS, STORED_ONLY_FIELDS, TRANSMITTED_FIELDS } from './settingsFields'
+import { SETTINGS_FIELDS, STORED_ONLY_FIELDS, TRANSMITTED_FIELDS, formatMinutes } from './settingsFields'
 
 describe('settingsFields (KAN-163 FR8, FR12; GAP6)', () => {
   it('splits the fields into exactly 5 transmitted and 5 stored-only (FR8)', () => {
@@ -37,5 +37,31 @@ describe('settingsFields (KAN-163 FR8, FR12; GAP6)', () => {
   it('has no duplicate field names across both groups', () => {
     const names = SETTINGS_FIELDS.map((f) => f.name)
     expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('gives every field the control and unit that fit it', () => {
+    const byName = Object.fromEntries(SETTINGS_FIELDS.map((f) => [f.name, f]))
+    expect(byName.FREQ_MESURE_CL).toMatchObject({ control: 'stepper', min: 0, max: 255, defaultValue: 1 })
+    expect(byName.FREQ_MESURE_CL.unit).toBeUndefined() // firmware unit undocumented: never invented
+    expect(byName.WAKEUP_ESP_CL).toMatchObject({ control: 'duration', unit: 'min', defaultValue: 5 })
+    expect(byName.WAKEUP_ESP_CL.presets?.map((p) => p.value)).toEqual([15, 60, 360, 1440])
+    expect(byName.Seuil_TEMPAMB_CL).toMatchObject({ unit: '°C', min: -50, max: 100 })
+    expect(byName.Seuil_HRAMB_CL).toMatchObject({ unit: '% HR', min: 0, max: 100 })
+    expect(byName.Seuil_MASSE_CL).toMatchObject({ unit: 'kg', min: 0 })
+    expect(byName.Seuil_LAT_CL).toMatchObject({ unit: '°', min: -90, max: 90 })
+    expect(byName.Seuil_LONG_CL).toMatchObject({ unit: '°', min: -180, max: 180 })
+    expect(byName.Seuil_TEMPMPU_CL).toMatchObject({ label: 'Seuil tension batterie', unit: 'V', min: 0 })
+  })
+})
+
+describe('formatMinutes', () => {
+  it('formats minutes as a compact human duration', () => {
+    expect(formatMinutes(0)).toBe('0 min')
+    expect(formatMinutes(15)).toBe('15 min')
+    expect(formatMinutes(60)).toBe('1 h')
+    expect(formatMinutes(90)).toBe('1 h 30 min')
+    expect(formatMinutes(360)).toBe('6 h')
+    expect(formatMinutes(1440)).toBe('1 j')
+    expect(formatMinutes(1500)).toBe('1 j 1 h')
   })
 })

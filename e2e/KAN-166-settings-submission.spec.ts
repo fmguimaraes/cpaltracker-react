@@ -94,19 +94,25 @@ async function mockEligibleWorkspace(
   })
 }
 
-test('an accepted change shows a success flash and refreshes the displayed placeholder (FR11, FR13)', async ({
+/** The result of a save is a sonner toast (centred at the top), not an inline flash. */
+const toastOf = (page: import('@playwright/test').Page) => page.locator('[data-sonner-toast]')
+
+test('an accepted change shows a success toast and refreshes the displayed placeholder (FR11, FR13)', async ({
   page,
 }) => {
   await mockEligibleWorkspace(page, { config: { FREQ_MESURE_CL: '3' } })
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('10')
   await page.getByTestId('settings-form-submit').click()
 
-  await expect(page.getByTestId('settings-form-flash')).toContainText('Réglages enregistrés')
-  await expect(page.getByTestId('settings-form-flash')).toContainText('prochaine remontée sur le port 3')
+  await expect(toastOf(page)).toContainText('Réglages enregistrés')
+  await expect(toastOf(page)).toContainText('prochaine remontée sur le port 3')
+  await expect(page.getByTestId('settings-form-flash')).toHaveCount(0)
   await expect(page.getByTestId('settings-field-FREQ_MESURE_CL')).toHaveAttribute('placeholder', '10')
 })
 
@@ -128,11 +134,13 @@ test('a 409 contract_inactive response shows the server message, does not change
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('10')
   await page.getByTestId('settings-form-submit').click()
 
-  await expect(page.getByTestId('settings-form-flash')).toContainText(
+  await expect(toastOf(page)).toContainText(
     "Ce contrat n'est pas actif aujourd'hui",
   )
   await expect(page.getByTestId('settings-field-FREQ_MESURE_CL')).toHaveAttribute('placeholder', '3')
@@ -142,7 +150,7 @@ test('a 409 contract_inactive response shows the server message, does not change
   await expect(page.getByTestId('settings-form-submit')).toBeDisabled()
 })
 
-test('a 400 "no values changed" response is shown as an informational result, not an error (FR11)', async ({
+test('a 400 "no values changed" response is shown as an info toast, not an error (FR11)', async ({
   page,
 }) => {
   await mockEligibleWorkspace(page, {
@@ -157,13 +165,15 @@ test('a 400 "no values changed" response is shown as an informational result, no
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('3')
   await page.getByTestId('settings-form-submit').click()
 
-  const flash = page.getByTestId('settings-form-flash')
-  await expect(flash).toContainText('Aucune valeur modifiée')
-  await expect(flash).toHaveAttribute('data-flash-kind', 'info')
+  const toast = toastOf(page)
+  await expect(toast).toContainText('Aucune valeur modifiée')
+  await expect(toast).toHaveAttribute('data-type', 'info')
 })
 
 test('a browser refresh after a submit never re-sends the write request (FR20)', async ({ page }) => {
@@ -171,6 +181,8 @@ test('a browser refresh after a submit never re-sends the write request (FR20)',
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('10')
 
@@ -182,7 +194,7 @@ test('a browser refresh after a submit never re-sends the write request (FR20)',
   })
 
   await page.getByTestId('settings-form-submit').click()
-  await expect(page.getByTestId('settings-form-flash')).toContainText('Réglages enregistrés')
+  await expect(toastOf(page)).toContainText('Réglages enregistrés')
   expect(postCount).toBe(1)
 
   await page.reload()

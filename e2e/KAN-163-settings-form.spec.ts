@@ -85,6 +85,8 @@ test('shows two visibly labeled field groups, 5 transmitted + 5 stored-only (FR8
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await expect(page.getByTestId('settings-group-transmitted')).toContainText('Transmises au device')
   await expect(page.getByTestId('settings-group-stored-only')).toContainText(
@@ -107,6 +109,8 @@ test('never shows the binary WiFi credential fields (FR12)', async ({ page }) =>
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await expect(page.getByTestId('settings-form')).toBeVisible()
   await expect(page.getByTestId('settings-field-WiFi_SSID_CL')).toHaveCount(0)
@@ -120,13 +124,14 @@ test("shows the device's current value as a placeholder hint, never pre-filled (
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   const input = page.getByTestId('settings-field-FREQ_MESURE_CL')
   await expect(input).toHaveAttribute('placeholder', '3')
   await expect(input).toHaveValue('')
-  await expect(page.getByTestId('settings-field-FREQ_MESURE_CL-hint')).toContainText(
-    'laissez vide pour conserver la valeur actuelle (3)',
-  )
+  await expect(page.getByTestId('settings-keep-note')).toContainText('Laissez un champ vide pour conserver sa valeur actuelle.')
+  await expect(page.getByTestId('settings-field-FREQ_MESURE_CL-hint')).toContainText('valeur actuelle : 3')
 })
 
 test('rejects an out-of-range value client-side before any submission (FR9, CB13)', async ({ page }) => {
@@ -134,6 +139,8 @@ test('rejects an out-of-range value client-side before any submission (FR9, CB13
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('settings-field-FREQ_MESURE_CL').fill('999')
   await page.getByTestId('settings-form-submit').click()
@@ -148,9 +155,44 @@ test('normalizes a decimal comma to a dot for a float field (FR9, CB13)', async 
 
   await page.goto('/pilotage')
   await pickContract(page, 12)
+  // The settings form lives on the device's own page (/pilotage/:chipId).
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
 
   await page.getByTestId('settings-field-Seuil_TEMPAMB_CL').fill('19,5')
   await page.getByTestId('settings-form-submit').click()
 
   await expect(page.getByTestId('settings-field-Seuil_TEMPAMB_CL-error')).toHaveCount(0)
+})
+
+test('validates on blur and focuses the first invalid field on submit (FR9)', async ({ page }) => {
+  await mockEligibleWorkspace(page)
+
+  await page.goto('/pilotage')
+  await pickContract(page, 12)
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
+
+  await page.getByTestId('settings-field-Seuil_HRAMB_CL').fill('120')
+  await page.getByTestId('settings-field-Seuil_HRAMB_CL').blur()
+  await expect(page.getByTestId('settings-field-Seuil_HRAMB_CL-error')).toContainText('entre 0 et 100 % HR')
+
+  // Submit with Enter: the blur error above reflows the form, which would move the button under a mouse click.
+  await page.getByTestId('settings-field-Seuil_LAT_CL').fill('95')
+  await page.getByTestId('settings-field-Seuil_LAT_CL').press('Enter')
+  await expect(page.getByTestId('settings-field-Seuil_LAT_CL-error')).toContainText('entre -90 et 90')
+  await expect(page.getByTestId('settings-field-Seuil_HRAMB_CL')).toBeFocused()
+})
+
+test('steps the measurement frequency and fills the wake-up duration from a preset (FR8)', async ({ page }) => {
+  await mockEligibleWorkspace(page, { FREQ_MESURE_CL: '3' })
+
+  await page.goto('/pilotage')
+  await pickContract(page, 12)
+  await page.getByTestId('pilotage-device-CHIP-001-select').click()
+
+  await page.getByTestId('settings-field-FREQ_MESURE_CL-increment').click()
+  await expect(page.getByTestId('settings-field-FREQ_MESURE_CL')).toHaveValue('4')
+
+  await page.getByRole('radio', { name: '6 h' }).click()
+  await expect(page.getByTestId('settings-field-WAKEUP_ESP_CL')).toHaveValue('360')
+  await expect(page.getByTestId('settings-field-WAKEUP_ESP_CL-readout')).toHaveText('= 6 h')
 })
