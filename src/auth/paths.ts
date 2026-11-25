@@ -44,6 +44,23 @@ export function devicePilotagePath(chipId: string): string {
   return `${DEVICE_PILOTAGE_PATH}/${encodeURIComponent(chipId)}`
 }
 
+/** A device's full readings history, a child page of its device page. */
+export function deviceReadingsPath(chipId: string): string {
+  return `${devicePilotagePath(chipId)}/releves`
+}
+
+/** Alerts (anomalies) as full pages: the list, and one alert's own page (the Pulse drawer's content). */
+export const ALERTS_PATH = '/alertes'
+
+export function alertPath(anomalyKey: string): string {
+  return `${ALERTS_PATH}/${encodeURIComponent(anomalyKey)}`
+}
+
+/** The alerts list filtered to one device (`?device=`), linked from that device's page. */
+export function deviceAlertsPath(chipId: string): string {
+  return `${ALERTS_PATH}?device=${encodeURIComponent(chipId)}`
+}
+
 /** KAN-272 — Pulse: Live Tracking plus each device's lot (route `routes/Pulse.tsx`). */
 export const PULSE_PATH = '/pulse'
 /** KAN-256 — Trends (risk quadrant + lot table). */

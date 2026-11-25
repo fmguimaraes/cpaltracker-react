@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { House, PanelRightClose } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { House, Maximize2, PanelRightClose } from 'lucide-react'
 import { Alert } from '@/ui/alert'
 import { Button } from '@/ui/button'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
@@ -18,6 +18,7 @@ import { useLoad } from '../anomalies/useLoad'
 import { fetchAnomalies } from '../api/anomalies'
 import { fetchPulse } from '../api/pulse'
 import type { Position } from '../api/positions'
+import { alertPath } from '../auth/paths'
 import { useContracts } from '../contracts/ContractContext'
 import { ContractPositions, type PositionsRefreshState } from '../live-tracking/ContractPositions'
 import { filterByLastReport } from '../live-tracking/lastReportFilter'
@@ -544,7 +545,21 @@ export function Pulse() {
                     onLocate={setFocus}
                     // "Voir la palette →": the pallet's drawer, the map flying onto it (as "Localiser").
                     onShowPallet={selectChip}
-                    actions={collapseButton}
+                    actions={
+                      <>
+                        <Button variant="ghost" size="icon-sm" asChild>
+                          <Link
+                            to={alertPath(view.anomalyKey)}
+                            aria-label="Ouvrir en pleine page"
+                            title="Ouvrir en pleine page"
+                            data-testid="pulse-anomaly-fullpage"
+                          >
+                            <Maximize2 aria-hidden />
+                          </Link>
+                        </Button>
+                        {collapseButton}
+                      </>
+                    }
                   />
                 ) : pallet ? (
                   <PalletPanel

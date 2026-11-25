@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export type LoadState<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; value: T }
+export type LoadState<T> = { status: 'loading' } | { status: 'error'; error?: unknown } | { status: 'ready'; value: T }
 
 /** Runs `load` on mount and whenever it changes; `reload()` runs it again. A stale answer is ignored. */
 export function useLoad<T>(load: () => Promise<T>): { state: LoadState<T>; reload: () => void } {
@@ -11,7 +11,7 @@ export function useLoad<T>(load: () => Promise<T>): { state: LoadState<T>; reloa
     let current = true
     load().then(
       (value) => current && setState({ status: 'ready', value }),
-      () => current && setState({ status: 'error' }),
+      (error: unknown) => current && setState({ status: 'error', error }),
     )
     return () => {
       current = false
