@@ -16,6 +16,7 @@ import {
   setSessionLossHandler,
 } from '../api/client'
 import type { LoginNotice } from './loginNotice'
+import { answerTokenRequests, canShareAcrossTabs, requestTokenFromOtherTabs } from './tabSession'
 
 /**
  * Account shape as returned by GET /api/v1/account.php (api/openapi.yaml
@@ -280,8 +281,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setSessionLossHandler(null)
   }, [handleSessionLoss])
 
+  useEffect(() => answerTokenRequests(getAuthToken), [])
+
+  // Bootstrap: a tab opened without a token (e.g. a link opened in a new tab) first asks the other open
+  // tabs for theirs, so it doesn't have to sign in again. Otherwise refresh right away.
   useEffect(() => {
-    void refresh()
+    if (getAuthToken() !== null || !canShareAcrossTabs()) {
+      void refresh()
+      return
+    }
+    let cancelled = false
+    const idBeforeWait = requestId.current
+    void requestTokenFromOtherTabs().then((shared) => {
+      // Unmounted, or the user already signed in / out meanwhile: that action owns the state now.
+      if (cancelled || requestId.current !== idBeforeWait) return
+      if (shared !== null && getAuthToken() === null) setAuthToken(shared)
+      void refresh()
+    })
+    return () => {
+      cancelled = true
+    }
   }, [refresh])
 
   const isAdmin = account?.role === 'admin'
