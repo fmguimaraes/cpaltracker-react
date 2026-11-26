@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { CalendarRange } from 'lucide-react'
+import { addMonths, endOfMonth, format, isValid, parse, startOfMonth, startOfYear } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import type { DateRange } from 'react-day-picker'
+import { fr as frCalendar } from 'react-day-picker/locale'
 import { Button } from '@/ui/button'
 import { Calendar } from '@/ui/calendar'
+import { Input } from '@/ui/input'
+import { Label } from '@/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover'
 import { ToggleGroup, ToggleGroupItem } from '@/ui/toggle-group'
 import { cn } from '@/lib/utils'
@@ -48,6 +52,32 @@ export function formatDayRange(from: Date, to: Date, now: Date = new Date()): st
   return start === end ? start : `${start} – ${end}`
 }
 
+/** Month-aligned shortcuts of the custom range, relative to `now`; the current month ends today. */
+export function monthShortcuts(now: Date = new Date()): { key: string; label: string; from: Date; to: Date }[] {
+  const thisMonth = startOfMonth(now)
+  return [
+    { key: 'this-month', label: 'Ce mois', from: thisMonth, to: now },
+    { key: 'last-month', label: 'Mois dernier', from: addMonths(thisMonth, -1), to: endOfMonth(addMonths(thisMonth, -1)) },
+    { key: '3-months', label: '3 derniers mois', from: addMonths(thisMonth, -2), to: now },
+    { key: '6-months', label: '6 derniers mois', from: addMonths(thisMonth, -5), to: now },
+    { key: 'this-year', label: 'Cette année', from: startOfYear(now), to: now },
+  ]
+}
+
+const DAY_FORMAT = 'dd/MM/yyyy'
+
+/** A typed "jj/mm/aaaa" day, or null when it is not a real date. */
+export function parseDay(text: string): Date | null {
+  const day = parse(text.trim(), DAY_FORMAT, new Date(), { locale: fr })
+  return isValid(day) && day.getFullYear() >= 1000 ? day : null
+}
+
+function wideScreen(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(min-width: 768px)').matches
+    : true
+}
+
 export interface PeriodControlProps {
   /** The active preset; `null` = a custom range (`custom`). */
   preset: PeriodPreset | null
@@ -81,7 +111,44 @@ export function PeriodControl({
 }: PeriodControlProps) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<DateRange | undefined>()
+  const [month, setMonth] = useState<Date>(() => startOfMonth(range.from))
+  const [fromText, setFromText] = useState('')
+  const [toText, setToText] = useState('')
+  const [months, setMonths] = useState(2)
   const custom = preset === null
+  const now = new Date()
+  const fromInvalid = fromText.trim() !== '' && parseDay(fromText) === null
+  const toInvalid = toText.trim() !== '' && parseDay(toText) === null
+
+  function showRange(next: DateRange | undefined) {
+    setDraft(next)
+    setFromText(next?.from ? format(next.from, DAY_FORMAT) : '')
+    setToText(next?.to ? format(next.to, DAY_FORMAT) : '')
+  }
+
+  function commitTyped(edge: 'from' | 'to') {
+    const day = parseDay(edge === 'from' ? fromText : toText)
+    if (!day) return
+    let from = edge === 'from' ? day : draft?.from
+    let to = edge === 'to' ? day : draft?.to
+    if (from && to && from > to) [from, to] = [to, from]
+    showRange({ from: from ?? day, to })
+    setMonth(startOfMonth(edge === 'to' && months > 1 ? addMonths(day, 1 - months) : day))
+  }
+
+  function apply() {
+    const from = parseDay(fromText) ?? draft?.from
+    if (!from) return
+    let to = parseDay(toText) ?? draft?.to ?? from
+    let start = from
+    if (start > to) [start, to] = [to, start]
+    const startDay = new Date(start)
+    startDay.setHours(0, 0, 0, 0)
+    const endDay = new Date(to)
+    endDay.setHours(23, 59, 59, 999)
+    onCustom(startDay, endDay)
+    setOpen(false)
+  }
   return (
     <div role="group" aria-label="Période" className={cn('flex shrink-0 items-center gap-1.5', className)} data-testid={testId}>
       <ToggleGroup
@@ -104,7 +171,11 @@ export function PeriodControl({
         open={open}
         onOpenChange={(next) => {
           setOpen(next)
-          if (next) setDraft({ from: range.from, to: range.to })
+          if (!next) return
+          const count = wideScreen() ? 2 : 1
+          setMonths(count)
+          showRange({ from: range.from, to: range.to })
+          setMonth(startOfMonth(count > 1 && range.to >= addMonths(startOfMonth(range.from), 1) ? addMonths(range.to, -1) : range.from))
         }}
       >
         <PopoverTrigger asChild>
@@ -126,25 +197,83 @@ export function PeriodControl({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
-          <Calendar mode="range" locale={fr} numberOfMonths={1} selected={draft} onSelect={setDraft} defaultMonth={draft?.from} />
+        <PopoverContent className="w-auto max-w-[calc(100vw-1rem)] p-0" align="end" data-testid={`${testId}-custom-panel`}>
+          <div className="flex flex-col md:flex-row">
+            <div
+              role="group"
+              aria-label="Raccourcis"
+              className="flex flex-wrap gap-1 border-b border-border p-2 md:w-40 md:flex-col md:flex-nowrap md:border-r md:border-b-0"
+            >
+              {monthShortcuts(now).map((s) => (
+                <Button
+                  key={s.key}
+                  variant="ghost"
+                  size="sm"
+                  className="justify-start"
+                  data-testid={`${testId}-shortcut-${s.key}`}
+                  onClick={() => {
+                    showRange({ from: s.from, to: s.to })
+                    setMonth(startOfMonth(months > 1 ? addMonths(s.to, -1) : s.from))
+                  }}
+                >
+                  {s.label}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-col">
+              <div className="flex gap-2 px-3 pt-3">
+                {(['from', 'to'] as const).map((edge) => {
+                  const id = `${testId}-custom-${edge}`
+                  const invalid = edge === 'from' ? fromInvalid : toInvalid
+                  return (
+                    <div key={edge} className="flex flex-1 flex-col gap-1">
+                      <Label htmlFor={id}>{edge === 'from' ? 'Du' : 'Au'}</Label>
+                      <Input
+                        id={id}
+                        data-testid={id}
+                        inputMode="numeric"
+                        placeholder="jj/mm/aaaa"
+                        className="h-8 tabular-nums"
+                        aria-invalid={invalid || undefined}
+                        value={edge === 'from' ? fromText : toText}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => (edge === 'from' ? setFromText : setToText)(e.target.value)}
+                        onBlur={() => commitTyped(edge)}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter') return
+                          e.preventDefault()
+                          commitTyped(edge)
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+              <Calendar
+                mode="range"
+                locale={frCalendar}
+                numberOfMonths={months}
+                showOutsideDays={months === 1}
+                captionLayout="dropdown"
+                startMonth={new Date(now.getFullYear() - 5, 0)}
+                endMonth={new Date(now.getFullYear() + 3, 11)}
+                month={month}
+                onMonthChange={setMonth}
+                resetOnSelect
+                selected={draft}
+                onSelect={showRange}
+              />
+            </div>
+          </div>
           <div className="flex justify-end gap-2 border-t border-border p-2">
             <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
               Annuler
             </Button>
             <Button
               size="sm"
-              disabled={!draft?.from}
+              disabled={!draft?.from || fromInvalid || toInvalid}
               data-testid={`${testId}-custom-apply`}
-              onClick={() => {
-                if (!draft?.from) return
-                const start = new Date(draft.from)
-                start.setHours(0, 0, 0, 0)
-                const end = new Date(draft.to ?? draft.from)
-                end.setHours(23, 59, 59, 999)
-                onCustom(start, end)
-                setOpen(false)
-              }}
+              onClick={apply}
             >
               Appliquer
             </Button>
