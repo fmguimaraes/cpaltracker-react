@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { BellOff, X } from 'lucide-react'
-import { fetchAnomalies, type AnomalyRow } from '../api/anomalies'
+import { fetchAnomalies, peekAnomalies, type AnomalyRow } from '../api/anomalies'
 import { sortAnomalies, TYPE_LABEL, TYPE_ORDER, typeKeyOf, type TypeKey } from '../anomalies/anomalyCard'
 import { STATUS_FILTER_OPTIONS, statusesForFilter, type StatusFilter } from '../anomalies/anomalyFormat'
 import { TYPE_ICON } from '../anomalies/AnomalyList'
@@ -74,7 +74,8 @@ export function AlertsList({ contractId, device: fixedDevice }: { contractId: nu
     () => (contractId === null ? NEVER : fetchAnomalies(contractId, ALL)),
     [contractId],
   )
-  const { state, reload } = useLoad(load)
+  const peek = useCallback(() => (contractId === null ? undefined : peekAnomalies(contractId, ALL)), [contractId])
+  const { state, reload } = useLoad(load, peek)
 
   /** Writes one filter into the URL (the default value drops its param); a replace, so back leaves the page. */
   const update = (changes: Record<string, string | null>) => {

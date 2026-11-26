@@ -1,6 +1,7 @@
 import { ApiError } from '../api/client'
 import { fetchDeviceConfig } from '../api/deviceConfig'
 import { fetchPositions, type Position } from '../api/positions'
+import { cacheGeneration, peekCache, storeCache, type CacheKey } from '../api/responseCache'
 import { eligibilityFromError } from './eligibility'
 
 /**
@@ -32,7 +33,22 @@ export type PilotageWorkspaceResult =
   | { kind: 'empty' }
   | { kind: 'eligible'; devices: Position[] }
 
+const workspaceKey = (contractId: number): CacheKey => ({ group: 'positions', fn: 'loadPilotageWorkspace', contractId })
+
+/** KAN-345 (FR24): the last eligible workspace (younger than the maximum age), shown at once while revalidated. */
+export function peekPilotageWorkspace(contractId: number): PilotageWorkspaceResult | undefined {
+  return peekCache<PilotageWorkspaceResult>(workspaceKey(contractId))
+}
+
+/** Always hits the network; only an `eligible` answer is cached (no error, 404 or ineligible verdict, EC20). */
 export async function loadPilotageWorkspace(contractId: number): Promise<PilotageWorkspaceResult> {
+  const startedAt = cacheGeneration()
+  const result = await fetchPilotageWorkspace(contractId)
+  if (result.kind === 'eligible') storeCache(workspaceKey(contractId), result, startedAt)
+  return result
+}
+
+async function fetchPilotageWorkspace(contractId: number): Promise<PilotageWorkspaceResult> {
   let devices: Position[]
   try {
     devices = await fetchPositions(contractId)

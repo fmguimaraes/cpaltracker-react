@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { invalidateCache } from './responseCache'
 
 /**
  * `POST /api/v1/devices/{deviceId}/transfer` (KAN-123, physically served
@@ -36,7 +37,7 @@ export async function postDeviceTransfer(
   deviceId: string,
   input: { targetContractId: number; startDate: string; endDate?: string | null },
 ): Promise<TransferResult> {
-  return apiClient.post<TransferResult>(
+  const result = await apiClient.post<TransferResult>(
     `/devices/transfer.php?deviceId=${encodeURIComponent(deviceId)}`,
     {
       targetContractId: input.targetContractId,
@@ -44,4 +45,7 @@ export async function postDeviceTransfer(
       endDate: input.endDate ?? null,
     },
   )
+  // KAN-345 (FR25): the device moved contract, so both contracts' positions changed.
+  invalidateCache('positions')
+  return result
 }

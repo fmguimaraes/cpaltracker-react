@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError } from '../api/client'
-import { fetchPositions, type Position } from '../api/positions'
+import { fetchPositions, peekPositions, type Position } from '../api/positions'
 import { DeviceFilter } from './DeviceFilter'
 import { useDeviceVisibilityStore } from './deviceVisibilityStore'
 import { PositionsMap } from './PositionsMap'
@@ -72,6 +72,8 @@ export function ContractPositions({
   footerSlot,
   period,
   load = fetchPositions,
+  peek = peekPositions,
+  onCached,
   filter,
   showFleetPanel = true,
   selectedChipId,
@@ -118,6 +120,13 @@ export function ContractPositions({
   period?: TimeRangeValue
   /** KAN-272 (Pulse): the data source, `fetchPositions` by default. Must be referentially stable. */
   load?: (contractId: number) => Promise<Position[]>
+  /**
+   * KAN-345 (FR24): the cached answer of `load` for a contract (younger than the cache's maximum age), shown at
+   * once instead of the loader while `load` revalidates it. `peekPositions` by default. Must be stable and pure.
+   */
+  peek?: (contractId: number) => Position[] | undefined
+  /** KAN-345: told when the cached snapshot is what the map starts from (Pulse mirrors it for its lot list). */
+  onCached?: (positions: Position[]) => void
   /** KAN-272 (Pulse): extra client-side predicate (lot filter) applied after `period`. */
   filter?: (position: Position) => boolean
   /** KAN-272 (Pulse): `false` hides the fleet panel (and its device list); Live Tracking keeps it. */
@@ -176,8 +185,10 @@ export function ContractPositions({
    */
   emptyNotice?: ReactNode
 }) {
-  const [state, setState] = useState<LoadState>('loading')
-  const [allPositions, setPositions] = useState<Position[]>([])
+  // A cached snapshot makes the first render already loaded (no loader flash, FR24).
+  const [initialCache] = useState(() => (contractId === null ? undefined : peek(contractId)))
+  const [state, setState] = useState<LoadState>(initialCache ? 'loaded' : 'loading')
+  const [allPositions, setPositions] = useState<Position[]>(initialCache ?? [])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
@@ -195,13 +206,21 @@ export function ContractPositions({
   // new inline callback identity from the parent never re-triggers the fetch.
   const onUnauthorizedRef = useRef(onUnauthorized)
   onUnauthorizedRef.current = onUnauthorized
+  const onCachedRef = useRef(onCached)
+  onCachedRef.current = onCached
 
   useEffect(() => {
     let cancelled = false
     activeContractIdRef.current = contractId
-    setState('loading')
+    const cached = contractId === null ? undefined : peek(contractId)
     setRefreshError(null)
     setRefreshing(false)
+    if (cached) {
+      // FR24: show the cached snapshot at once and revalidate behind it.
+      setPositions(cached)
+      setState('loaded')
+      onCachedRef.current?.(cached)
+    } else setState('loading')
     if (contractId === null) return
     showAll()
     load(contractId)
@@ -217,12 +236,14 @@ export function ContractPositions({
           onUnauthorizedRef.current?.()
           return
         }
-        setState('error')
+        // FR27: a failed revalidation keeps the cached data and reports through the freshness state.
+        if (cached) setRefreshError('Impossible de rafraîchir les positions. Dernières positions connues affichées.')
+        else setState('error')
       })
     return () => {
       cancelled = true
     }
-  }, [contractId, showAll, load, attempt])
+  }, [contractId, showAll, load, peek, attempt])
 
   function refresh() {
     if (contractId === null) return

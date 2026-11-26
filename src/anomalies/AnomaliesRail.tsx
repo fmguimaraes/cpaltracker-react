@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { TriangleAlert } from 'lucide-react'
-import { fetchAnomalies } from '../api/anomalies'
+import { fetchAnomalies, peekAnomalies } from '../api/anomalies'
 import { statusesForFilter } from './anomalyFormat'
 import { useLoad } from './useLoad'
 import { Badge } from '@/ui/badge'
@@ -22,7 +22,8 @@ export function AnomaliesRail({
   onExpand: () => void
 }) {
   const load = useCallback(() => fetchAnomalies(contractId, statusesForFilter('open')), [contractId])
-  const { state } = useLoad(load)
+  const peek = useCallback(() => peekAnomalies(contractId, statusesForFilter('open')), [contractId])
+  const { state } = useLoad(load, peek)
 
   const count =
     state.status === 'ready'

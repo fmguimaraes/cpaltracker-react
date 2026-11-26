@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { fetchAndStore, invalidateCache, peekCache, type CacheKey } from './responseCache'
 
 /**
  * `GET /api/v1/anomalies/list.php/{contractId}` and `detail.php/{anomalyKey}?contractId=` (KAN-261).
@@ -59,10 +60,32 @@ export interface AnomalyDetail extends Omit<AnomalyRow, 'status'> {
 }
 
 /** `statuses` omitted = the server default (everything but `cloturee`). */
-export async function fetchAnomalies(contractId: number, statuses?: AnomalyStatus[]): Promise<AnomalyRow[]> {
-  const query = statuses ? `?status=${statuses.join(',')}` : ''
-  const body = await apiClient.get<{ anomalies: AnomalyRow[] }>(`/anomalies/list.php/${contractId}${query}`)
-  return body.anomalies ?? []
+const anomaliesKey = (contractId: number, statuses?: AnomalyStatus[]): CacheKey => ({
+  group: 'anomalies',
+  fn: 'fetchAnomalies',
+  contractId,
+  params: statuses?.join(',') ?? '',
+})
+
+/** KAN-345: the last cached list (younger than the maximum age), shown at once while it is revalidated. */
+export function peekAnomalies(contractId: number, statuses?: AnomalyStatus[]): AnomalyRow[] | undefined {
+  return peekCache<AnomalyRow[]>(anomaliesKey(contractId, statuses))
+}
+
+/** Always hits the network (so a refresh bypasses the cache) and caches its success (KAN-345). */
+export function fetchAnomalies(contractId: number, statuses?: AnomalyStatus[]): Promise<AnomalyRow[]> {
+  return fetchAndStore(anomaliesKey(contractId, statuses), async () => {
+    const query = statuses ? `?status=${statuses.join(',')}` : ''
+    const body = await apiClient.get<{ anomalies: AnomalyRow[] }>(`/anomalies/list.php/${contractId}${query}`)
+    return body.anomalies ?? []
+  })
+}
+
+/** Runs a mutation, then (only on success) drops the contract's cached anomalies (FR25). */
+async function thenInvalidateAnomalies<T>(contractId: number, request: Promise<T>): Promise<T> {
+  const result = await request
+  invalidateCache('anomalies', contractId)
+  return result
 }
 
 export function fetchAnomalyDetail(contractId: number, anomalyKey: string): Promise<AnomalyDetail> {
@@ -77,10 +100,13 @@ export function postAnomalyTransition(
   anomalyKey: string,
   input: { from: AnomalyStatus; to: AnomalyStatus; comment: string },
 ): Promise<AnomalyDetail> {
-  return apiClient.post<AnomalyDetail>(`/anomalies/transition.php/${encodeURIComponent(anomalyKey)}`, {
+  return thenInvalidateAnomalies(
     contractId,
-    ...input,
-  })
+    apiClient.post<AnomalyDetail>(`/anomalies/transition.php/${encodeURIComponent(anomalyKey)}`, {
+      contractId,
+      ...input,
+    }),
+  )
 }
 
 /** True for a history entry that is a comment saved without a status change. */
@@ -90,8 +116,11 @@ export function isCommentEntry(entry: AnomalyHistoryEntry): boolean {
 
 /** `POST /api/v1/anomalies/comment.php/{anomalyKey}?contractId=`: saves a comment, status unchanged; 201 = updated detail. */
 export function postAnomalyComment(contractId: number, anomalyKey: string, comment: string): Promise<AnomalyDetail> {
-  return apiClient.post<AnomalyDetail>(
-    `/anomalies/comment.php/${encodeURIComponent(anomalyKey)}?contractId=${contractId}`,
-    { comment },
+  return thenInvalidateAnomalies(
+    contractId,
+    apiClient.post<AnomalyDetail>(
+      `/anomalies/comment.php/${encodeURIComponent(anomalyKey)}?contractId=${contractId}`,
+      { comment },
+    ),
   )
 }

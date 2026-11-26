@@ -16,8 +16,8 @@ import { anomalyCardContent, cardHeadline, formatAbsolute, parseUtc } from '../a
 import { statusesForFilter } from '../anomalies/anomalyFormat'
 import { ContractAnomalies } from '../anomalies/ContractAnomalies'
 import { useLoad } from '../anomalies/useLoad'
-import { fetchAnomalies } from '../api/anomalies'
-import { fetchPulse } from '../api/pulse'
+import { fetchAnomalies, peekAnomalies } from '../api/anomalies'
+import { fetchPulse, peekPulse } from '../api/pulse'
 import type { Position } from '../api/positions'
 import { alertPath } from '../auth/paths'
 import { useContracts } from '../contracts/ContractContext'
@@ -150,11 +150,21 @@ export function Pulse() {
     return positions
   }, [])
 
+  // FR24: the cached snapshot also feeds Pulse's own mirror (lot list, timeline bar) at once.
+  const applyCachedSnapshot = useCallback((positions: Position[]) => {
+    setLoaded(positions)
+    setSnapshotReady(true)
+  }, [])
+
   const loadAnomalies = useCallback(
     () => (selectedId === null ? Promise.resolve([]) : fetchAnomalies(selectedId, ALL_STATUSES)),
     [selectedId],
   )
-  const { state: anomalyState } = useLoad(loadAnomalies)
+  const peekAnomalyRows = useCallback(
+    () => (selectedId === null ? undefined : peekAnomalies(selectedId, ALL_STATUSES)),
+    [selectedId],
+  )
+  const { state: anomalyState } = useLoad(loadAnomalies, peekAnomalyRows)
   const anomalyRows = useMemo(() => (anomalyState.status === 'ready' ? anomalyState.value : []), [anomalyState])
 
   const listView: ListView = view.kind === 'anomaly' ? view.from : view
@@ -478,6 +488,8 @@ export function Pulse() {
               onRefreshState={setFreshness}
               emptyNotice={allHidden ? noneSelectedNotice : undefined}
               load={load}
+              peek={peekPulse}
+              onCached={applyCachedSnapshot}
               filter={filter}
               period={period}
               showFleetPanel={false}

@@ -1,4 +1,5 @@
 import { ApiError, apiClient } from './client'
+import { invalidateCache } from './responseCache'
 
 /**
  * `GET`/`POST /api/v1/devices/{deviceId}/config` (KAN-123, physically served
@@ -55,10 +56,13 @@ export async function postDeviceConfig(
   deviceId: string,
   changes: Record<string, string>,
 ): Promise<{ deviceId: string; contractId: number; modifiedFields: string[] }> {
-  return apiClient.post(
+  const result = await apiClient.post<{ deviceId: string; contractId: number; modifiedFields: string[] }>(
     `/devices/config.php?deviceId=${encodeURIComponent(deviceId)}`,
     changes,
   )
+  // KAN-345 (FR25): the device's settings feed the positions and the Pilotage workspace.
+  invalidateCache('positions', result?.contractId)
+  return result
 }
 
 /**

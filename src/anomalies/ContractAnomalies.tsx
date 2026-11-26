@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { MapPin } from 'lucide-react'
-import { fetchAnomalies, type AnomalyRow } from '../api/anomalies'
+import { fetchAnomalies, peekAnomalies, type AnomalyRow } from '../api/anomalies'
 import { sortAnomalies, TYPE_LABEL, TYPE_ORDER, typeKeyOf, type TypeKey } from './anomalyCard'
 import { STATUS_FILTER_OPTIONS, statusesForFilter, type StatusFilter } from './anomalyFormat'
 import { AnomalyList, TYPE_ICON, type AnomalySelection } from './AnomalyList'
@@ -89,7 +89,8 @@ export function ContractAnomalies({
   const [tab, setTab] = useState<StatusFilter>(readTab)
   const [activeTypes, setActiveTypes] = useState<Set<TypeKey> | null>(null)
   const load = useCallback(() => fetchAnomalies(contractId, ALL), [contractId])
-  const { state, reload } = useLoad(load)
+  const peek = useCallback(() => peekAnomalies(contractId, ALL), [contractId])
+  const { state, reload } = useLoad(load, peek)
 
   const view = useMemo(() => {
     const loaded = state.status === 'ready' ? state.value : []

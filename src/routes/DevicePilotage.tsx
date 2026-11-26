@@ -9,7 +9,7 @@ import { useContracts } from '../contracts/ContractContext'
 import { DEVICE_PILOTAGE_PATH, deviceAlertsPath, devicePilotagePath, deviceReadingsPath } from '../auth/paths'
 import { DeviceListSkeleton } from '../pilotage/DeviceListSkeleton'
 import { DeviceList } from '../pilotage/DeviceList'
-import { loadPilotageWorkspace } from '../pilotage/loadPilotageWorkspace'
+import { loadPilotageWorkspace, peekPilotageWorkspace } from '../pilotage/loadPilotageWorkspace'
 import type { Position } from '../api/positions'
 import type { TransferResult } from '../api/transfer'
 
@@ -58,13 +58,19 @@ type WorkspaceState =
   | { phase: 'empty' }
   | { phase: 'eligible'; devices: Position[] }
 
+/** KAN-345: the cached eligible workspace of a contract, as a page state. */
+function cachedWorkspace(contractId: number | null): WorkspaceState | undefined {
+  const cached = contractId === null ? undefined : peekPilotageWorkspace(contractId)
+  return cached?.kind === 'eligible' ? { phase: 'eligible', devices: cached.devices } : undefined
+}
+
 export function DevicePilotage() {
   const { contracts, loadState: state, selectedId, accessError, rejectContract } = useContracts()
   const { chipId } = useParams<{ chipId?: string }>()
   const navigate = useNavigate()
   const { pathname } = useLocation()
 
-  const [workspace, setWorkspace] = useState<WorkspaceState>({ phase: 'loading' })
+  const [workspace, setWorkspace] = useState<WorkspaceState>(() => cachedWorkspace(selectedId) ?? { phase: 'loading' })
   const [transferHistory, setTransferHistory] = useState<TransferResult[]>([])
   const addTransfer = useCallback(
     (result: TransferResult) => setTransferHistory((prev) => [...prev, result]),
@@ -79,7 +85,10 @@ export function DevicePilotage() {
   useEffect(() => {
     if (selectedId === null) return
     let cancelled = false
-    setWorkspace({ phase: 'loading' })
+    // KAN-345 (FR24): a cached eligible workspace shows at once and is revalidated behind it (FR27: a failed
+    // revalidation keeps it).
+    const cached = cachedWorkspace(selectedId)
+    setWorkspace(cached ?? { phase: 'loading' })
     setTransferHistory([])
     loadPilotageWorkspace(selectedId)
       .then((result) => {
@@ -99,7 +108,7 @@ export function DevicePilotage() {
         setWorkspace({ phase: 'eligible', devices: result.devices })
       })
       .catch(() => {
-        if (!cancelled) setWorkspace({ phase: 'error' })
+        if (!cancelled && !cached) setWorkspace({ phase: 'error' })
       })
     return () => {
       cancelled = true

@@ -461,3 +461,43 @@ describe('ContractPositions non-blocking loading (KAN-344 FR15/FR16/FR22/FR23)',
     expect(document.querySelector('.leaflet-marker-icon')).not.toBeNull()
   })
 })
+
+describe('ContractPositions client cache (KAN-345 FR24, FR27, EC13)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    useDeviceVisibilityStore.getState().showAll()
+  })
+
+  const reply = (positions: unknown[]) => new Response(JSON.stringify({ positions }), { status: 200 })
+
+  it('shows the cached snapshot at once on a revisit, then updates in place from the revalidation (AC20)', async () => {
+    stubFetch(reply([onePosition]))
+    const first = render(<ContractPositions contractId={12} />)
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
+    first.unmount()
+
+    let resolve!: (value: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((r) => (resolve = r))))
+    render(<ContractPositions contractId={12} />)
+    expect(screen.queryByTestId('positions-loading')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1)
+
+    resolve(reply([onePosition, { ...onePosition, chipId: 'CHIP-002' }]))
+    await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(2))
+    expect(screen.queryByTestId('positions-loading')).not.toBeInTheDocument()
+  })
+
+  it('keeps the cached snapshot when the background revalidation fails (FR27)', async () => {
+    stubFetch(reply([onePosition]))
+    render(<ContractPositions contractId={12} />).unmount()
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled())
+    await Promise.resolve()
+
+    stubFetch(new Response(JSON.stringify({ error: { code: 'service_unavailable', message: 'x' } }), { status: 503 }))
+    const onRefreshState = vi.fn()
+    render(<ContractPositions contractId={12} onRefreshState={onRefreshState} />)
+    await waitFor(() => expect(onRefreshState).toHaveBeenLastCalledWith(expect.objectContaining({ failed: true })))
+    expect(screen.queryByTestId('positions-error')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1)
+  })
+})

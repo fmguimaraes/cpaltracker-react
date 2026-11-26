@@ -8,6 +8,8 @@
  * `Authorization: Bearer <token>` (stack decision §3).
  */
 
+import { clearCache } from './responseCache'
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -38,6 +40,8 @@ function readDevToken(): string | null {
 let authToken: string | null = PERSIST_DEV_TOKEN ? readDevToken() : null
 
 export function setAuthToken(token: string | null): void {
+  // KAN-345 (FR25, EC14): session end (null) or any identity change (another login) empties the read cache.
+  if (token === null || token !== authToken) clearCache()
   authToken = token
   if (!PERSIST_DEV_TOKEN) return
   try {

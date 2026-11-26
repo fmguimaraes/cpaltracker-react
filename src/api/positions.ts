@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { fetchAndStore, peekCache, type CacheKey } from './responseCache'
 
 /**
  * `GET /api/v1/devices/positions.php?contractId=...` (KAN-121). Every
@@ -35,9 +36,17 @@ interface PositionsResponse {
   positions: Position[]
 }
 
-export async function fetchPositions(contractId: number): Promise<Position[]> {
-  const body = await apiClient.get<PositionsResponse>(
-    `/devices/positions.php?contractId=${contractId}`,
-  )
-  return body.positions ?? []
+const positionsKey = (contractId: number): CacheKey => ({ group: 'positions', fn: 'fetchPositions', contractId })
+
+/** KAN-345: the last cached answer (younger than the maximum age), shown at once while it is revalidated. */
+export function peekPositions(contractId: number): Position[] | undefined {
+  return peekCache<Position[]>(positionsKey(contractId))
+}
+
+/** Always hits the network (so a Refresh bypasses the cache) and caches its success (KAN-345). */
+export function fetchPositions(contractId: number): Promise<Position[]> {
+  return fetchAndStore(positionsKey(contractId), async () => {
+    const body = await apiClient.get<PositionsResponse>(`/devices/positions.php?contractId=${contractId}`)
+    return body.positions ?? []
+  })
 }
