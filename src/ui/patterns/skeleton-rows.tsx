@@ -12,6 +12,7 @@ export function SkeletonRows({
   rowClassName = 'h-16',
   className,
   testId,
+  surface,
 }: {
   /** The announced text, e.g. "Chargement des anomalies…". */
   label: string
@@ -19,11 +20,13 @@ export function SkeletonRows({
   rowClassName?: string
   className?: string
   testId?: string
+  /** `card` when drawn on a card surface (the Pulse drawer): see `Skeleton`. */
+  surface?: 'page' | 'card'
 }) {
   return (
     <div role="status" data-testid={testId} className={cn('flex flex-col gap-3', className)}>
       {Array.from({ length: rows }, (_, i) => (
-        <Skeleton key={i} className={cn('w-full', rowClassName)} />
+        <Skeleton key={i} surface={surface} className={cn('w-full', rowClassName)} />
       ))}
       <span className="sr-only">{label}</span>
     </div>

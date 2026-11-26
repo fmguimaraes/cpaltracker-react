@@ -36,8 +36,8 @@ export function DeviceListSkeleton() {
       <ul className="flex flex-col gap-3 md:hidden" data-testid="pilotage-loading-cards" aria-hidden>
         {Array.from({ length: ROWS }, (_, i) => (
           <li key={i} className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-56" />
+            <Skeleton surface="card" className="h-4 w-40" />
+            <Skeleton surface="card" className="h-3 w-56" />
           </li>
         ))}
       </ul>

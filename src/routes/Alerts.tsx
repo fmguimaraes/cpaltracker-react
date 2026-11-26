@@ -45,10 +45,10 @@ function byStatus(rows: AnomalyRow[], filter: StatusFilter) {
 /** A load that never settles: the list stays in its loading state until the contract is known. */
 const NEVER = new Promise<AnomalyRow[]>(() => undefined)
 
-function ListSkeleton({ testId }: { testId: string }) {
+function ListSkeleton({ testId, label }: { testId: string; label: string }) {
   return (
     <div data-testid={testId} role="status" aria-busy className="flex flex-col gap-2">
-      <span className="sr-only">Chargement des alertes…</span>
+      <span className="sr-only">{label}</span>
       {Array.from({ length: 6 }, (_, index) => (
         <Skeleton key={index} className="h-10 w-full" />
       ))}
@@ -108,7 +108,12 @@ export function AlertsList({ contractId, device: fixedDevice }: { contractId: nu
   const statusEmpty = STATUS_FILTER_OPTIONS.find((option) => option.value === status)?.empty ?? 'Aucune alerte'
 
   let body
-  if (state.status === 'loading') body = <ListSkeleton testId={contractId === null ? 'alerts-contracts-loading' : 'alerts-loading'} />
+  if (state.status === 'loading') body =
+      contractId === null ? (
+        <ListSkeleton testId="alerts-contracts-loading" label="Chargement des contrats…" />
+      ) : (
+        <ListSkeleton testId="alerts-loading" label="Chargement des alertes…" />
+      )
   else if (state.status === 'error') {
     body = (
       <Alert variant="danger" data-testid="alerts-error">
@@ -182,7 +187,7 @@ export function AlertsList({ contractId, device: fixedDevice }: { contractId: nu
                   </span>
                 ) : (
                   // FR20: a placeholder holds the count's place, so the filter doesn't shift when counts arrive.
-                  <Skeleton className="h-4 w-5" aria-hidden data-testid={`alerts-status-count-loading-${option.value}`} />
+                  <Skeleton surface="card" className="h-4 w-5" aria-hidden data-testid={`alerts-status-count-loading-${option.value}`} />
                 )}
               </ToggleGroupItem>
             ))}

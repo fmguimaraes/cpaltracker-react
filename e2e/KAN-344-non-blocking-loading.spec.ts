@@ -63,30 +63,56 @@ async function mockApi(page: Page, delay: number, overrides: Record<string, () =
   })
 }
 
-/** Counts base-map tile image requests (any host that is not the app). */
-function trackTiles(page: Page) {
-  const tiles: string[] = []
-  page.on('request', (request) => {
-    if (request.resourceType() === 'image' && !request.url().startsWith('http://localhost') && !request.url().startsWith('data:'))
-      tiles.push(request.url())
-  })
-  return tiles
+/**
+ * Every skeleton in `scope` must be told apart from the surface it sits on: its background colour differs from
+ * the first opaque background among its ancestors (`--card` and `--muted` are one colour, so a muted skeleton on
+ * a card is invisible although Playwright still calls it "visible").
+ */
+async function expectSkeletonsContrast(page: Page, scope: string) {
+  const result = await page.evaluate((selector) => {
+    const opaque = (value: string) => value !== 'rgba(0, 0, 0, 0)' && value !== 'transparent'
+    const skeletons = Array.from(document.querySelectorAll(`${selector} [data-slot="skeleton"]`))
+    return {
+      count: skeletons.length,
+      same: skeletons.filter((el) => {
+        const own = getComputedStyle(el).backgroundColor
+        let parent = el.parentElement
+        while (parent && !opaque(getComputedStyle(parent).backgroundColor)) parent = parent.parentElement
+        return parent !== null && getComputedStyle(parent).backgroundColor === own
+      }).length,
+    }
+  }, scope)
+  expect(result.count, `skeletons in ${scope}`).toBeGreaterThan(0)
+  expect(result.same, `skeletons in ${scope} with the same colour as their surface`).toBe(0)
 }
 
 for (const path of ['/pulse', '/live-tracking']) {
   test(`AC12 / AC19: ${path} shows shell, map with tiles and the loader before delayed data @desktop`, async ({ page }) => {
     await mockApi(page, DELAY_MS)
-    const tiles = trackTiles(page)
-    const started = Date.now()
+    // The page's CSP forbids `waitForFunction` (eval), so an init script watches the DOM instead and stamps
+    // `performance.now()` (counted from the navigation start) when the map container, the loader and a tile
+    // image are all there together.
+    await page.addInitScript(() => {
+      const check = () => {
+        const w = window as unknown as { __nfr4?: number }
+        if (
+          w.__nfr4 === undefined &&
+          document.querySelector('.leaflet-container') &&
+          document.querySelector('[data-testid="positions-loading"]') &&
+          document.querySelector('.leaflet-tile-pane img')
+        )
+          w.__nfr4 = performance.now()
+      }
+      new MutationObserver(check).observe(document, { childList: true, subtree: true, attributes: true })
+    })
     await page.goto(path, { waitUntil: 'commit' })
-
-    await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: BUDGET_MS })
-    await expect(page.getByTestId('positions-loading')).toBeVisible({ timeout: BUDGET_MS })
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __nfr4?: number }).__nfr4 ?? null), { timeout: 20_000 })
+      .not.toBeNull()
+    const elapsed = await page.evaluate(() => (window as unknown as { __nfr4: number }).__nfr4)
+    expect(elapsed, 'shell + map + tile + loader within the NFR4 budget').toBeLessThan(BUDGET_MS)
     await expect(page.getByTestId('positions-loading')).toHaveText(/Chargement des positions…/)
-    await expect(page.locator('.leaflet-tile-pane')).toBeAttached()
     await expect(page.getByRole('navigation').first()).toBeVisible()
-    await expect.poll(() => tiles.length, { timeout: BUDGET_MS }).toBeGreaterThan(0)
-    expect(Date.now() - started, 'shell + map + tiles + loader within the NFR4 budget').toBeLessThan(BUDGET_MS)
     // No full-height skeleton in place of the map.
     await expect(page.locator('[data-testid="positions-loading"] [data-slot="skeleton"]')).toHaveCount(0)
 
@@ -101,6 +127,20 @@ test('AC19: Pulse side panel shows list skeletons, not a blank block, while data
   await page.goto('/pulse')
   await expect(page.getByTestId('pulse-anomalies-cell')).toBeVisible({ timeout: BUDGET_MS })
   await expect(page.getByTestId('pulse-anomalies-cell').getByRole('status')).toBeVisible()
+  await expectSkeletonsContrast(page, '[data-testid="pulse-anomalies-cell"]')
+})
+
+test('AC13: the Pulse drawer skeletons stand out from the card surface once contracts answered @desktop', async ({ page }) => {
+  await mockApi(page, 0, {
+    '/anomalies/': () => ({ status: 200, body: { anomalies: [] } }),
+  })
+  await page.route('**/anomalies/**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    await route.fulfill(json({ anomalies: [] })).catch(() => undefined)
+  })
+  await page.goto('/pulse')
+  await expect(page.getByTestId('anomaly-list-loading')).toBeVisible()
+  await expectSkeletonsContrast(page, '[data-testid="anomaly-list-loading"]')
 })
 
 test('AC19 / AC15: Alerts shows breadcrumb, filter with count placeholders and list skeleton while delayed', async ({ page }) => {
@@ -110,6 +150,7 @@ test('AC19 / AC15: Alerts shows breadcrumb, filter with count placeholders and l
   await expect(page.getByTestId('alerts-status-filter')).toBeVisible({ timeout: BUDGET_MS })
   await expect(page.getByTestId('alerts-status-count-loading-open')).toBeVisible()
   await expect(page.getByTestId('alerts-contracts-loading')).toBeVisible()
+  await expectSkeletonsContrast(page, '[data-testid="alerts-status-filter"]')
 })
 
 test('AC19 / AC14: Pilotage shows its breadcrumb and a list skeleton while delayed', async ({ page }) => {
@@ -133,6 +174,7 @@ test('AC14: Pilotage workspace skeleton is table-shaped at md+ and card-shaped b
   await page.setViewportSize({ width: 390, height: 800 })
   await expect(page.getByTestId('pilotage-loading-cards')).toBeVisible()
   await expect(page.getByTestId('pilotage-loading-table')).toBeHidden()
+  await expectSkeletonsContrast(page, '[data-testid="pilotage-loading-cards"]')
 })
 
 test('AC17: a positions error keeps the map and offers "Réessayer" which reloads @desktop', async ({ page }) => {

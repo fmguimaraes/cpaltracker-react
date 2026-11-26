@@ -540,7 +540,7 @@ export function Pulse() {
                 )}
               >
                 {selectedId === null ? (
-                  <SkeletonRows label="Chargement des anomalies…" rows={4} className="gap-4" testId="pulse-drawer-loading" />
+                  <SkeletonRows label="Chargement des anomalies…" rows={4} className="gap-4" surface="card" testId="pulse-drawer-loading" />
                 ) : view.kind === 'anomaly' ? (
                   <AnomalyDetailView
                     contractId={selectedId}

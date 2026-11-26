@@ -205,7 +205,7 @@ describe('Alerts (list page)', () => {
     expect(screen.getByTestId('alerts-status-filter')).toBeInTheDocument()
     expect(screen.getByTestId('alerts-status-count-loading-open')).toBeInTheDocument()
     expect(screen.queryByTestId('alerts-status-count-open')).not.toBeInTheDocument()
-    expect(screen.getAllByRole('status').some((el) => el.textContent?.includes('Chargement des alertes…'))).toBe(true)
+    expect(screen.getAllByRole('status').some((el) => el.textContent?.includes('Chargement des contrats…'))).toBe(true)
   })
 
   it('explains an empty contract, and offers the closed ones when only they exist', async () => {

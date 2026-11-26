@@ -192,8 +192,8 @@ export function PalletPanel({
         <div role="status" data-testid="pallet-loading" className="flex flex-col gap-3 pt-2">
           {[0, 1].map((i) => (
             <div key={i} className="flex flex-col gap-2">
-              <Skeleton className="h-4 w-1/3" />
-              <Skeleton className="h-24 w-full" />
+              <Skeleton surface="card" className="h-4 w-1/3" />
+              <Skeleton surface="card" className="h-24 w-full" />
             </div>
           ))}
           <span className="sr-only">Chargement des mesures…</span>

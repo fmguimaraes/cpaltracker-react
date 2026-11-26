@@ -158,7 +158,7 @@ export function ContractAnomalies({
     )
 
   let body: ReactNode
-  if (state.status === 'loading') body = <SkeletonRows label="Chargement des anomalies…" rows={4} className="gap-4" testId="anomaly-list-loading" />
+  if (state.status === 'loading') body = <SkeletonRows label="Chargement des anomalies…" rows={4} className="gap-4" surface="card" testId="anomaly-list-loading" />
   else if (state.status === 'error') {
     body = (
       <Empty data-testid="anomaly-list-error">

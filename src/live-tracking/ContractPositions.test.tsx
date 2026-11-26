@@ -108,7 +108,7 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
 
     render(<ContractPositions contractId={12} />)
 
-    await waitFor(() => expect(document.querySelector('.position-map')).toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByTestId('positions-loading')).not.toBeInTheDocument())
     expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1)
   })
 
@@ -306,7 +306,7 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     )
 
     render(<ContractPositions contractId={12} />)
-    await waitFor(() => expect(document.querySelector('.position-map')).toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByTestId('positions-loading')).not.toBeInTheDocument())
 
     fireEvent.click(screen.getByTestId('positions-refresh'))
 
@@ -333,7 +333,7 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     )
 
     render(<ContractPositions contractId={12} />)
-    await waitFor(() => expect(document.querySelector('.position-map')).toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByTestId('positions-loading')).not.toBeInTheDocument())
 
     fireEvent.click(screen.getByTestId('positions-refresh'))
     await waitFor(() => expect(screen.getByTestId('positions-refresh-error')).toBeInTheDocument())
