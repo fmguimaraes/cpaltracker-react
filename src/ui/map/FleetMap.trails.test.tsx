@@ -11,7 +11,7 @@ vi.mock('react-leaflet', async (importOriginal) => ({
   Polyline: ({ positions, interactive, pathOptions }: {
     positions: Array<[number, number]>
     interactive?: boolean
-    pathOptions?: { color?: string; weight?: number; opacity?: number }
+    pathOptions?: { color?: string; weight?: number; opacity?: number; dashArray?: string }
   }) => (
     <span
       data-testid="polyline"
@@ -19,6 +19,7 @@ vi.mock('react-leaflet', async (importOriginal) => ({
       data-interactive={String(interactive)}
       data-color={pathOptions?.color ?? ''}
       data-weight={pathOptions?.weight ?? ''}
+      data-dash={pathOptions?.dashArray ?? ''}
     />
   ),
 }))
@@ -49,8 +50,9 @@ describe('FleetMap trails', () => {
     expect(lines.map((l) => JSON.parse(l.dataset.positions!))).toEqual([trails[0].points, trails[1].points])
     for (const line of lines) {
       expect(line).toHaveAttribute('data-interactive', 'false')
-      // Themed like the History timeline's trails (chart theme primary; 4 px light, 3 px dark).
-      expect(['3', '4']).toContain(line.dataset.weight)
+      // Chart theme primary, thin and dashed (2.5 px light, 2 px dark; owner 2026-11-26).
+      expect(['2', '2.5']).toContain(line.dataset.weight)
+      expect(line).toHaveAttribute('data-dash', '6 6')
       expect(line).toHaveAttribute('data-color')
     }
 

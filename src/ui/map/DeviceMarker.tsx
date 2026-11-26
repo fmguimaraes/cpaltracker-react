@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Marker } from 'react-leaflet'
 import type L from 'leaflet'
 import type { MapDevice, MapLabels } from './types'
@@ -32,12 +32,16 @@ export function DeviceMarker({ device, selected, highlighted = false, onSelect, 
   const ref = useRef<L.Marker | null>(null)
   // runs after Marker's own effect, so it sees the element created by setIcon
   useEffect(() => syncPressed(ref.current, selected, device.id))
+  // Same array while the coordinates don't change: a new one makes react-leaflet call setLatLng, which the
+  // cluster group handles as a move (remove + re-add), closing an opened group on every re-render.
+  const { lat, lng } = device
+  const position = useMemo<[number, number]>(() => [lat, lng], [lat, lng])
   return (
     <Marker
       ref={ref}
       // status in the key: marker options are read once, so a state change remounts the marker
       key={`${device.id}:${device.status}:${device.series ?? ''}:${device.load ?? ''}`}
-      position={[device.lat, device.lng]}
+      position={position}
       icon={deviceIcon(device, selected, labels.status[device.status], highlighted, compact)}
       riseOnHover={compact}
       zIndexOffset={selected || highlighted ? 1000 : 0}

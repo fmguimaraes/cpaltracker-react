@@ -119,16 +119,37 @@ interface ClusterGroupLike {
   getLayers(): L.Layer[]
   getVisibleParent(marker: L.Marker): L.Layer | null
   zoomToShowLayer(marker: L.Marker, callback?: () => void): void
-  on(type: string, fn: () => void): void
-  off(type: string, fn: () => void): void
+  on(type: string, fn: (event: never) => void): void
+  off(type: string, fn: (event: never) => void): void
   once(type: string, fn: () => void): void
   /** Private plugin flag, set while a zoom re-cluster animation runs. */
   _inZoomAnimation?: number
+  /** Private plugin field: the cluster currently fanned out (spiderfied), if any. */
+  _spiderfied?: ClusterLike | null
+  /** Private plugin method: closes the opened group, animated unless `zoomDetails` says a zoom runs. */
+  _unspiderfy(zoomDetails?: unknown): void
+  /** Private plugin method: closes the opened group at once. */
+  _noanimationUnspiderfy(): void
+  addLayer(layer: L.Layer): unknown
+  removeLayer(layer: L.Layer): unknown
+  addLayers(layers: L.Layer[], skipLayerAddEvent?: boolean): unknown
+  removeLayers(layers: L.Layer[]): unknown
+  /** Private plugin method (react-leaflet-cluster overrides it): re-files a moved marker. */
+  _moveChild(layer: L.Layer, from: L.LatLng, to: L.LatLng): void
 }
 
 interface ClusterLike {
   getAllChildMarkers(): L.Marker[]
   getChildCount(): number
+  spiderfy(): void
+  /** Private plugin method that fans the markers out; the non-animated class has an instant one. */
+  _animationSpiderfy?: (...args: never[]) => void
+}
+
+/** The plugin's instant fan-out, from its non-animated cluster class (it registers on the global `L`). */
+function instantSpiderfy(): ClusterLike['_animationSpiderfy'] {
+  const plugin = (globalThis as { L?: { MarkerClusterNonAnimated?: { prototype: ClusterLike } } }).L
+  return plugin?.MarkerClusterNonAnimated?.prototype._animationSpiderfy
 }
 
 
@@ -273,6 +294,139 @@ function Fitter({
   return null
 }
 
+/** Delay before re-opening a group, so the plugin's re-cluster (zoom animation, layer flush) has settled. */
+const STICKY_REOPEN_DELAY_MS = 80
+
+/**
+ * Keeps an opened (spiderfied) group of pallets open. The cluster plugin closes it on any zoom and on any
+ * marker add/remove (a selection, a positions refresh); the owner wants it closed only by a click on the map
+ * background or on another group (2026-11-26). So the opened pallets are remembered, and after each close
+ * the group now holding them is opened again, provided it holds nothing else (zoomed out into a bigger
+ * group: it stays closed until zoomed back in).
+ *
+ * A close forced by a marker add/remove (clicking a pallet of the open group re-renders markers) is done
+ * at once and the group re-opened at once, before the next paint, so the fan doesn't visibly fold and
+ * unfold again (owner 2026-11-26). Closes by a zoom keep the plugin's animation.
+ */
+function StickySpiderfy({ groupRef }: { groupRef: RefObject<ClusterGroupLike | null> }) {
+  const map = useMap()
+  useEffect(() => {
+    const group = groupRef.current
+    if (!group) return
+    let opened: Set<string> | null = null
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let layerOps = 0 // > 0 while the group adds or removes markers
+    let quietClose = false // the last close came from a marker add/remove
+    let microtask = 0 // id of the pending instant reopen; a newer one cancels it
+    const deviceId = (layer: L.Layer) => (layer.options as { deviceId?: string }).deviceId
+
+    const spiderfyAt = (cluster: ClusterLike, instant: boolean) => {
+      const fanOut = instant ? instantSpiderfy() : undefined
+      if (!fanOut) return cluster.spiderfy()
+      cluster._animationSpiderfy = fanOut
+      try {
+        cluster.spiderfy()
+      } finally {
+        delete cluster._animationSpiderfy
+      }
+    }
+
+    /** Opens the group holding exactly the remembered pallets; false = a zoom animation runs, try later. */
+    const reopenNow = (instant: boolean) => {
+      if (!opened || group._spiderfied) return true
+      if (group._inZoomAnimation) return false
+      const held = new Map<ClusterLike, number>()
+      for (const layer of group.getLayers()) {
+        const id = deviceId(layer)
+        if (id === undefined || !opened.has(id)) continue
+        const parent = group.getVisibleParent(layer as L.Marker)
+        if (parent && parent !== layer) {
+          const cluster = parent as unknown as ClusterLike
+          held.set(cluster, (held.get(cluster) ?? 0) + 1)
+        }
+      }
+      let best: ClusterLike | null = null
+      for (const [cluster, count] of held) {
+        if (cluster.getChildCount() === count && (!best || count > best.getChildCount())) best = cluster
+      }
+      if (best) spiderfyAt(best, instant)
+      return true
+    }
+
+    const reopen = () => {
+      clearTimeout(timer)
+      if (quietClose) {
+        // Same task as the marker add/remove (React commits them together): reopen once it is done.
+        quietClose = false
+        const id = ++microtask
+        queueMicrotask(() => {
+          if (id === microtask && !reopenNow(true)) reopen()
+        })
+        return
+      }
+      microtask++
+      timer = setTimeout(() => {
+        if (!reopenNow(false)) reopen()
+      }, STICKY_REOPEN_DELAY_MS)
+    }
+
+    // Marker adds/removes: the plugin closes the open group first; make that close instant and flag it.
+    const { addLayer, removeLayer, addLayers, removeLayers, _moveChild, _unspiderfy } = group
+    const counted =
+      <A extends unknown[]>(fn: (...args: A) => unknown) =>
+      (...args: A) => {
+        layerOps++
+        try {
+          return fn.apply(group, args)
+        } finally {
+          layerOps--
+        }
+      }
+    group.addLayer = counted(addLayer)
+    group.removeLayer = counted(removeLayer)
+    group.addLayers = counted(addLayers)
+    group.removeLayers = counted(removeLayers)
+    group._moveChild = counted(_moveChild) // a marker moved (positions refresh): removed and re-added
+    group._unspiderfy = (zoomDetails?: unknown) => {
+      if (layerOps > 0 && opened && group._spiderfied && !zoomDetails) {
+        quietClose = true
+        group._noanimationUnspiderfy()
+        return
+      }
+      _unspiderfy.call(group, zoomDetails)
+    }
+    const onSpiderfied = (event: { markers: L.Marker[] }) => {
+      opened = new Set(event.markers.map(deviceId).filter((id): id is string => id !== undefined))
+    }
+    // A click on another group: forget the opened one (if that group fans out, `spiderfied` remembers it).
+    const onClusterClick = (event: { layer: ClusterLike }) => {
+      if (group._spiderfied !== event.layer) opened = null
+    }
+    const forget = () => {
+      opened = null
+    }
+
+    group.on('spiderfied', onSpiderfied)
+    group.on('clusterclick', onClusterClick)
+    group.on('unspiderfied', reopen)
+    group.on('animationend', reopen)
+    map.on('zoomend', reopen)
+    map.on('click', forget)
+    return () => {
+      clearTimeout(timer)
+      microtask++
+      Object.assign(group, { addLayer, removeLayer, addLayers, removeLayers, _moveChild, _unspiderfy })
+      group.off('spiderfied', onSpiderfied)
+      group.off('clusterclick', onClusterClick)
+      group.off('unspiderfied', reopen)
+      group.off('animationend', reopen)
+      map.off('zoomend', reopen)
+      map.off('click', forget)
+    }
+  }, [map, groupRef])
+  return null
+}
+
 /** Reports the visible bounds on mount and at the end of every move/zoom/resize; identical bounds are skipped. */
 function BackgroundClickHandler({ onClick }: { onClick: () => void }) {
   const map = useMap()
@@ -327,7 +481,13 @@ function TrailLayer({ trails }: { trails: MapTrail[] }) {
             key={`trail-${trail.id}`}
             positions={trail.points}
             interactive={false}
-            pathOptions={{ color: chartTheme.primary, weight: chartTheme.theme === 'light' ? 4 : 3, opacity: 1 }}
+            // Thin dashed line (owner 2026-11-26), so it doesn't compete with the markers.
+            pathOptions={{
+              color: chartTheme.primary,
+              weight: chartTheme.theme === 'light' ? 2.5 : 2,
+              dashArray: '6 6',
+              opacity: 1,
+            }}
           />
         ))}
     </>
@@ -563,6 +723,8 @@ export function FleetMap({
             chunkedLoading
             showCoverageOnHover={false}
             maxClusterRadius={50}
+            // Opened groups: labelled pills need more room than the plugin's default fan (owner 2026-11-26).
+            spiderfyDistanceMultiplier={1.5}
             iconCreateFunction={(c: ClusterLike) => {
               const children = c.getAllChildMarkers().map((m) => m.options as { status?: DeviceStatus; load?: MapLoadLevel })
               const worst = worstStatus(children.map((o) => o.status ?? 'ok'))
@@ -582,6 +744,7 @@ export function FleetMap({
         {onMapClick && <BackgroundClickHandler onClick={onMapClick} />}
         {onViewportChange && <ViewportReporter onChange={onViewportChange} />}
         {reveal && <Revealer reveal={reveal} devices={devices} groupRef={groupRef} clusters={clusters} />}
+        {clusters && <StickySpiderfy groupRef={groupRef} />}
         {clusters && highlightedId && <ClusterHighlighter key={statusKey} id={highlightedId} groupRef={groupRef} />}
         <Controls
           fit={() => setFitTick((t) => t + 1)}
