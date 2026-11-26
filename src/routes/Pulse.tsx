@@ -584,6 +584,7 @@ export function Pulse() {
                     contractId={selectedId}
                     position={pallet}
                     range={range}
+                    periodKey={periodParam(timeline.choice)}
                     onBack={backToContract}
                     onOpenAnomaly={openAnomaly}
                     onShowAnomalies={() => showPalletAnomalies(pallet.chipId)}

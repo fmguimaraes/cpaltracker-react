@@ -340,6 +340,23 @@ describe('PalletPanel', () => {
     expect(screen.queryByTestId('pallet-loading')).not.toBeInTheDocument()
   })
 
+  it('a period change with the fetch held shows pallet-loading, not the old period (KAN-353)', async () => {
+    fetchAnomalies.mockResolvedValue([])
+    fetchContractHistory.mockResolvedValueOnce(response(readings(5)))
+    const panel = (periodKey: string, to: Date) => (
+      <PalletPanel contractId={7} position={position} range={{ from: FROM, to }} periodKey={periodKey} onBack={() => {}} />
+    )
+    const { rerender } = render(panel('7j', TO), { wrapper: MemoryRouter })
+    await screen.findByTestId('pallet-charts')
+
+    fetchContractHistory.mockReturnValueOnce(new Promise(() => {}))
+    rerender(panel('1mois', new Date(TO.getTime() + 24 * HOUR)))
+
+    expect(screen.getByTestId('pallet-loading')).toBeInTheDocument()
+    expect(screen.queryByTestId('pallet-charts')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pallet-empty')).not.toBeInTheDocument()
+  })
+
   it('adds a "Période" section: readings, temperature range and Δ24h per metric', async () => {
     // 25 hourly readings: the temperature climbs 0.5 °C an hour, the weight loses 10 kg an hour.
     const rows = Array.from({ length: 25 }, (_, i) => row({ t: LAST - (24 - i) * HOUR, ta: 4 + i / 2, hr: 50, m: 500 - 10 * i }))

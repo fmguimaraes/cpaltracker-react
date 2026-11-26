@@ -9,6 +9,7 @@ import type { MapTrail, MapViewport } from '@/ui/map'
 import {
   DEFAULT_PERIOD,
   editRange,
+  periodParam,
   inViewport,
   positionsAt,
   reportWindow,
@@ -123,7 +124,8 @@ export function usePulseTimeline({
         : Promise.resolve(null),
     [historyWanted, contractId, startDay, endDay],
   )
-  const { state: history } = useLoad(load, undefined, String(contractId))
+  // Keyed on the period choice (stable across a preset's refresh), so a period change never shows the old rows.
+  const { state: history } = useLoad(load, undefined, `${contractId}:${periodParam(choice)}`)
   const rows = history.status === 'ready' ? history.value?.rows ?? null : null
   const byDevice = useMemo(() => (rows ? buildDeviceSeries(rows) : null), [rows])
   let historyStatus: PulseTimeline['historyStatus'] = 'idle'

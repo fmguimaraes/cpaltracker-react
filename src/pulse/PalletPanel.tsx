@@ -64,6 +64,7 @@ export function PalletPanel({
   contractId,
   position,
   range,
+  periodKey = '',
   onBack,
   onOpenAnomaly,
   onShowAnomalies,
@@ -73,6 +74,8 @@ export function PalletPanel({
   contractId: number
   position: Position
   range: { from: Date; to: Date }
+  /** The period choice (e.g. `7j`), not its resolved instants: names the data the charts show. */
+  periodKey?: string
   onBack: () => void
   /** A click on an anomaly dot. */
   onOpenAnomaly?: (anomalyKey: string) => void
@@ -92,8 +95,9 @@ export function PalletPanel({
     () => fetchContractHistory(contractId, { start: new Date(fromMs), end: new Date(toMs) }, chipId),
     [contractId, fromMs, toMs, chipId],
   )
-  // The key is the entity (contract + pallet), not the period: a refresh or a period change keeps the charts (FR27).
-  const { state, reload } = useLoad(loadHistory, undefined, `${contractId}:${chipId}`)
+  // The key is the entity and the period choice, never the resolved instants: a preset's refresh moves them every
+  // time and keeps the charts (FR27), while another period never shows the previous period's charts.
+  const { state, reload } = useLoad(loadHistory, undefined, `${contractId}:${chipId}:${periodKey}`)
   const loadAnomalies = useCallback(() => fetchAnomalies(contractId, ALL_STATUSES), [contractId])
   // KAN-345 (FR24): reopening the panel shows the cached alerts at once while they are revalidated.
   const peekAnomalyRows = useCallback(() => peekAnomalies(contractId, ALL_STATUSES), [contractId])
