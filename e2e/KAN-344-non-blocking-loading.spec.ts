@@ -6,7 +6,8 @@ import { test, expect, type Page } from '@playwright/test'
  * map with its tiles and the loader, are visible within 1.5 s; markers follow when the data arrives.
  */
 
-// The NFR4 timing checks are CPU-sensitive: run this file's tests one after the other.
+// The NFR4 timing checks are CPU-sensitive: run this file's tests one after the other, in the 'timed' project
+// that starts after every other spec (playwright.config.ts). Alone: `npx playwright test --no-deps <this file>`.
 test.describe.configure({ mode: 'serial' })
 
 const DELAY_MS = 5000
