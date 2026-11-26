@@ -6,6 +6,7 @@ import { Badge } from '@/ui/badge'
 import { Button } from '@/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover'
 import { WidgetCard } from '@/ui/widget-card'
+import { Z_OVERLAY_ABOVE_MAP } from '@/ui/z-index'
 import { DeviceChecklist } from './DeviceChecklist'
 import { HistoryCharts } from './HistoryCharts'
 import { LotHookHistory } from './LotHookHistory'
@@ -70,7 +71,7 @@ export function HistoryReadyPanel({
             Appareils ({deviceCount}/{history.devices.length})
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="z-1100 w-80 p-4">
+        <PopoverContent align="start" className={`${Z_OVERLAY_ABOVE_MAP} w-80 p-4`}>
           <DeviceChecklist
             devices={history.devices}
             selected={selected}

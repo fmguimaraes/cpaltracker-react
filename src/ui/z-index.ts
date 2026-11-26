@@ -10,4 +10,4 @@
  * `Tooltip`/`Sheet` stay at the Tailwind default `z-50`; none of them are used over a map in any
  * current story, and a full kit-wide z-index audit is a separate concern.
  */
-export const Z_OVERLAY_ABOVE_MAP = 'z-[1100]'
+export const Z_OVERLAY_ABOVE_MAP = 'z-1100'

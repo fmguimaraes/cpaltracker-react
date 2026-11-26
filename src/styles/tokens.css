@@ -215,6 +215,13 @@
   /* Viewport height under the shell's 48 px top bar: full-height pages (no page scroll) */
   --page-height: calc(100svh - 3rem);
 
+  /* Max height of an overlay panel inside its map: full height minus a 0.75rem inset on both edges
+     (matches the panel's top-3 offset), so it never overflows the map */
+  --panel-inset: calc(100% - 1.5rem);
+
+  /* Corner radius of a small badge sitting on a control (4 px): half the base radius, so it follows --radius */
+  --badge-radius: calc(var(--radius) * 0.5);
+
   /* Selected row / chip / pressed state: the subtle surface (spec: pressed = surface-subtle) */
   --primary-soft: var(--accent);
 }
