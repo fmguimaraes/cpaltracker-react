@@ -129,13 +129,19 @@ describe('period in the URL (unified shell §1.3)', () => {
 describe('reportWindow (KAN-350)', () => {
   const now = new Date('2026-11-26T10:00:00Z')
   const ahead = (chipId: string, iso: string): Position => ({ ...position(chipId), timestamp: iso })
-  // The device/server clock is 2 h ahead of the browser's: every latest report is "after" the load time.
-  const positions = [ahead('a', '2026-11-26T11:30:00Z'), ahead('b', '2026-11-26T12:00:00Z'), ahead('old', '2026-10-01T00:00:00Z')]
+  // Data dated in the future (the demo runs to 2029, EC11) or a browser clock behind: the latest reports are
+  // "after" the load time and must still be drawn.
+  const positions = [
+    ahead('a', '2026-11-26T11:30:00Z'),
+    ahead('b', '2026-11-26T12:00:00Z'),
+    ahead('future', '2029-06-01T00:00:00Z'),
+    ahead('old', '2026-10-01T00:00:00Z'),
+  ]
 
   it('a preset keeps the reports stamped after the load time (the map no longer empties)', () => {
     const choice = { kind: 'preset' as const, days: '30' }
     const window = reportWindow(choice, resolveRangeChoice(choice, now))
-    expect(filterByLastReport(positions, { preset: 'custom', ...window }).map((p) => p.chipId)).toEqual(['a', 'b'])
+    expect(filterByLastReport(positions, { preset: 'custom', ...window }).map((p) => p.chipId)).toEqual(['a', 'b', 'future'])
   })
 
   it('typed calendar days keep their end', () => {

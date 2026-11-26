@@ -235,8 +235,9 @@ export function Pulse() {
     [lot],
   )
 
-  // The page's one period (a preset ending at the latest load, or calendar days) filters the map by last
-  // report (ContractPositions' `period`), is the pallet panel's chart range and the replay span. The map draws
+  // The page's one period (a preset ending at the latest load, or calendar days) is the pallet panel's chart
+  // range and the replay span; the map's last-report filter (ContractPositions' `period`) uses its
+  // `reportRange` (open-ended for a preset, so a future-dated report stays). The map draws
   // exactly `timeline.displayed` (lot, checked pallets, then live period or replay instant); the contract
   // anomaly list follows what is inside the map's view.
   const lotPositions = useMemo(() => (filter ? loaded.filter(filter) : loaded), [loaded, filter])

@@ -11,9 +11,9 @@ import {
   editRange,
   inViewport,
   positionsAt,
-  trailsAt,
   reportWindow,
   resolveRangeChoice,
+  trailsAt,
   type RangeChoice,
   type TimeSpan,
 } from './timelinePositions'
@@ -33,9 +33,9 @@ export interface PalletChip {
 
 export interface PulseTimeline {
   choice: RangeChoice
-  /** The page's one period: map's last-report filter, pallet panel range, playback span. */
+  /** The page's one period: pallet panel range and playback span (the map's last-report filter is `reportRange`). */
   range: TimeSpan
-  /** The window the map's last-report filter uses: `range`, but a preset has no upper bound. */
+  /** The map's last-report filter window: `range`, but a preset has no upper bound (future-dated reports stay). */
   reportRange: TimeSpan
   setPreset: (days: string) => void
   setDate: (field: 'start' | 'end', value: string) => void
