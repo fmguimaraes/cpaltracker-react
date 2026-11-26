@@ -37,6 +37,16 @@ async function mockApi(page: Page, positions: unknown[]) {
     if (url.includes('/contracts/pulse.php') || url.includes('/devices/positions.php')) {
       return route.fulfill(json({ contract: { contractId: 12, active: true }, generatedAt: iso(Date.now()), positions }))
     }
+    if (url.includes('/contracts/history.php')) {
+      return route.fulfill(
+        json({
+          contract: { ContratID: 12, ContratRef: 'REF-012', ContratType: 'MAIN', ClientID: 7, DebutContrat: null, FinContrat: null },
+          devices: [],
+          rows: [],
+          hooks: [],
+        }),
+      )
+    }
     if (url.includes('/anomalies/list.php')) return route.fulfill(json({ anomalies: [] }))
     return route.fulfill(json({}))
   })
@@ -51,7 +61,7 @@ const locate = (page: Page, chipId: string) => page.getByTestId(`pulse-pallet-lo
 test.use({ viewport: { width: 1440, height: 900 } })
 
 test.describe('KAN-350 Pulse future-dated reports @desktop', () => {
-  test('350-1 @SI-350 (a) a preset draws a pallet whose last report is in 2029, with no empty-period notice', async ({ page }) => {
+  test('350-1 AC39 AC30 @SI-350 (a) a preset draws a pallet whose last report is in 2029, with no empty-period notice', async ({ page }) => {
     await mockApi(page, [position('FUTURE', '2029-06-01T08:00:00Z', 48.8566, 2.3522)])
     for (const periode of ['1j', '1mois']) {
       await page.goto(`/pulse?periode=${periode}`)
@@ -62,7 +72,7 @@ test.describe('KAN-350 Pulse future-dated reports @desktop', () => {
     }
   })
 
-  test('350-2 @SI-350 (b) a preset still hides a pallet whose last report is before its start', async ({ page }) => {
+  test('350-2 AC39 @SI-350 (b) a preset still hides a pallet whose last report is before its start', async ({ page }) => {
     await mockApi(page, [
       position('FUTURE', '2029-06-01T08:00:00Z', 48.8566, 2.3522),
       position('OLD', iso(Date.now() - 45 * DAY), 35.68, 139.69),
@@ -75,7 +85,7 @@ test.describe('KAN-350 Pulse future-dated reports @desktop', () => {
     await expect(page.getByTestId('positions-period-empty')).toHaveCount(0)
   })
 
-  test('350-3 @SI-350 (c) typed custom days still hide a report after their end; the notice shows over the mounted map', async ({ page }) => {
+  test('350-3 AC39 @SI-350 (c) typed custom days still hide a report after their end; the notice shows over the mounted map', async ({ page }) => {
     await mockApi(page, [
       position('FUTURE', '2029-06-01T08:00:00Z', 48.8566, 2.3522),
       position('RECENT', iso(Date.now() - 3600_000), 35.68, 139.69),
@@ -90,16 +100,21 @@ test.describe('KAN-350 Pulse future-dated reports @desktop', () => {
     await expect(locate(page, 'RECENT')).toBeDisabled()
   })
 
-  test('350-4 @SI-350 (d) "Localiser" on a future-stamped pallet flies to it and opens its drawer', async ({ page }) => {
+  test('350-4 AC39 AC30 @SI-350 (d) "Localiser" on a hidden future-stamped pallet is allowed, shows it again and opens its panel', async ({ page }) => {
     await mockApi(page, [
       position('FUTURE', '2029-06-01T08:00:00Z', 48.8566, 2.3522),
       position('FRESH', iso(Date.now() - 3600_000), 35.68, 139.69),
     ])
     await page.goto('/pulse')
     await openPallets(page)
+    await page.getByTestId('pulse-pallet-check-FUTURE').click()
+    await expect(page.getByTestId('pulse-pallets')).toContainText('Palettes 1/2')
+    // Hidden, so only its report inside the (open-ended) period makes it locatable.
     await expect(locate(page, 'FUTURE')).toBeEnabled()
     await locate(page, 'FUTURE').click()
     await expect(page).toHaveURL(/palette=FUTURE/)
+    await expect(page.getByTestId('pallet-panel')).toBeVisible()
+    await expect(page.getByTestId('pulse-pallets')).toContainText('Palettes 2/2')
     await expect(page.getByTestId('positions-period-empty')).toHaveCount(0)
   })
 })
