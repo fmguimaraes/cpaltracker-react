@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { HistoryRow } from '../api/history'
 import type { Position } from '../api/positions'
 import { buildDeviceSeries } from '../history/timelineData'
-import { editRange, inViewport, positionsAt, resolveRangeChoice, toDateInput, trailsAt } from './timelinePositions'
+import { filterByLastReport } from '../live-tracking/lastReportFilter'
+import { editRange, inViewport, positionsAt, reportWindow, resolveRangeChoice, toDateInput, trailsAt } from './timelinePositions'
 
 const position = (chipId: string, latitude: number | null = 48.8, longitude: number | null = 2.3): Position => ({
   contractId: 1, chipId, timestamp: '2026-11-24T10:00:00Z', latitude, longitude,
@@ -122,5 +123,24 @@ describe('period in the URL (unified shell §1.3)', () => {
     const { formatInstant } = await import('./timelinePositions')
     const now = new Date(2026, 10, 25, 12, 0)
     expect(formatInstant(new Date(2026, 10, 15, 11, 0).getTime(), now)).toMatch(/^15\snov\.\s11:00$/)
+  })
+})
+
+describe('reportWindow (KAN-350)', () => {
+  const now = new Date('2026-11-26T10:00:00Z')
+  const ahead = (chipId: string, iso: string): Position => ({ ...position(chipId), timestamp: iso })
+  // The device/server clock is 2 h ahead of the browser's: every latest report is "after" the load time.
+  const positions = [ahead('a', '2026-11-26T11:30:00Z'), ahead('b', '2026-11-26T12:00:00Z'), ahead('old', '2026-10-01T00:00:00Z')]
+
+  it('a preset keeps the reports stamped after the load time (the map no longer empties)', () => {
+    const choice = { kind: 'preset' as const, days: '30' }
+    const window = reportWindow(choice, resolveRangeChoice(choice, now))
+    expect(filterByLastReport(positions, { preset: 'custom', ...window }).map((p) => p.chipId)).toEqual(['a', 'b'])
+  })
+
+  it('typed calendar days keep their end', () => {
+    const choice = { kind: 'custom' as const, start: '2026-11-01', end: '2026-11-03' }
+    const range = resolveRangeChoice(choice, now)
+    expect(reportWindow(choice, range)).toEqual(range)
   })
 })

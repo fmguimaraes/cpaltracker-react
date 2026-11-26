@@ -89,6 +89,19 @@ export function resolveRangeChoice(choice: RangeChoice, now: Date): TimeSpan {
   }
 }
 
+/** Latest instant a `Date` holds: the open end of a preset's report window. */
+const END_OF_TIME = new Date(8.64e15)
+
+/**
+ * The window the map's last-report filter uses. A preset ("the last N days") has no upper bound: a report
+ * stamped after the snapshot's load time (device or server clock ahead of the browser's, demo data) is still
+ * the pallet's latest report, and bounding it at "now" made every such pallet vanish from the map. Typed
+ * calendar days keep their end. The chart and replay span stay `range`.
+ */
+export function reportWindow(choice: RangeChoice, range: TimeSpan): TimeSpan {
+  return choice.kind === 'preset' ? { from: range.from, to: END_OF_TIME } : range
+}
+
 /** A date input's value for an instant (local day). */
 export function toDateInput(date: Date): string {
   return format(date, INPUT_FORMAT)

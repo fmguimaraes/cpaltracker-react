@@ -251,8 +251,8 @@ export function Pulse() {
     initialChoice: initial.choice,
     initialInstant: initial.instant,
   })
-  const { range } = timeline
-  const period = useMemo(() => ({ preset: 'custom' as const, ...range }), [range])
+  const { range, reportRange } = timeline
+  const period = useMemo(() => ({ preset: 'custom' as const, ...reportRange }), [reportRange])
 
   const setShown = useCallback((chipIds: string[], shown: boolean) => {
     setHidden((previous) => {

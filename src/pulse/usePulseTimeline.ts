@@ -12,6 +12,7 @@ import {
   inViewport,
   positionsAt,
   trailsAt,
+  reportWindow,
   resolveRangeChoice,
   type RangeChoice,
   type TimeSpan,
@@ -34,6 +35,8 @@ export interface PulseTimeline {
   choice: RangeChoice
   /** The page's one period: map's last-report filter, pallet panel range, playback span. */
   range: TimeSpan
+  /** The window the map's last-report filter uses: `range`, but a preset has no upper bound. */
+  reportRange: TimeSpan
   setPreset: (days: string) => void
   setDate: (field: 'start' | 'end', value: string) => void
   /** Any period choice (the shared control's preset or calendar range, the URL). */
@@ -176,7 +179,8 @@ export function usePulseTimeline({
     [range],
   )
 
-  const period = useMemo(() => ({ preset: 'custom' as const, from: range.from, to: range.to }), [range])
+  const reportRange = useMemo(() => reportWindow(choice, range), [choice, range])
+  const period = useMemo(() => ({ preset: 'custom' as const, from: reportRange.from, to: reportRange.to }), [reportRange])
   // Playback falls back to the live snapshot until the history has arrived.
   const displayed = useMemo(
     () => (current !== null && byDevice ? positionsAt(positions, byDevice, current) : filterByLastReport(positions, period)),
@@ -211,6 +215,7 @@ export function usePulseTimeline({
   return {
     choice,
     range,
+    reportRange,
     setPreset,
     setDate,
     setChoice,
