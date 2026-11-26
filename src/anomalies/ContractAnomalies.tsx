@@ -90,7 +90,7 @@ export function ContractAnomalies({
   const [activeTypes, setActiveTypes] = useState<Set<TypeKey> | null>(null)
   const load = useCallback(() => fetchAnomalies(contractId, ALL), [contractId])
   const peek = useCallback(() => peekAnomalies(contractId, ALL), [contractId])
-  const { state, reload } = useLoad(load, peek)
+  const { state, reload } = useLoad(load, peek, String(contractId))
 
   const view = useMemo(() => {
     const loaded = state.status === 'ready' ? state.value : []

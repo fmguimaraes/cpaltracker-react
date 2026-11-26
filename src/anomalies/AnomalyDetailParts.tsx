@@ -49,8 +49,14 @@ const READINGS: { key: ReadingKey; label: string; unit: string; icon: (typeof TY
 /** Loads one anomaly's detail; after a transition the server's answer replaces it until the next reload. */
 export function useAnomalyDetail(contractId: number, anomalyKey: string) {
   const load = useCallback(() => fetchAnomalyDetail(contractId, anomalyKey), [contractId, anomalyKey])
-  const { state, reload } = useLoad(load)
+  const { state, reload } = useLoad(load, undefined, `${contractId}:${anomalyKey}`)
   const [updated, setUpdated] = useState<Detail | null>(null)
+  // KAN-353: another anomaly never shows the previous one's post-transition detail.
+  const [updatedFor, setUpdatedFor] = useState(`${contractId}:${anomalyKey}`)
+  if (updatedFor !== `${contractId}:${anomalyKey}`) {
+    setUpdatedFor(`${contractId}:${anomalyKey}`)
+    setUpdated(null)
+  }
   const current = updated ?? (state.status === 'ready' ? state.value : null)
   const reloadDetail = () => {
     setUpdated(null)

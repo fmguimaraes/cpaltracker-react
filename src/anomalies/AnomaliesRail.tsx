@@ -23,7 +23,7 @@ export function AnomaliesRail({
 }) {
   const load = useCallback(() => fetchAnomalies(contractId, statusesForFilter('open')), [contractId])
   const peek = useCallback(() => peekAnomalies(contractId, statusesForFilter('open')), [contractId])
-  const { state } = useLoad(load, peek)
+  const { state } = useLoad(load, peek, String(contractId))
 
   const count =
     state.status === 'ready'

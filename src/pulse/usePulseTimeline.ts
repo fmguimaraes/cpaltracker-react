@@ -123,7 +123,7 @@ export function usePulseTimeline({
         : Promise.resolve(null),
     [historyWanted, contractId, startDay, endDay],
   )
-  const { state: history } = useLoad(load)
+  const { state: history } = useLoad(load, undefined, String(contractId))
   const rows = history.status === 'ready' ? history.value?.rows ?? null : null
   const byDevice = useMemo(() => (rows ? buildDeviceSeries(rows) : null), [rows])
   let historyStatus: PulseTimeline['historyStatus'] = 'idle'

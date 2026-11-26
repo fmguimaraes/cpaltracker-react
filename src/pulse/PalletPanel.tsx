@@ -92,11 +92,12 @@ export function PalletPanel({
     () => fetchContractHistory(contractId, { start: new Date(fromMs), end: new Date(toMs) }, chipId),
     [contractId, fromMs, toMs, chipId],
   )
-  const { state, reload } = useLoad(loadHistory)
+  // The key is the entity (contract + pallet), not the period: a refresh or a period change keeps the charts (FR27).
+  const { state, reload } = useLoad(loadHistory, undefined, `${contractId}:${chipId}`)
   const loadAnomalies = useCallback(() => fetchAnomalies(contractId, ALL_STATUSES), [contractId])
   // KAN-345 (FR24): reopening the panel shows the cached alerts at once while they are revalidated.
   const peekAnomalyRows = useCallback(() => peekAnomalies(contractId, ALL_STATUSES), [contractId])
-  const { state: anomalyState } = useLoad(loadAnomalies, peekAnomalyRows)
+  const { state: anomalyState } = useLoad(loadAnomalies, peekAnomalyRows, String(contractId))
 
   const anomalies = useMemo<AnomalyRow[]>(
     () => (anomalyState.status === 'ready' ? anomalyState.value.filter((row) => row.chipId === chipId) : []),

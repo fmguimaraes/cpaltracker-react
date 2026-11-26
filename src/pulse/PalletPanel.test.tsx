@@ -322,6 +322,24 @@ describe('PalletPanel', () => {
     expect(fetchContractHistory).toHaveBeenCalledOnce()
   })
 
+  it('keeps the charts while a refresh moves both range ends and its fetch is held (KAN-353, FR27, EC13)', async () => {
+    fetchAnomalies.mockResolvedValue([])
+    fetchContractHistory.mockResolvedValueOnce(response(readings(5)))
+    const panel = (from: Date, to: Date) => (
+      <PalletPanel contractId={7} position={position} range={{ from, to }} onBack={() => {}} now={new Date(LAST + 30 * 60_000)} />
+    )
+    const { rerender } = render(panel(FROM, TO), { wrapper: MemoryRouter })
+    await screen.findByTestId('pallet-charts')
+
+    // A preset period's "now" moves on every positions refresh: both ends shift, the next fetch is held.
+    fetchContractHistory.mockReturnValueOnce(new Promise(() => {}))
+    rerender(panel(new Date(FROM.getTime() + 60_000), new Date(TO.getTime() + 60_000)))
+
+    expect(fetchContractHistory).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('pallet-charts')).toBeInTheDocument()
+    expect(screen.queryByTestId('pallet-loading')).not.toBeInTheDocument()
+  })
+
   it('adds a "Période" section: readings, temperature range and Δ24h per metric', async () => {
     // 25 hourly readings: the temperature climbs 0.5 °C an hour, the weight loses 10 kg an hour.
     const rows = Array.from({ length: 25 }, (_, i) => row({ t: LAST - (24 - i) * HOUR, ta: 4 + i / 2, hr: 50, m: 500 - 10 * i }))

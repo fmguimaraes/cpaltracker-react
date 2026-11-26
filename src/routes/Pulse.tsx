@@ -164,7 +164,7 @@ export function Pulse() {
     () => (selectedId === null ? undefined : peekAnomalies(selectedId, ALL_STATUSES)),
     [selectedId],
   )
-  const { state: anomalyState } = useLoad(loadAnomalies, peekAnomalyRows)
+  const { state: anomalyState } = useLoad(loadAnomalies, peekAnomalyRows, String(selectedId))
   const anomalyRows = useMemo(() => (anomalyState.status === 'ready' ? anomalyState.value : []), [anomalyState])
 
   const listView: ListView = view.kind === 'anomaly' ? view.from : view

@@ -75,7 +75,7 @@ export function AlertsList({ contractId, device: fixedDevice }: { contractId: nu
     [contractId],
   )
   const peek = useCallback(() => (contractId === null ? undefined : peekAnomalies(contractId, ALL)), [contractId])
-  const { state, reload } = useLoad(load, peek)
+  const { state, reload } = useLoad(load, peek, String(contractId))
 
   /** Writes one filter into the URL (the default value drops its param); a replace, so back leaves the page. */
   const update = (changes: Record<string, string | null>) => {
