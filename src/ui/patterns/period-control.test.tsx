@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PeriodControl, monthShortcuts, parseDay } from './period-control'
@@ -39,12 +39,18 @@ describe('monthShortcuts', () => {
   })
 })
 
-describe('PeriodControl custom range', () => {
+// Opening the two-month calendar costs ~0.5 s in jsdom and each typed key re-renders it: one test took 1 to 2 s
+// alone and hit the 5 s default on a loaded full run (KAN-351). Days go in as one paste, with a wider timeout.
+describe('PeriodControl custom range', { timeout: 15_000 }, () => {
+  let user: ReturnType<typeof userEvent.setup>
+  beforeEach(() => {
+    user = userEvent.setup()
+  })
   const range = { from: new Date(2026, 9, 27), to: new Date(2026, 10, 26) }
 
   async function open(onCustom = vi.fn()) {
     render(<PeriodControl preset="30d" range={range} onPreset={vi.fn()} onCustom={onCustom} testId="p" />)
-    await userEvent.click(screen.getByTestId('p-custom'))
+    await user.click(screen.getByTestId('p-custom'))
     return onCustom
   }
 
@@ -52,11 +58,13 @@ describe('PeriodControl custom range', () => {
     const onCustom = await open()
     const from = screen.getByTestId('p-custom-from')
     const to = screen.getByTestId('p-custom-to')
-    await userEvent.click(to)
-    await userEvent.keyboard('20/12/2026{Enter}')
-    await userEvent.click(from)
-    await userEvent.keyboard('15/09/2026{Enter}')
-    await userEvent.click(screen.getByTestId('p-custom-apply'))
+    await user.click(to)
+    await user.paste('20/12/2026')
+    await user.keyboard('{Enter}')
+    await user.click(from)
+    await user.paste('15/09/2026')
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByTestId('p-custom-apply'))
     const [start, end] = onCustom.mock.calls[0]
     expect([...day(start), start.getHours()]).toEqual([2026, 9, 15, 0])
     expect([...day(end), end.getHours(), end.getMinutes()]).toEqual([2026, 12, 20, 23, 59])
@@ -64,9 +72,10 @@ describe('PeriodControl custom range', () => {
 
   it('swaps a start typed after the end', async () => {
     const onCustom = await open()
-    await userEvent.click(screen.getByTestId('p-custom-from'))
-    await userEvent.keyboard('05/12/2026{Enter}')
-    await userEvent.click(screen.getByTestId('p-custom-apply'))
+    await user.click(screen.getByTestId('p-custom-from'))
+    await user.paste('05/12/2026')
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByTestId('p-custom-apply'))
     const [start, end] = onCustom.mock.calls[0]
     expect(day(start)).toEqual([2026, 11, 26])
     expect(day(end)).toEqual([2026, 12, 5])
@@ -75,15 +84,15 @@ describe('PeriodControl custom range', () => {
   it('blocks Appliquer while a typed day is invalid', async () => {
     await open()
     const from = screen.getByTestId('p-custom-from')
-    await userEvent.click(from)
-    await userEvent.keyboard('31/02/2026')
+    await user.click(from)
+    await user.paste('31/02/2026')
     expect(from).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByTestId('p-custom-apply')).toBeDisabled()
   })
 
   it('fills both days from a shortcut', async () => {
     await open()
-    await userEvent.click(screen.getByTestId('p-shortcut-last-month'))
+    await user.click(screen.getByTestId('p-shortcut-last-month'))
     expect(screen.getByTestId('p-custom-from')).toHaveValue(
       monthShortcuts().find((s) => s.key === 'last-month')!.from.toLocaleDateString('fr-FR'),
     )
