@@ -7,8 +7,12 @@ import { pickContract } from './contract-helpers'
  * calendar opens on that month; pick the day there.
  */
 async function pickJune2026Day(page: Page, fieldTestId: string, day: number) {
+  const dayButton = page.getByRole('button', { name: new RegExp(`June ${day}(st|nd|rd|th), 2026`) })
   await page.getByTestId(fieldTestId).getByRole('button').click()
-  await page.getByRole('button', { name: new RegExp(`June ${day}(st|nd|rd|th), 2026`) }).click()
+  await dayButton.click()
+  // Wait for this calendar to close: picking the next field while it is still closing put two
+  // calendars on the page, and the next day lookup matched a day button in each (KAN-351).
+  await expect(dayButton).toHaveCount(0)
 }
 
 test.beforeEach(async ({ page }) => {
