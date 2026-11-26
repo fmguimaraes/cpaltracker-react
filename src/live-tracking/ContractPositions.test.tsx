@@ -457,8 +457,10 @@ describe('ContractPositions non-blocking loading (KAN-344 FR15/FR16/FR22/FR23)',
 
     stubFetch(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
-    await waitFor(() => expect(screen.queryByTestId('positions-error')).not.toBeInTheDocument())
-    expect(document.querySelector('.leaflet-marker-icon')).not.toBeNull()
+    // Wait for the data itself: the error also disappears while the retry is still loading, so waiting
+    // on its absence alone raced the marker assertion against the in-flight response.
+    await waitFor(() => expect(document.querySelector('.leaflet-marker-icon')).not.toBeNull())
+    expect(screen.queryByTestId('positions-error')).not.toBeInTheDocument()
   })
 })
 

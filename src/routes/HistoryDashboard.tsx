@@ -91,7 +91,7 @@ export function HistoryDashboard() {
 
   function renderHeaderFilters() {
     if (loadState !== 'loaded' || contracts.length === 0) return undefined
-    // The device FilterBar is portalled here by `HistoryReadyPanel` once the history is ready.
+    // The device checklist popover trigger ("Appareils") is portalled here by `HistoryReadyPanel` once the history is ready.
     return <div ref={setFilterSlot} data-testid="history-header-filters" className="empty:hidden" />
   }
 

@@ -99,11 +99,12 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
 
     render(<TimelineMap rows={rows} hooks={hooks} />)
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
-    expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('bg-success')
+    expect(document.querySelector('.leaflet-marker-icon .bg-success')).not.toBeNull()
 
     fireEvent.keyDown(sliderThumb(), { key: 'Home' })
 
-    await waitFor(() => expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('bg-danger'))
+    await waitFor(() => expect(document.querySelector('.leaflet-marker-icon .bg-danger-mark')).not.toBeNull())
+    expect(document.querySelector('.leaflet-marker-icon .bg-success')).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
