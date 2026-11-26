@@ -268,8 +268,8 @@ describe('HistoryDashboard (KAN-172 FR1, FR2, FR25, NFR5)', () => {
     await waitFor(() => expect(screen.getByTestId('contract-selector')).toHaveTextContent('REF-013'))
     expect(window.sessionStorage.getItem(STORAGE_KEY)).toBe('13')
     expect(header.getByTestId('time-30d')).toBeInTheDocument()
-    // The device FilterBar sits in the header row (the contract Select now lives in the sidebar).
-    expect(header.getByTestId('history-header-filters')).toContainElement(screen.getByTestId('filter-bar'))
+    // The "Appareils" device filter button sits in the header row (the contract Select now lives in the sidebar).
+    expect(header.getByTestId('history-header-filters')).toContainElement(screen.getByTestId('device-checklist-trigger'))
     expect(screen.queryByRole('radiogroup', { name: 'Sélection du contrat' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('date-range-picker')).not.toBeInTheDocument()
     expect(screen.getByTestId('history-dashboard-ready')).not.toHaveTextContent(/période du/)

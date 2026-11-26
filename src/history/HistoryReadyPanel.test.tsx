@@ -76,12 +76,19 @@ function historyResponse(overrides: Partial<HistoryResponse> = {}): HistoryRespo
   }
 }
 
+/** The device checklist lives in the "Appareils" popover (operator decision 2026-11-13). */
+function openDeviceChecklist() {
+  fireEvent.click(screen.getByTestId('device-checklist-trigger'))
+}
+
 describe('HistoryReadyPanel (KAN-175 FR4, FR9, FR19-24, NFR3)', () => {
   it('renders the map, checklist, charts, lot-hooks and selection summary together', async () => {
     render(<HistoryReadyPanel history={historyResponse()} />)
 
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(2))
-    expect(screen.getByTestId('device-checklist')).toBeInTheDocument()
+    expect(screen.getByTestId('device-checklist-trigger')).toHaveTextContent('Appareils (2/2)')
+    openDeviceChecklist()
+    expect(await screen.findByTestId('device-checklist')).toBeInTheDocument()
     expect(screen.getByTestId('history-charts')).toBeInTheDocument()
     expect(screen.getByTestId('lot-hook-history-empty')).toBeInTheDocument()
     expect(screen.getByTestId('selection-summary')).toBeInTheDocument()
@@ -94,7 +101,8 @@ describe('HistoryReadyPanel (KAN-175 FR4, FR9, FR19-24, NFR3)', () => {
     render(<HistoryReadyPanel history={historyResponse()} />)
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(2))
 
-    fireEvent.click(screen.getByTestId('device-checklist-item-CHIP-B'))
+    openDeviceChecklist()
+    fireEvent.click(await screen.findByTestId('device-checklist-item-CHIP-B'))
 
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
     expect(screen.getByTestId('selection-summary-count')).toHaveTextContent('1 mesure(s)')
@@ -102,18 +110,20 @@ describe('HistoryReadyPanel (KAN-175 FR4, FR9, FR19-24, NFR3)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('portals the device FilterBar into the given header slot, still driven by the checklist selection (operator decision 2026-10-29)', async () => {
+  it('portals the "Appareils" device filter into the given header slot, still driven by the checklist selection (operator decision 2026-11-13)', async () => {
     const slot = document.createElement('div')
     document.body.appendChild(slot)
 
     render(<HistoryReadyPanel history={historyResponse()} filterSlot={slot} />)
 
-    const bar = screen.getByTestId('filter-bar')
-    expect(slot).toContainElement(bar)
-    expect(screen.getByTestId('history-ready-panel')).not.toContainElement(bar)
+    const trigger = screen.getByTestId('device-checklist-trigger')
+    expect(slot).toContainElement(trigger)
+    expect(screen.getByTestId('history-ready-panel')).not.toContainElement(trigger)
 
-    fireEvent.click(screen.getByTestId('device-checklist-item-CHIP-B'))
+    openDeviceChecklist()
+    fireEvent.click(await screen.findByTestId('device-checklist-item-CHIP-B'))
     await waitFor(() => expect(slot).toHaveTextContent('Appareils = 1 sur 2'))
+    expect(trigger).toHaveTextContent('Appareils (1/2)')
     slot.remove()
   })
 
@@ -132,7 +142,8 @@ describe('HistoryReadyPanel (KAN-175 FR4, FR9, FR19-24, NFR3)', () => {
     const { rerender } = render(<HistoryReadyPanel history={first} />)
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(2))
 
-    fireEvent.click(screen.getByTestId('device-checklist-item-CHIP-B'))
+    openDeviceChecklist()
+    fireEvent.click(await screen.findByTestId('device-checklist-item-CHIP-B'))
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
 
     const second = historyResponse()

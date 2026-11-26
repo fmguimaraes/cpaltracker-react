@@ -22,6 +22,20 @@ function row(overrides: Partial<HistoryRow>): HistoryRow {
 
 const hooks: HistoryHook[] = []
 
+// The trail is ON by default since KAN-217 (4db4898), so any device whose instant is past its first
+// point mounts a `<Polyline>`, which throws under jsdom (Leaflet's SVG renderer finds a null pane — see
+// the CB23 note below). Stub only that layer; the map, markers and slider stay real. The trail's math is
+// covered by `timelineData.test.ts`, its real rendering by the browser E2E.
+vi.mock('react-leaflet', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-leaflet')>()
+  return {
+    ...actual,
+    Polyline: ({ positions }: { positions: unknown[] }) => (
+      <div data-testid="timeline-trail-line" data-points={positions.length} />
+    ),
+  }
+})
+
 // The kit Slider (Radix) observes its thumb; jsdom has no ResizeObserver.
 beforeEach(() => {
   vi.stubGlobal(
@@ -77,7 +91,7 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
 
   it('re-renders the marker (same device, new position) as the slider scrubs, with no network call', async () => {
     const rows: HistoryRow[] = [
-      row({ c: 'CHIP-1', t: 1000, la: 1, lo: 1, m: 100 }), // alert (<200)
+      row({ c: 'CHIP-1', t: 1000, la: 1, lo: 1, m: 100 }), // alert (<200): the state is the marker's dot (theming spec 2026-11-25)
       row({ c: 'CHIP-1', t: 2000, la: 2, lo: 2, m: 600 }), // ok (>=500)
     ]
     const fetchSpy = vi.fn()
@@ -85,11 +99,11 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
 
     render(<TimelineMap rows={rows} hooks={hooks} />)
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
-    expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('ring-success')
+    expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('bg-success')
 
     fireEvent.keyDown(sliderThumb(), { key: 'Home' })
 
-    await waitFor(() => expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('ring-danger'))
+    await waitFor(() => expect(document.querySelector('.leaflet-marker-icon')?.innerHTML).toContain('bg-danger'))
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -107,11 +121,17 @@ describe('TimelineMap (KAN-174 FR10-18, NFR1, NFR3)', () => {
   // `timelineData.test.ts`'s `trailPositions` unit tests; the real SVG
   // rendering is covered end-to-end, in a real browser, by
   // `e2e/history-timeline-map.spec.ts`.
-  it('renders the "Afficher la trace" toggle unchecked by default', async () => {
-    const rows: HistoryRow[] = [row({ c: 'CHIP-1', t: 1000, la: 1, lo: 1 })]
+  it('renders the "Afficher la trace" toggle pressed by default (on since KAN-217) and drops the trail when released', async () => {
+    const rows: HistoryRow[] = [row({ c: 'CHIP-1', t: 0, la: 1, lo: 1 }), row({ c: 'CHIP-1', t: 1000, la: 2, lo: 2 })]
     render(<TimelineMap rows={rows} hooks={hooks} />)
     await waitFor(() => expect(document.querySelectorAll('.leaflet-marker-icon')).toHaveLength(1))
-    expect(screen.getByTestId('timeline-trail-toggle')).not.toBeChecked()
+    expect(screen.getByTestId('timeline-trail-toggle')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('timeline-trail-line')).toHaveAttribute('data-points', '2')
+
+    fireEvent.click(screen.getByTestId('timeline-trail-toggle'))
+
+    expect(screen.getByTestId('timeline-trail-toggle')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByTestId('timeline-trail-line')).not.toBeInTheDocument()
   })
 
   it('"Rejouer" advances the instant over time and stops automatically at the end (CB24)', async () => {

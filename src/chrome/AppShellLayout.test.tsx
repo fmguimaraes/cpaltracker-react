@@ -22,6 +22,8 @@ const account = {
 function stubEnv(
   opts: {
     logoStatus?: number
+    /** When given, the logo response is held until this promise resolves (deterministic "loading" window). */
+    logoGate?: Promise<void>
     role?: string
     clientId?: number | null
     mobile?: boolean
@@ -30,6 +32,7 @@ function stubEnv(
 ) {
   const {
     logoStatus = 200,
+    logoGate,
     role = 'client',
     clientId = 7,
     mobile = false,
@@ -66,9 +69,8 @@ function stubEnv(
         )
       }
       if (url.includes('/clients/logo.php')) {
-        return Promise.resolve(
-          new Response(new Blob(['fake-png']), { status: logoStatus }),
-        )
+        const response = () => new Response(new Blob(['fake-png']), { status: logoStatus })
+        return logoGate ? logoGate.then(response) : Promise.resolve(response())
       }
       return Promise.resolve(new Response('{}', { status: 404 }))
     }),
@@ -190,10 +192,16 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
   })
 
   it('shows a Skeleton while the client logo loads, then nothing when there is no logo', async () => {
-    renderShell({ logoStatus: 404 })
-    expect(
-      await screen.findByTestId('client-logo-skeleton'),
-    ).toBeInTheDocument()
+    // The logo response is held on a gate: with an immediately-resolving stub the skeleton could be
+    // mounted and removed between two polls of findBy*, which made this test flaky.
+    let releaseLogo!: () => void
+    const logoGate = new Promise<void>((resolve) => {
+      releaseLogo = resolve
+    })
+    renderShell({ logoStatus: 404, logoGate })
+    expect(await screen.findByTestId('client-logo-skeleton')).toBeInTheDocument()
+
+    releaseLogo()
     await waitFor(() =>
       expect(screen.queryByTestId('client-logo-skeleton')).toBeNull(),
     )
