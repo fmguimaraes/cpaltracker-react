@@ -34,7 +34,7 @@ export function FleetPanel({ statuses, children }: { statuses: DeviceStatus[]; c
       className={cn(
         // Shrink-to-fit: the card never stretches to the map's full height, only grows with its
         // content, capped so it can't overflow past the map's edges (same 0.75rem inset as top-3).
-        'z-1000 gap-0 py-0 shadow-overlay md:absolute md:top-3 md:left-3 md:w-80 md:max-h-[calc(100%-1.5rem)]',
+        'z-1000 gap-0 py-0 shadow-overlay md:absolute md:top-3 md:left-3 md:w-80 md:max-h-panel-inset',
       )}
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -64,8 +64,8 @@ export function FleetPanel({ statuses, children }: { statuses: DeviceStatus[]; c
         className={cn(
           'flex flex-col gap-4 p-4 transition-[max-height,opacity] duration-300 ease-in-out overflow-y-auto',
           open
-            ? 'max-h-[50rem] opacity-100'
-            : 'max-md:max-h-[50rem] max-md:opacity-100 md:max-h-0 md:overflow-hidden md:p-0 md:opacity-0',
+            ? 'max-h-200 opacity-100'
+            : 'max-md:max-h-200 max-md:opacity-100 md:max-h-0 md:overflow-hidden md:p-0 md:opacity-0',
         )}
       >
         <section aria-label="Répartition par état">

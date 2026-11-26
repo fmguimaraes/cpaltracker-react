@@ -70,7 +70,7 @@ export function HistoryReadyPanel({
             Appareils ({deviceCount}/{history.devices.length})
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="z-[1100] w-80 p-4">
+        <PopoverContent align="start" className="z-1100 w-80 p-4">
           <DeviceChecklist
             devices={history.devices}
             selected={selected}

@@ -82,6 +82,8 @@
   --color-load-5: var(--load-5);
 
   --spacing-page: var(--page-height);
+  /* Panel height cap: the map's full height minus a 0.75rem inset on both edges (FleetPanel) */
+  --spacing-panel-inset: calc(100% - 1.5rem);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -96,6 +98,7 @@
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.25); /* 10 px: popovers, menus, cards */
+  --radius-badge: 0.25rem; /* 4 px: small corner badge on a toggle */
   --radius-2xl: calc(var(--radius) * 1.8);
 
   --shadow-overlay: var(--shadow-overlay);

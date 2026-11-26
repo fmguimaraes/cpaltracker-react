@@ -206,8 +206,8 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null, onInstantCha
          * dark tile filter is `tokens.css`'s `.leaflet-tile-pane` rule, scoped
          * so it never touches markers/trail/tooltips.
          */}
-        <div className="relative aspect-[160/63] w-full overflow-hidden rounded-lg bg-media">
-          <div className="absolute top-2.5 right-2.5 z-[1000] flex gap-1.5">
+        <div className="relative aspect-160/63 w-full overflow-hidden rounded-lg bg-media">
+          <div className="absolute top-2.5 right-2.5 z-1000 flex gap-1.5">
             <Toggle
               variant="outline"
               size="sm"
@@ -223,7 +223,7 @@ export function TimelineMap({ rows, hooks, visibleDeviceIds = null, onInstantCha
               <span
                 aria-hidden
                 className={cn(
-                  'absolute -right-1 -bottom-1 flex size-3.5 items-center justify-center rounded-[4px] border border-input shadow-xs',
+                  'absolute -right-1 -bottom-1 flex size-3.5 items-center justify-center rounded-badge border border-input shadow-xs',
                   trailEnabled ? 'border-signal bg-accent text-foreground' : 'bg-card',
                 )}
               >

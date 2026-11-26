@@ -14,19 +14,19 @@ describe('FleetPanel collapse (desktop)', () => {
     const body = document.getElementById(button.getAttribute('aria-controls')!)!
 
     // Shrink-to-fit: the panel is capped to the map's height, never pinned to stretch across it.
-    expect(panel).toHaveClass('md:max-h-[calc(100%-1.5rem)]')
+    expect(panel).toHaveClass('md:max-h-panel-inset')
     expect(panel).not.toHaveClass('md:bottom-3')
-    expect(body).toHaveClass('max-h-[50rem]')
+    expect(body).toHaveClass('max-h-200')
     expect(body).not.toHaveClass('md:max-h-0')
 
     await userEvent.click(button)
     expect(button).toHaveAttribute('aria-expanded', 'false')
     expect(body).toHaveClass('md:max-h-0', 'md:overflow-hidden')
-    expect(body).not.toHaveClass('max-h-[50rem]')
+    expect(body).not.toHaveClass('max-h-200')
 
     await userEvent.click(button)
     expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(body).toHaveClass('max-h-[50rem]')
+    expect(body).toHaveClass('max-h-200')
     expect(body).not.toHaveClass('md:max-h-0')
   })
 })

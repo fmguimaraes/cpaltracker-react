@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { openContractSelect, pickContract } from './contract-helpers'
+import { openContractSelect } from './contract-helpers'
 
 /**
  * KAN-158 smoke coverage for Live Tracking's entry gate and contract
