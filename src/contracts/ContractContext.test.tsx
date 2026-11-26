@@ -53,7 +53,8 @@ describe('ContractProvider', () => {
     await renderProvider()
     expect(ctx.selectedId).toBe(12)
     expect(ctx.selectedContract?.contractRef).toBe('REF-12')
-    expect(window.sessionStorage.getItem('cpaltracker:contract')).toBe('12')
+    // Stored by an effect after the selection renders.
+    await waitFor(() => expect(window.sessionStorage.getItem('cpaltracker:contract')).toBe('12'))
   })
 
   it('prefers the stored contract when still listed, else the first', async () => {

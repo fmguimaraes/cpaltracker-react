@@ -55,10 +55,13 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     }
   }, [search])
 
-  // Remember whichever contract is on screen (picked, deep-linked or defaulted).
+  // Remember whichever contract is on screen (picked, deep-linked or defaulted), and forget a rejected one.
+  // The forget happens here, not in `rejectContract`: a write there could be overwritten by this effect
+  // still pending from the previous selection, putting the rejected contract back as the default.
   useEffect(() => {
     if (selectedId !== null) writeStoredContractId(selectedId)
-  }, [selectedId])
+    else if (accessError !== null) writeStoredContractId(null)
+  }, [selectedId, accessError])
 
   useEffect(() => {
     let cancelled = false
@@ -90,9 +93,8 @@ export function ContractProvider({ children }: { children: ReactNode }) {
         setSelectedId(contractId)
       },
       rejectContract: () => {
+        // A rejected contract must not be offered again as the remembered default: the storage effect forgets it.
         setSelectedId(null)
-        // A rejected contract must not be offered again as the remembered default.
-        writeStoredContractId(null)
         setAccessError(CONTRACT_ACCESS_ERROR)
       },
     }),

@@ -142,7 +142,8 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
     expect(screen.queryByTestId('theme-toggle')).not.toBeInTheDocument()
     await user.click(await screen.findByTestId('user-menu'))
     // Name, then the role.
-    expect(await screen.findByTestId('user-menu-identity')).toHaveTextContent(/Demo.*Client$/)
+    // The name arrives with the account, which can land after the menu opens: wait for the text, not the node.
+    await waitFor(() => expect(screen.getByTestId('user-menu-identity')).toHaveTextContent(/Demo.*Client$/))
     const choice = screen.getByTestId('theme-choice')
     expect(within(choice).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Clair', 'Sombre', 'Système'])
     expect(screen.getByTestId('theme-system')).toHaveAttribute('data-state', 'on')
