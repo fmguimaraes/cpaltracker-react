@@ -89,27 +89,35 @@ async function expectSkeletonsContrast(page: Page, scope: string) {
 for (const path of ['/pulse', '/live-tracking']) {
   test(`AC12 / AC19: ${path} shows shell, map with tiles and the loader before delayed data @desktop`, async ({ page }) => {
     await mockApi(page, DELAY_MS)
-    // The page's CSP forbids `waitForFunction` (eval), so an init script watches the DOM instead and stamps
-    // `performance.now()` (counted from the navigation start) when the map container, the loader and a tile
-    // image are all there together.
+    // The page's CSP forbids `waitForFunction` (eval), and `mockApi` installs Playwright's fake clock, which
+    // replaces `performance.now()` / `Date` in the page (counted from the `setFixedTime` call, not from the
+    // navigation). So the time is read on the real clock, in Node: an init script's MutationObserver calls the
+    // exposed `__nfr4` binding (bindings pass the CSP) the first time the map container, the loader and a tile
+    // image are all present; the origin is `Date.now()` taken right before `goto` (the navigation request).
+    let reachedAt: number | null = null
+    await page.exposeFunction('__nfr4', () => {
+      reachedAt ??= Date.now()
+    })
     await page.addInitScript(() => {
+      let reported = false
       const check = () => {
-        const w = window as unknown as { __nfr4?: number }
         if (
-          w.__nfr4 === undefined &&
+          !reported &&
           document.querySelector('.leaflet-container') &&
           document.querySelector('[data-testid="positions-loading"]') &&
           document.querySelector('.leaflet-tile-pane img')
-        )
-          w.__nfr4 = performance.now()
+        ) {
+          reported = true
+          void (window as unknown as { __nfr4: () => Promise<void> }).__nfr4()
+        }
       }
       new MutationObserver(check).observe(document, { childList: true, subtree: true, attributes: true })
     })
+    const navigationStart = Date.now()
     await page.goto(path, { waitUntil: 'commit' })
-    await expect
-      .poll(() => page.evaluate(() => (window as unknown as { __nfr4?: number }).__nfr4 ?? null), { timeout: 20_000 })
-      .not.toBeNull()
-    const elapsed = await page.evaluate(() => (window as unknown as { __nfr4: number }).__nfr4)
+    await expect.poll(() => reachedAt, { timeout: 20_000 }).not.toBeNull()
+    const elapsed = (reachedAt as unknown as number) - navigationStart
+    console.log(`NFR4 ${path}: ${elapsed} ms`)
     expect(elapsed, 'shell + map + tile + loader within the NFR4 budget').toBeLessThan(BUDGET_MS)
     await expect(page.getByTestId('positions-loading')).toHaveText(/Chargement des positions…/)
     await expect(page.getByRole('navigation').first()).toBeVisible()
@@ -131,9 +139,7 @@ test('AC19: Pulse side panel shows list skeletons, not a blank block, while data
 })
 
 test('AC13: the Pulse drawer skeletons stand out from the card surface once contracts answered @desktop', async ({ page }) => {
-  await mockApi(page, 0, {
-    '/anomalies/': () => ({ status: 200, body: { anomalies: [] } }),
-  })
+  await mockApi(page, 0)
   await page.route('**/anomalies/**', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 3000))
     await route.fulfill(json({ anomalies: [] })).catch(() => undefined)
