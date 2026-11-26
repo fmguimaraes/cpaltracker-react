@@ -42,9 +42,12 @@ function byStatus(rows: AnomalyRow[], filter: StatusFilter) {
   return rows.filter((row) => allowed.has(row.status))
 }
 
-function ListSkeleton() {
+/** A load that never settles: the list stays in its loading state until the contract is known. */
+const NEVER = new Promise<AnomalyRow[]>(() => undefined)
+
+function ListSkeleton({ testId }: { testId: string }) {
   return (
-    <div data-testid="alerts-loading" role="status" aria-busy className="flex flex-col gap-2">
+    <div data-testid={testId} role="status" aria-busy className="flex flex-col gap-2">
       <span className="sr-only">Chargement des alertes…</span>
       {Array.from({ length: 6 }, (_, index) => (
         <Skeleton key={index} className="h-10 w-full" />
@@ -57,7 +60,7 @@ function ListSkeleton() {
  * The filterable alerts list. `device` pins it to one device (the device's own alerts page): the `?device=`
  * param, its chip and its reset are then left out.
  */
-export function AlertsList({ contractId, device: fixedDevice }: { contractId: number; device?: string }) {
+export function AlertsList({ contractId, device: fixedDevice }: { contractId: number | null; device?: string }) {
   const [params, setParams] = useSearchParams()
   const isMobile = useIsMobile()
   const status = parseStatus(params.get(STATUS_PARAM))
@@ -66,7 +69,11 @@ export function AlertsList({ contractId, device: fixedDevice }: { contractId: nu
   /** A removable `?device=` filter on the contract-wide list. */
   const deviceFilter = fixedDevice === undefined && device !== null
 
-  const load = useCallback(() => fetchAnomalies(contractId, ALL), [contractId])
+  // `null` = the contract list is still loading (FR20): the shell shows with its placeholders, nothing is fetched.
+  const load = useCallback(
+    () => (contractId === null ? NEVER : fetchAnomalies(contractId, ALL)),
+    [contractId],
+  )
   const { state, reload } = useLoad(load)
 
   /** Writes one filter into the URL (the default value drops its param); a replace, so back leaves the page. */
@@ -101,7 +108,7 @@ export function AlertsList({ contractId, device: fixedDevice }: { contractId: nu
   const statusEmpty = STATUS_FILTER_OPTIONS.find((option) => option.value === status)?.empty ?? 'Aucune alerte'
 
   let body
-  if (state.status === 'loading') body = <ListSkeleton />
+  if (state.status === 'loading') body = <ListSkeleton testId={contractId === null ? 'alerts-contracts-loading' : 'alerts-loading'} />
   else if (state.status === 'error') {
     body = (
       <Alert variant="danger" data-testid="alerts-error">
@@ -169,10 +176,13 @@ export function AlertsList({ contractId, device: fixedDevice }: { contractId: nu
             {STATUS_FILTER_OPTIONS.map((option) => (
               <ToggleGroupItem key={option.value} value={option.value} className={SELECTED_TOGGLE} data-testid={`alerts-status-${option.value}`}>
                 {option.label}
-                {ready && (
+                {ready ? (
                   <span className="tabular-nums" data-testid={`alerts-status-count-${option.value}`}>
                     {view.counts[option.value]}
                   </span>
+                ) : (
+                  // FR20: a placeholder holds the count's place, so the filter doesn't shift when counts arrive.
+                  <Skeleton className="h-4 w-5" aria-hidden data-testid={`alerts-status-count-loading-${option.value}`} />
                 )}
               </ToggleGroupItem>
             ))}
@@ -246,7 +256,9 @@ export function Alerts() {
         <ShellBreadcrumb levels={[{ label: 'Alertes', testId: 'breadcrumb-alerts' }]} />
       </ShellPageTitle>
       <div className="flex flex-col gap-6 p-4 md:p-6">
-        <AlertsContractGate>{(contractId) => <AlertsList key={contractId} contractId={contractId} />}</AlertsContractGate>
+        <AlertsContractGate whileLoading={<AlertsList contractId={null} />}>
+          {(contractId) => <AlertsList key={contractId} contractId={contractId} />}
+        </AlertsContractGate>
       </div>
     </div>
   )

@@ -416,3 +416,48 @@ describe('ContractPositions (KAN-160 FR3/FR4)', () => {
     expect(screen.queryByTestId('device-filter-CHIP-001')).not.toBeInTheDocument()
   })
 })
+
+describe('ContractPositions non-blocking loading (KAN-344 FR15/FR16/FR22/FR23)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    useDeviceVisibilityStore.getState().showAll()
+  })
+
+  it('mounts the map with a status loader while positions load, then drops the loader (AC12)', async () => {
+    let resolve!: (value: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((r) => (resolve = r))))
+    render(<ContractPositions contractId={12} />)
+
+    expect(screen.getByRole('region', { name: 'Carte de la flotte' })).toBeInTheDocument()
+    const loader = screen.getByTestId('positions-loading')
+    expect(loader).toHaveAttribute('role', 'status')
+    expect(loader).toHaveTextContent('Chargement des positions…')
+    expect(document.querySelector('[data-slot="skeleton"]')).toBeNull()
+
+    resolve(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+    await waitFor(() => expect(screen.queryByTestId('positions-loading')).not.toBeInTheDocument())
+    expect(document.querySelector('.leaflet-marker-icon')).not.toBeNull()
+  })
+
+  it('shows the map and the loader without fetching while the contract is unknown (EC17)', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    render(<ContractPositions contractId={null} />)
+    expect(screen.getByRole('region', { name: 'Carte de la flotte' })).toBeInTheDocument()
+    expect(screen.getByTestId('positions-loading')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the map on a positions error and retries on "Réessayer" (AC17, EC15)', async () => {
+    stubFetch(new Response(JSON.stringify({ error: { code: 'service_unavailable', message: 'x' } }), { status: 503 }))
+    render(<ContractPositions contractId={12} />)
+    await waitFor(() => expect(screen.getByTestId('positions-error')).toBeInTheDocument())
+    expect(screen.getByRole('region', { name: 'Carte de la flotte' })).toBeInTheDocument()
+    expect(screen.queryByTestId('positions-loading')).not.toBeInTheDocument()
+
+    stubFetch(new Response(JSON.stringify({ positions: [onePosition] }), { status: 200 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+    await waitFor(() => expect(screen.queryByTestId('positions-error')).not.toBeInTheDocument())
+    expect(document.querySelector('.leaflet-marker-icon')).not.toBeNull()
+  })
+})

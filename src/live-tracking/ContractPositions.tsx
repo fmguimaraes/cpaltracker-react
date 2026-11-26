@@ -11,7 +11,7 @@ import { massStatus } from './markerStyle'
 import { Alert } from '@/ui/alert'
 import { Button } from '@/ui/button'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
-import { Skeleton } from '@/ui/skeleton'
+import { Spinner } from '@/ui/spinner'
 import type { TimeRangeValue } from '@/ui/patterns/time-picker'
 import { filterByLastReport } from './lastReportFilter'
 import { ShellPageRefresh } from '@/ui/patterns/shell-title'
@@ -93,7 +93,11 @@ export function ContractPositions({
   onRefreshState,
   emptyNotice,
 }: {
-  contractId: number
+  /**
+   * `null` = the contract list is still loading (Pulse): the map and its loader show, nothing is fetched yet
+   * (FR15, EC17).
+   */
+  contractId: number | null
   onUnauthorized?: () => void
   /**
    * FR8: the page header's actions slot (last updated + refresh). `undefined`
@@ -177,6 +181,8 @@ export function ContractPositions({
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
+  // Bumped by the error state's "Réessayer": re-runs the initial load.
+  const [attempt, setAttempt] = useState(0)
   const showAll = useDeviceVisibilityStore((s) => s.showAll)
   const hiddenChipIds = useDeviceVisibilityStore((s) => s.hiddenChipIds)
 
@@ -196,6 +202,7 @@ export function ContractPositions({
     setState('loading')
     setRefreshError(null)
     setRefreshing(false)
+    if (contractId === null) return
     showAll()
     load(contractId)
       .then((result) => {
@@ -215,9 +222,10 @@ export function ContractPositions({
     return () => {
       cancelled = true
     }
-  }, [contractId, showAll, load])
+  }, [contractId, showAll, load, attempt])
 
   function refresh() {
+    if (contractId === null) return
     setRefreshing(true)
     setRefreshError(null)
     load(contractId)
@@ -265,29 +273,15 @@ export function ContractPositions({
     [keepMapWhenEmpty, allPositions],
   )
 
-  if (state === 'loading') {
-    return (
-      <div data-testid="positions-loading" role="status" className="px-4 md:px-6">
-        <Skeleton className="h-96 w-full md:h-176" />
-        <span className="sr-only">Chargement des positions…</span>
-      </div>
-    )
-  }
-
-  if (state === 'error') {
-    return (
-      <div className="px-4 md:px-6">
-        <Alert variant="danger" data-testid="positions-error">
-          Impossible de charger les positions de ce contrat. Réessayez plus tard.
-        </Alert>
-      </div>
-    )
-  }
-
+  // FR15/FR22: while positions load (or failed) the map stays mounted with no marker; a loader or the error
+  // sits with it. The page never shows a skeleton in place of the map.
+  const loading = state === 'loading'
+  const errored = state === 'error'
+  const pending = loading || errored
   const visiblePositions = positions.filter((p) => !hiddenChipIds.has(p.chipId))
   // What the map draws; with `keepMapWhenEmpty`, its notice shows whenever this is empty (e.g. not during a
   // playback that has pallets to show).
-  const drawn = mapPositions ?? visiblePositions
+  const drawn = pending ? [] : (mapPositions ?? visiblePositions)
   const emptyTestId = allPositions.length === 0 ? 'positions-empty' : 'positions-period-empty'
   const emptyMessage =
     allPositions.length === 0
@@ -307,7 +301,7 @@ export function ContractPositions({
     </>
   )
   let actionsNode: ReactNode = null
-  if (onRefreshState) actionsNode = null
+  if (onRefreshState || pending) actionsNode = null
   else if (refreshInShell)
     actionsNode = (
       <ShellPageRefresh>
@@ -336,7 +330,18 @@ export function ContractPositions({
         </div>
       )}
 
-      {positions.length === 0 && !keepMapWhenEmpty ? (
+      {errored && (
+        <div className="flex flex-wrap items-center gap-3 px-4 md:px-6">
+          <Alert variant="danger" data-testid="positions-error" className="flex-1">
+            Impossible de charger les positions de ce contrat. Réessayez plus tard.
+          </Alert>
+          <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)} data-testid="positions-retry">
+            Réessayer
+          </Button>
+        </div>
+      )}
+
+      {!pending && positions.length === 0 && !keepMapWhenEmpty ? (
         <div className="px-4 md:px-6">
           <Empty data-testid={emptyTestId}>
             <EmptyHeader>
@@ -364,9 +369,23 @@ export function ContractPositions({
               markerStyle={markerStyle}
               onMapClick={onMapClick}
               trails={trails}
-              emptyFit={emptyFit}
+              emptyFit={pending ? undefined : emptyFit}
             />
-            {keepMapWhenEmpty && drawn.length === 0 && (
+            {loading && (
+              // FR15: same card style as the map's notices; clear of the zoom/fit controls (top right).
+              <div
+                role="status"
+                data-testid="positions-loading"
+                data-overlay="map"
+                className="pointer-events-none absolute inset-0 z-1000 flex items-center justify-center px-16"
+              >
+                <div className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-overlay">
+                  <Spinner aria-hidden role={undefined} />
+                  <span>Chargement des positions…</span>
+                </div>
+              </div>
+            )}
+            {!pending && keepMapWhenEmpty && drawn.length === 0 && (
               // A message centred on the map (Pulse layout v2 §5), clear of the zoom/fit controls (top right).
               <div
                 role="status"
@@ -380,7 +399,7 @@ export function ContractPositions({
               </div>
             )}
           </div>
-          {showFleetPanel && (
+          {showFleetPanel && !pending && (
             <FleetPanel statuses={fleetStatuses}>
               <DeviceFilter chipIds={positions.map((p) => p.chipId)} statuses={statusByChip} />
             </FleetPanel>

@@ -1,3 +1,4 @@
+import { SkeletonRows } from '@/ui/patterns/skeleton-rows'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
@@ -201,7 +202,7 @@ function AlertsSection({ alerts, chipId }: { alerts: DeviceAlerts; chipId: strin
         </Link>
       }
     >
-      {alerts.status === 'loading' && <p className="text-sm text-muted-foreground">Chargement des alertes…</p>}
+      {alerts.status === 'loading' && <SkeletonRows label="Chargement des alertes…" rows={3} rowClassName="h-10" />}
       {alerts.status === 'error' && (
         <p className="text-sm text-muted-foreground" data-testid="pilotage-device-alerts-error">
           Alertes indisponibles pour le moment.

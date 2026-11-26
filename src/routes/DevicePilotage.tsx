@@ -7,6 +7,7 @@ import { ShellPageTitle } from '@/ui/patterns/shell-title'
 import { Skeleton } from '@/ui/skeleton'
 import { useContracts } from '../contracts/ContractContext'
 import { DEVICE_PILOTAGE_PATH, deviceAlertsPath, devicePilotagePath, deviceReadingsPath } from '../auth/paths'
+import { DeviceListSkeleton } from '../pilotage/DeviceListSkeleton'
 import { DeviceList } from '../pilotage/DeviceList'
 import { loadPilotageWorkspace } from '../pilotage/loadPilotageWorkspace'
 import type { Position } from '../api/positions'
@@ -168,14 +169,7 @@ export function DevicePilotage() {
           </Alert>
         )}
 
-        {selectedId !== null && workspace.phase === 'loading' && (
-          <div data-testid="pilotage-loading" role="status" aria-busy className="flex flex-col gap-2">
-            <span className="sr-only">Chargement du pilotage…</span>
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-          </div>
-        )}
+        {selectedId !== null && workspace.phase === 'loading' && <DeviceListSkeleton />}
 
         {selectedId !== null && workspace.phase === 'error' && (
           <Alert variant="danger" data-testid="pilotage-error">

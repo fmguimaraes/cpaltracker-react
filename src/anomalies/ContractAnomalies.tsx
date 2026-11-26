@@ -7,7 +7,7 @@ import { AnomalyList, TYPE_ICON, type AnomalySelection } from './AnomalyList'
 import { useLoad } from './useLoad'
 import { Button } from '@/ui/button'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
-import { Skeleton } from '@/ui/skeleton'
+import { SkeletonRows } from '@/ui/patterns/skeleton-rows'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/ui/tooltip'
 
@@ -158,7 +158,7 @@ export function ContractAnomalies({
     )
 
   let body: ReactNode
-  if (state.status === 'loading') body = <Skeleton className="h-48 w-full" data-testid="anomaly-list-loading" />
+  if (state.status === 'loading') body = <SkeletonRows label="Chargement des anomalies…" rows={4} className="gap-4" testId="anomaly-list-loading" />
   else if (state.status === 'error') {
     body = (
       <Empty data-testid="anomaly-list-error">

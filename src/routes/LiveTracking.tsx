@@ -111,7 +111,8 @@ export function LiveTracking() {
         {selectedId !== null && <ContractMessage contractId={selectedId} />}
       </div>
 
-      {selectedId !== null && (
+      {/* FR18/EC17: the map and its loader show while the contract list loads, before any contract is known. */}
+      {(selectedId !== null || state === 'loading') && (
         <>
           <ContractPositions
             contractId={selectedId}

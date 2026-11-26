@@ -1,8 +1,8 @@
+import { SkeletonRows } from '@/ui/patterns/skeleton-rows'
 import { Alert, AlertDescription } from '@/ui/alert'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { ShellBreadcrumb, type ShellBreadcrumbLevel } from '@/ui/patterns/shell-breadcrumb'
 import { ShellPageTitle } from '@/ui/patterns/shell-title'
-import { Skeleton } from '@/ui/skeleton'
 import { useContracts } from '../contracts/ContractContext'
 import { TRENDS_PATH } from '../auth/paths'
 import { TrendsWorkspace } from '../trends/TrendsWorkspace'
@@ -19,7 +19,7 @@ export function Trends() {
       <ShellPageTitle>
         <ShellBreadcrumb levels={TRENDS_LEVELS} />
       </ShellPageTitle>
-      {loadState === 'loading' && <Skeleton className="h-9 w-full" />}
+      {loadState === 'loading' && <SkeletonRows label="Chargement des contrats…" rows={1} rowClassName="h-9" testId="trends-contracts-loading" />}
       {loadState === 'error' && (
         <Alert variant="danger" data-testid="trends-contracts-error">
           <AlertDescription>Impossible de charger vos contrats. Réessayez plus tard.</AlertDescription>

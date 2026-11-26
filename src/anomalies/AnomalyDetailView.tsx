@@ -1,3 +1,4 @@
+import { SkeletonRows } from '@/ui/patterns/skeleton-rows'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { anomalyCardContent } from './anomalyCard'
 import {
@@ -15,7 +16,6 @@ import {
 import { TransitionForm } from './TransitionForm'
 import { Button } from '@/ui/button'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
-import { Skeleton } from '@/ui/skeleton'
 import type { AnomalyDetail as Detail } from '../api/anomalies'
 
 function Context({ detail, now, onShowPallet }: { detail: Detail; now: Date; onShowPallet?: (chipId: string) => void }) {
@@ -101,7 +101,7 @@ export function AnomalyDetailView({
     <section aria-labelledby="anomaly-detail-title" className="flex min-w-0 flex-col" data-testid="anomaly-detail">
       <AnomalyHeader detail={current} now={now} onBack={back} actions={actions} />
 
-      {state.status === 'loading' && !current ? <Skeleton className="h-48 w-full" /> : null}
+      {state.status === 'loading' && !current ? <SkeletonRows label="Chargement de l'anomalie…" rows={1} rowClassName="h-48" testId="anomaly-detail-loading" /> : null}
       {state.status === 'error' && !current ? (
         <Empty data-testid="anomaly-detail-error">
           <EmptyHeader>

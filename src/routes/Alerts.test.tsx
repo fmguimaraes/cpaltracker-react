@@ -199,6 +199,15 @@ describe('Alerts (list page)', () => {
     expect(screen.getByTestId('alerts-contracts-loading')).toBeInTheDocument()
   })
 
+  it('shows the filter with count placeholders at once, before any answer (AC15, AC18)', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    renderAlerts()
+    expect(screen.getByTestId('alerts-status-filter')).toBeInTheDocument()
+    expect(screen.getByTestId('alerts-status-count-loading-open')).toBeInTheDocument()
+    expect(screen.queryByTestId('alerts-status-count-open')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('status').some((el) => el.textContent?.includes('Chargement des alertes…'))).toBe(true)
+  })
+
   it('explains an empty contract, and offers the closed ones when only they exist', async () => {
     const user = userEvent.setup()
     stubFetch(new Response(JSON.stringify({ anomalies: [ROWS[2]] }), { status: 200 }))

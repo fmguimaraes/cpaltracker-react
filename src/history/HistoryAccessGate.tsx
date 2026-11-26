@@ -1,3 +1,4 @@
+import { SkeletonRows } from '@/ui/patterns/skeleton-rows'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Alert } from '@/ui/alert'
 import { Button } from '@/ui/button'
@@ -102,9 +103,7 @@ export function HistoryAccessGate({
 
   if (state.status === 'loading') {
     return (
-      <p data-testid="history-access-loading" className="text-sm text-muted-foreground">
-        Chargement de l'historique…
-      </p>
+      <SkeletonRows label="Chargement de l'historique…" rows={3} rowClassName="h-24" testId="history-access-loading" />
     )
   }
 

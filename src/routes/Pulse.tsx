@@ -5,6 +5,7 @@ import { Alert } from '@/ui/alert'
 import { Button } from '@/ui/button'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
 import { Skeleton } from '@/ui/skeleton'
+import { SkeletonRows } from '@/ui/patterns/skeleton-rows'
 import { ShellBreadcrumb, type ShellBreadcrumbLevel } from '@/ui/patterns/shell-breadcrumb'
 import { ShellPageActions, ShellPageTitle } from '@/ui/patterns/shell-title'
 import { cn } from '@/lib/utils'
@@ -455,7 +456,8 @@ export function Pulse() {
         </div>
       )}
 
-      {selectedId !== null && (
+      {/* FR15/EC17: the map shows (with its loader) while the contract list loads, before any contract is known. */}
+      {(selectedId !== null || state === 'loading') && (
         <div
           data-testid="pulse-split"
           // `isolate`: the map's Leaflet panes and controls (z 400–1000) and its overlays stay in this
@@ -512,7 +514,7 @@ export function Pulse() {
             {drawerCollapsed && (
               <div className="hidden md:flex">
                 {/* A pallet open in the drawer: its latest values; otherwise the open-anomaly count. */}
-                {palletShown ? (
+                {selectedId === null ? null : palletShown ? (
                   <PalletRail position={pallet} onExpand={() => toggleDrawer(false)} />
                 ) : (
                   <AnomaliesRail contractId={selectedId} visibleChipIds={timeline.visibleChipIds} onExpand={() => toggleDrawer(false)} />
@@ -537,7 +539,9 @@ export function Pulse() {
                   (palletShown || view.kind === 'anomaly') && 'pt-2',
                 )}
               >
-                {view.kind === 'anomaly' ? (
+                {selectedId === null ? (
+                  <SkeletonRows label="Chargement des anomalies…" rows={4} className="gap-4" testId="pulse-drawer-loading" />
+                ) : view.kind === 'anomaly' ? (
                   <AnomalyDetailView
                     contractId={selectedId}
                     anomalyKey={view.anomalyKey}

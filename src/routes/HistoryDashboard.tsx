@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Skeleton } from '@/ui/skeleton'
 import { Alert } from '@/ui/alert'
 import { PeriodControl, type PeriodPreset } from '@/ui/patterns/period-control'
 import { ShellBreadcrumb } from '@/ui/patterns/shell-breadcrumb'
@@ -98,9 +99,11 @@ export function HistoryDashboard() {
     return (
       <>
         {loadState === 'loading' && (
-          <p data-testid="history-dashboard-loading" className="text-sm text-muted-foreground">
-            Chargement des contrats…
-          </p>
+          <div data-testid="history-dashboard-loading" role="status" aria-busy className="flex flex-col gap-2">
+            <span className="sr-only">Chargement des contrats…</span>
+            <Skeleton className="h-9 w-64" />
+            <Skeleton className="h-64 w-full" />
+          </div>
         )}
 
         {loadState === 'error' && (
