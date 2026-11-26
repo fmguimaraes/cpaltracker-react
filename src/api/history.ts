@@ -150,10 +150,13 @@ export const EMPTY_MEASURE_SUMMARIES: Record<MeasureKey, MeasureSummary | null> 
 export async function fetchContractHistory(
   contractId: number,
   range: HistoryDateRange = { start: null, end: null },
+  /** One device of the contract only (the Pulse pallet drawer); omitted = every device. */
+  deviceId?: string,
 ): Promise<HistoryResponse> {
   const params = new URLSearchParams()
   if (range.start) params.set('start', formatIsoDate(range.start))
   if (range.end) params.set('end', formatIsoDate(range.end))
+  if (deviceId) params.set('deviceId', deviceId)
   const query = params.toString()
   const path = `/contracts/history.php/${contractId}${query ? `?${query}` : ''}`
   const response = await apiClient.get<HistoryResponse>(path)

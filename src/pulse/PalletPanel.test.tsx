@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnomalyRow } from '../api/anomalies'
 import type { HistoryHook, HistoryResponse, HistoryRow } from '../api/history'
@@ -106,6 +107,7 @@ function renderPanel(props: Partial<Parameters<typeof PalletPanel>[0]> = {}) {
       now={new Date(LAST + 30 * 60_000)}
       {...props}
     />,
+    { wrapper: MemoryRouter },
   )
   return { onBack, onOpenAnomaly, onShowAnomalies }
 }
@@ -190,13 +192,13 @@ describe('PalletPanel', () => {
     expect(onShowAnomalies).toHaveBeenCalledOnce()
   })
 
-  it('asks the contract history over the range, and every anomaly status', () => {
+  it("asks this pallet's history over the range, and every anomaly status", () => {
     fetchContractHistory.mockReturnValue(new Promise(() => {}))
     fetchAnomalies.mockReturnValue(new Promise(() => {}))
     renderPanel()
 
     expect(screen.getByTestId('pallet-loading')).toBeInTheDocument()
-    expect(fetchContractHistory).toHaveBeenCalledWith(7, { start: FROM, end: TO })
+    expect(fetchContractHistory).toHaveBeenCalledWith(7, { start: FROM, end: TO }, 'CHIP-1')
     expect(fetchAnomalies).toHaveBeenCalledWith(7, ['detectee', 'en_cours', 'fermee', 'cloturee'])
   })
 
@@ -280,11 +282,22 @@ describe('PalletPanel', () => {
     expect(await screen.findByTestId('pallet-anomalies-error')).toHaveTextContent('Seuils et anomalies indisponibles.')
   })
 
+  it('links to the device page of the panel contract, in a new tab', () => {
+    fetchContractHistory.mockReturnValue(new Promise(() => {}))
+    renderPanel()
+    const link = screen.getByTestId('pallet-device-page')
+    expect(link).toHaveAttribute('href', `/pilotage/${encodeURIComponent(position.chipId)}?contrat_id=7`)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link).toHaveAccessibleName(`Ouvrir la page du device ${position.chipId} dans un nouvel onglet`)
+  })
+
   it('does not re-fetch when the parent re-creates the same range', () => {
     fetchContractHistory.mockReturnValue(new Promise(() => {}))
     fetchAnomalies.mockReturnValue(new Promise(() => {}))
     const { rerender } = render(
       <PalletPanel contractId={7} position={position} range={{ from: FROM, to: TO }} onBack={() => {}} />,
+      { wrapper: MemoryRouter },
     )
     rerender(
       <PalletPanel contractId={7} position={position} range={{ from: new Date(FROM), to: new Date(TO) }} onBack={() => {}} />,

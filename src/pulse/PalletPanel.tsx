@@ -1,7 +1,9 @@
 import { Fragment, useCallback, useMemo, type ReactNode } from 'react'
-import { ArrowLeft, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, SquareArrowOutUpRight, TriangleAlert } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import type { PlotMouseEvent } from 'plotly.js'
 import { fetchAnomalies, type AnomalyRow } from '../api/anomalies'
+import { devicePilotagePath } from '../auth/paths'
 import { fetchContractHistory, type HistoryHook } from '../api/history'
 import type { Position } from '../api/positions'
 import { formatAbsolute, formatLocalIso, formatMeasure, formatRelative, isClosed } from '../anomalies/anomalyCard'
@@ -86,8 +88,9 @@ export function PalletPanel({
   const toMs = range.to.getTime()
   // Keyed on the instants, not the Date objects, so a parent re-creating `range` does not re-fetch.
   const loadHistory = useCallback(
-    () => fetchContractHistory(contractId, { start: new Date(fromMs), end: new Date(toMs) }),
-    [contractId, fromMs, toMs],
+    // This pallet's readings only: a whole large contract is slow, and too heavy for the API past a month.
+    () => fetchContractHistory(contractId, { start: new Date(fromMs), end: new Date(toMs) }, chipId),
+    [contractId, fromMs, toMs, chipId],
   )
   const { state, reload } = useLoad(loadHistory)
   const loadAnomalies = useCallback(() => fetchAnomalies(contractId, ALL_STATUSES), [contractId])
@@ -146,6 +149,18 @@ export function PalletPanel({
           <h2 id="pallet-panel-title" className="min-w-0 truncate text-base font-semibold" title={chipId}>
             {chipId}
           </h2>
+          <Button asChild variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground">
+            <Link
+              to={`${devicePilotagePath(chipId)}?contrat_id=${contractId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Ouvrir la page du device ${chipId} dans un nouvel onglet`}
+              title="Ouvrir la page du device dans un nouvel onglet"
+              data-testid="pallet-device-page"
+            >
+              <SquareArrowOutUpRight aria-hidden />
+            </Link>
+          </Button>
           {inPeriod.length > 0 && (
             <Button
               variant="ghost"
