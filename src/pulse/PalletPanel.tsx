@@ -2,7 +2,7 @@ import { Fragment, useCallback, useMemo, type ReactNode } from 'react'
 import { ArrowLeft, SquareArrowOutUpRight, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { PlotMouseEvent } from 'plotly.js'
-import { fetchAnomalies, type AnomalyRow } from '../api/anomalies'
+import { fetchAnomalies, peekAnomalies, type AnomalyRow } from '../api/anomalies'
 import { devicePilotagePath } from '../auth/paths'
 import { fetchContractHistory, type HistoryHook } from '../api/history'
 import type { Position } from '../api/positions'
@@ -94,7 +94,9 @@ export function PalletPanel({
   )
   const { state, reload } = useLoad(loadHistory)
   const loadAnomalies = useCallback(() => fetchAnomalies(contractId, ALL_STATUSES), [contractId])
-  const { state: anomalyState } = useLoad(loadAnomalies)
+  // KAN-345 (FR24): reopening the panel shows the cached alerts at once while they are revalidated.
+  const peekAnomalyRows = useCallback(() => peekAnomalies(contractId, ALL_STATUSES), [contractId])
+  const { state: anomalyState } = useLoad(loadAnomalies, peekAnomalyRows)
 
   const anomalies = useMemo<AnomalyRow[]>(
     () => (anomalyState.status === 'ready' ? anomalyState.value.filter((row) => row.chipId === chipId) : []),

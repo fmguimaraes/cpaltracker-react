@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnomalyRow } from '../api/anomalies'
 import type { HistoryHook, HistoryResponse, HistoryRow } from '../api/history'
 import type { Position } from '../api/positions'
+import { cacheStart, clearCache, storeCache } from '../api/responseCache'
 import { anomaliesPillLabel, PalletPanel, palletSubtitle } from './PalletPanel'
 
 // jsdom implements neither canvas nor WebGL, which real Plotly probes at import time. The stand-in keeps
@@ -117,6 +118,7 @@ beforeEach(() => {
   fetchAnomalies.mockReset()
   fetchAnomalies.mockResolvedValue([])
   plot.props = null
+  clearCache()
 })
 
 describe('palletSubtitle / anomaliesPillLabel', () => {
@@ -200,6 +202,21 @@ describe('PalletPanel', () => {
     expect(screen.getByTestId('pallet-loading')).toBeInTheDocument()
     expect(fetchContractHistory).toHaveBeenCalledWith(7, { start: FROM, end: TO }, 'CHIP-1')
     expect(fetchAnomalies).toHaveBeenCalledWith(7, ['detectee', 'en_cours', 'fermee', 'cloturee'])
+  })
+
+  it('shows the cached alerts at once on reopen, with no wait, while revalidating them (KAN-345, FR24)', () => {
+    storeCache(
+      { group: 'anomalies', fn: 'fetchAnomalies', contractId: 7, params: 'detectee,en_cours,fermee,cloturee' },
+      [anomaly({ eventDate: '2026-11-06 09:00:00' })],
+      cacheStart(),
+    )
+    fetchContractHistory.mockReturnValue(new Promise(() => {}))
+    fetchAnomalies.mockReturnValue(new Promise(() => {}))
+    renderPanel()
+
+    // The alerts need no skeleton: the pill is there on the first render, and the list is still revalidated.
+    expect(screen.getByTestId('pallet-anomalies-link')).toHaveTextContent(anomaliesPillLabel(1))
+    expect(fetchAnomalies).toHaveBeenCalledTimes(1)
   })
 
   it('draws the measures of this pallet in one figure, with no weight gauge, KPI or min/max footer', async () => {

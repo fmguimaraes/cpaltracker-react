@@ -183,6 +183,15 @@ test('AC14: Pilotage workspace skeleton is table-shaped at md+ and card-shaped b
   await expectSkeletonsContrast(page, '[data-testid="pilotage-loading-cards"]')
 })
 
+test('344-12 / AC16: History shows its content-shaped skeleton, not text, while the contracts are delayed @desktop', async ({ page }) => {
+  await mockApi(page, DELAY_MS)
+  await page.goto('/history')
+  const loading = page.getByTestId('history-dashboard-loading')
+  await expect(loading).toBeVisible({ timeout: BUDGET_MS })
+  await expect(loading.locator('[data-slot="skeleton"]').first()).toBeVisible()
+  await expectSkeletonsContrast(page, '[data-testid="history-dashboard-loading"]')
+})
+
 test('AC17: a positions error keeps the map and offers "Réessayer" which reloads @desktop', async ({ page }) => {
   let failing = true
   await mockApi(page, 0, {
