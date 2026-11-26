@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { pickContract } from './contract-helpers'
+import { chooseTheme } from './theme-helpers'
 
 /**
  * KAN-173 (epic KAN-140) — Technical Foundation: Stack, Theming, Tests &
@@ -95,12 +96,12 @@ test('the pilotage workspace re-themes with the rest of the app, from the live c
   const readRowBackground = () => deviceRow.evaluate((el) => getComputedStyle(el).backgroundColor)
   const lightBackground = await readRowBackground()
 
-  // Toggle theme from the shared chrome's own entry point (`/`), then
-  // navigate back — the Zustand store (and its `localStorage` mirror) is
-  // app-wide, not per-route, so this is the same persistent theme state
-  // every other route already reads (`App.tsx`'s `data-theme` effect).
+  // Choose the dark theme from the user menu (the top bar has no theme control any more, Pulse layout v2 §3).
+  // The Zustand store (and its `localStorage` mirror) is app-wide, not per-route, so navigating away and back
+  // reads the same persistent theme state every other route already reads (`App.tsx`'s `data-theme` effect).
+  await chooseTheme(page, 'dark')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await page.goto('/')
-  await page.getByTestId('theme-toggle').click()
   await page.goto('/pilotage')
   await pickContract(page, 12)
   await expect(page.getByTestId('pilotage-device-CHIP-000')).toBeVisible()

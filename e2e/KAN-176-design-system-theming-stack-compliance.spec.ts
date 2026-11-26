@@ -109,8 +109,11 @@ test.describe('Header period control range wiring (FR5, FR8, NFR8 — US3)', () 
 
     await page.getByTestId('time-custom').click()
     const popover = page.locator('[data-slot="popover-content"]')
-    // Move the range start 14 months back: the end stays, so the span exceeds 1 year.
+    // The calendar restarts the range on a click once a full range is shown (resetOnSelect): pick the start
+    // 14 months back, then walk forward to the present and pick the end, so the span exceeds 1 year.
     for (let i = 0; i < 14; i++) await popover.locator('.rdp-button_previous').click()
+    await popover.locator('.rdp-day:not(.rdp-outside) button').first().click()
+    for (let i = 0; i < 14; i++) await popover.locator('.rdp-button_next').click()
     await popover.locator('.rdp-day:not(.rdp-outside) button').first().click()
     await popover.getByRole('button', { name: 'Appliquer' }).click()
 
