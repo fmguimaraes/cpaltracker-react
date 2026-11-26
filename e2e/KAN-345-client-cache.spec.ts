@@ -58,6 +58,8 @@ interface Backend {
   hold: Promise<void> | null
   failNext: boolean
   requests: string[]
+  /** Data requests received and not yet answered. */
+  inFlight: number
 }
 
 async function mockApi(page: Page, backend: Backend) {
@@ -73,22 +75,29 @@ async function mockApi(page: Page, backend: Backend) {
       return route.fulfill(json({ contracts: [{ contractId: 12, contractRef: 'REF-012', contractType: 'MAIN' }] }))
     }
     backend.requests.push(url)
-    if (backend.hold) await backend.hold
-    if (backend.failNext) {
-      backend.failNext = false
-      return route.fulfill(json({ error: { code: 'service_unavailable', message: 'down' } }, 503))
+    backend.inFlight += 1
+    try {
+      if (backend.hold) await backend.hold
+      if (backend.failNext) {
+        backend.failNext = false
+        return await route.fulfill(json({ error: { code: 'service_unavailable', message: 'down' } }, 503))
+      }
+      if (url.includes('/anomalies/list.php')) return await route.fulfill(json({ anomalies: backend.anomalies }))
+      if (url.includes('/devices/positions.php') || url.includes('/contracts/pulse.php')) {
+        return await route.fulfill(json({ positions: backend.positions }))
+      }
+      if (url.includes('/devices/config.php')) {
+        return await route.fulfill(json({ deviceId: 'CHIP-001', contractId: 12, config: {} }))
+      }
+      return await route.fulfill(json({}))
+    } finally {
+      backend.inFlight -= 1
     }
-    if (url.includes('/anomalies/list.php')) return route.fulfill(json({ anomalies: backend.anomalies }))
-    if (url.includes('/devices/positions.php') || url.includes('/contracts/pulse.php')) {
-      return route.fulfill(json({ positions: backend.positions }))
-    }
-    if (url.includes('/devices/config.php')) return route.fulfill(json({ deviceId: 'CHIP-001', contractId: 12, config: {} }))
-    return route.fulfill(json({}))
   })
 }
 
 function newBackend(): Backend {
-  return { anomalies: [row('A-1', 'CHIP-001')], positions: [position('CHIP-001')], hold: null, failNext: false, requests: [] }
+  return { anomalies: [row('A-1', 'CHIP-001')], positions: [position('CHIP-001')], hold: null, failNext: false, requests: [], inFlight: 0 }
 }
 
 /** Holds data responses until `release()`. */
@@ -153,11 +162,17 @@ test.describe('KAN-345 client cache @desktop', () => {
     await page.goto('/alertes?statut=all')
     await expect(page.getByTestId('alerts-count')).toHaveText('1 alerte')
 
-    await goTo(page, '/pulse')
-    await expect(page).toHaveURL(/\/pulse/)
+    // The clock only moves on a page that never reads the anomalies key (Pulse does, and a late answer would store a
+    // fresh entry after the forward), and once nothing is in flight.
+    await goTo(page, '/pilotage')
+    await expect(page.getByTestId('pilotage-device-CHIP-001')).toBeVisible()
+    await expect.poll(() => backend.inFlight).toBe(0)
     await page.clock.fastForward('06:00')
     const release = holdResponses(backend)
+    const anomalyRequests = () => backend.requests.filter((url) => url.includes('/anomalies/list.php')).length
+    const before = anomalyRequests()
     await goTo(page, '/alertes')
+    await expect.poll(anomalyRequests).toBeGreaterThan(before)
     await expect(page.getByTestId('alerts-loading')).toBeVisible()
     await expect(page.getByTestId('alerts-count')).toHaveCount(0)
     release()
