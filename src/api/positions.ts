@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import { fetchAndStore, peekCache, type CacheKey } from './responseCache'
+import { fetchAndStore, peekCache, peekFetchedAt, type CacheKey } from './responseCache'
 
 /**
  * `GET /api/v1/devices/positions.php?contractId=...` (KAN-121). Every
@@ -42,6 +42,9 @@ const positionsKey = (contractId: number): CacheKey => ({ group: 'positions', fn
 export function peekPositions(contractId: number): Position[] | undefined {
   return peekCache<Position[]>(positionsKey(contractId))
 }
+
+/** KAN-345: when the cached answer was fetched (epoch ms), for the freshness indicator. */
+export const peekPositionsAt = (contractId: number): number | undefined => peekFetchedAt(positionsKey(contractId))
 
 /** Always hits the network (so a Refresh bypasses the cache) and caches its success (KAN-345). */
 export function fetchPositions(contractId: number): Promise<Position[]> {

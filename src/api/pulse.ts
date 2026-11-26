@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import { fetchAndStore, peekCache, type CacheKey } from './responseCache'
+import { fetchAndStore, peekCache, peekFetchedAt, type CacheKey } from './responseCache'
 import type { Position } from './positions'
 
 /**
@@ -17,6 +17,9 @@ const pulseKey = (contractId: number): CacheKey => ({ group: 'positions', fn: 'f
 export function peekPulse(contractId: number): Position[] | undefined {
   return peekCache<Position[]>(pulseKey(contractId))
 }
+
+/** KAN-345: when the cached snapshot was fetched (epoch ms), for the freshness chip. */
+export const peekPulseAt = (contractId: number): number | undefined => peekFetchedAt(pulseKey(contractId))
 
 /** Always hits the network (Pulse's Refresh bypasses the cache) and caches its success (KAN-345). */
 export function fetchPulse(contractId: number): Promise<Position[]> {

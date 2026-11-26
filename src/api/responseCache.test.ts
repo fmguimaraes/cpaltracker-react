@@ -5,7 +5,7 @@ import { fetchPositions, peekPositions } from './positions'
 import { fetchPulse, peekPulse } from './pulse'
 import { postDeviceTransfer } from './transfer'
 import { postDeviceConfig } from './deviceConfig'
-import { CACHE_MAX_AGE_MS, clearCache, fetchAndStore, peekCache, type CacheKey } from './responseCache'
+import { CACHE_MAX_AGE_MS, clearCache, fetchAndStore, peekCache, peekFetchedAt, type CacheKey } from './responseCache'
 
 const key: CacheKey = { group: 'positions', fn: 'x', contractId: 1 }
 
@@ -54,6 +54,22 @@ describe('responseCache (KAN-345)', () => {
     resolve('late')
     await expect(pending).resolves.toBe('late')
     expect(peekCache(key)).toBeUndefined()
+  })
+
+  it('a slower older response never overwrites a newer-started one for the same key', async () => {
+    let resolveOld!: (v: string) => void
+    const old = fetchAndStore(key, () => new Promise<string>((r) => (resolveOld = r)))
+    await fetchAndStore(key, () => Promise.resolve('newer'))
+    resolveOld('older')
+    await old
+    expect(peekCache(key)).toBe('newer')
+  })
+
+  it('peekFetchedAt gives the entry time while fresh', async () => {
+    vi.setSystemTime(new Date('2026-11-26T09:00:00Z'))
+    await fetchAndStore(key, () => Promise.resolve('a'))
+    expect(peekFetchedAt(key)).toBe(Date.parse('2026-11-26T09:00:00Z'))
+    expect(peekFetchedAt({ ...key, contractId: 9 })).toBeUndefined()
   })
 
   it('setAuthToken clears everything on logout and on another identity (FR25, EC14)', async () => {

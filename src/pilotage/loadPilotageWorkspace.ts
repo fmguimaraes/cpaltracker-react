@@ -1,7 +1,7 @@
 import { ApiError } from '../api/client'
 import { fetchDeviceConfig } from '../api/deviceConfig'
 import { fetchPositions, type Position } from '../api/positions'
-import { cacheGeneration, peekCache, storeCache, type CacheKey } from '../api/responseCache'
+import { cacheStart, peekCache, storeCache, type CacheKey } from '../api/responseCache'
 import { eligibilityFromError } from './eligibility'
 
 /**
@@ -42,7 +42,7 @@ export function peekPilotageWorkspace(contractId: number): PilotageWorkspaceResu
 
 /** Always hits the network; only an `eligible` answer is cached (no error, 404 or ineligible verdict, EC20). */
 export async function loadPilotageWorkspace(contractId: number): Promise<PilotageWorkspaceResult> {
-  const startedAt = cacheGeneration()
+  const startedAt = cacheStart()
   const result = await fetchPilotageWorkspace(contractId)
   if (result.kind === 'eligible') storeCache(workspaceKey(contractId), result, startedAt)
   return result

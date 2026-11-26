@@ -22,6 +22,8 @@ export interface CacheKey {
 interface Entry {
   value: unknown
   fetchedAt: number
+  /** Start order of the request that produced it (see `storeCache`). */
+  seq: number
   group: CacheGroup
   contractId: number
 }
@@ -29,6 +31,8 @@ interface Entry {
 const entries = new Map<string, Entry>()
 /** Bumped by every clear/invalidate: a response that started before one is never stored (EC11, EC14). */
 let generation = 0
+/** Start order of requests; a slower older response never overwrites a newer-started one for the same key. */
+let startCounter = 0
 
 function keyOf({ group, fn, contractId, params }: CacheKey): string {
   return [group, fn, contractId, params ?? ''].join('|')
@@ -48,21 +52,35 @@ export function peekCache<T>(key: CacheKey): T | undefined {
 
 /** Runs `fetcher` (always over the network) and stores its success under `key`, unless the cache was reset meanwhile. */
 export async function fetchAndStore<T>(key: CacheKey, fetcher: () => Promise<T>): Promise<T> {
-  const startedAt = cacheGeneration()
+  const start = cacheStart()
   const value = await fetcher()
-  storeCache(key, value, startedAt)
+  storeCache(key, value, start)
   return value
 }
 
 /** Snapshot taken before a request starts; hand it back to `storeCache` with the response. */
-export function cacheGeneration(): number {
-  return generation
+export interface CacheStart {
+  generation: number
+  seq: number
 }
 
-/** Stores `value` unless a clear/invalidate happened since `startedAt` (the response may be stale or foreign). */
-export function storeCache(key: CacheKey, value: unknown, startedAt: number): void {
-  if (startedAt !== generation) return
-  entries.set(keyOf(key), { value, fetchedAt: Date.now(), group: key.group, contractId: key.contractId })
+export function cacheStart(): CacheStart {
+  startCounter += 1
+  return { generation, seq: startCounter }
+}
+
+/** When the cached value for `key` was fetched (epoch ms), or `undefined` if there is no fresh entry. */
+export function peekFetchedAt(key: CacheKey): number | undefined {
+  return peekCache(key) === undefined ? undefined : entries.get(keyOf(key))?.fetchedAt
+}
+
+/** Stores `value` unless a clear/invalidate happened since `start`, or a newer-started response is already stored. */
+export function storeCache(key: CacheKey, value: unknown, start: CacheStart): void {
+  if (start.generation !== generation) return
+  const id = keyOf(key)
+  const existing = entries.get(id)
+  if (existing && existing.seq > start.seq) return
+  entries.set(id, { value, fetchedAt: Date.now(), seq: start.seq, group: key.group, contractId: key.contractId })
 }
 
 /** Drops a group's entries: one contract's, or every contract's when `contractId` is omitted. */

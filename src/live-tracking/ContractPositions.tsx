@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError } from '../api/client'
-import { fetchPositions, peekPositions, type Position } from '../api/positions'
+import { fetchPositions, peekPositions, peekPositionsAt, type Position } from '../api/positions'
 import { DeviceFilter } from './DeviceFilter'
 import { useDeviceVisibilityStore } from './deviceVisibilityStore'
 import { PositionsMap } from './PositionsMap'
@@ -73,6 +73,7 @@ export function ContractPositions({
   period,
   load = fetchPositions,
   peek = peekPositions,
+  peekAt = peekPositionsAt,
   onCached,
   filter,
   showFleetPanel = true,
@@ -125,6 +126,8 @@ export function ContractPositions({
    * once instead of the loader while `load` revalidates it. `peekPositions` by default. Must be stable and pure.
    */
   peek?: (contractId: number) => Position[] | undefined
+  /** KAN-345: when the cached answer was fetched (epoch ms): the freshness shows its real age. */
+  peekAt?: (contractId: number) => number | undefined
   /** KAN-345: told when the cached snapshot is what the map starts from (Pulse mirrors it for its lot list). */
   onCached?: (positions: Position[]) => void
   /** KAN-272 (Pulse): extra client-side predicate (lot filter) applied after `period`. */
@@ -219,6 +222,8 @@ export function ContractPositions({
       // FR24: show the cached snapshot at once and revalidate behind it.
       setPositions(cached)
       setState('loaded')
+      const at = contractId === null ? undefined : peekAt(contractId)
+      if (at !== undefined) setLastUpdated(new Date(at))
       onCachedRef.current?.(cached)
     } else setState('loading')
     if (contractId === null) return
@@ -243,7 +248,7 @@ export function ContractPositions({
     return () => {
       cancelled = true
     }
-  }, [contractId, showAll, load, peek, attempt])
+  }, [contractId, showAll, load, peek, peekAt, attempt])
 
   function refresh() {
     if (contractId === null) return

@@ -17,7 +17,7 @@ import { statusesForFilter } from '../anomalies/anomalyFormat'
 import { ContractAnomalies } from '../anomalies/ContractAnomalies'
 import { useLoad } from '../anomalies/useLoad'
 import { fetchAnomalies, peekAnomalies } from '../api/anomalies'
-import { fetchPulse, peekPulse } from '../api/pulse'
+import { fetchPulse, peekPulse, peekPulseAt } from '../api/pulse'
 import type { Position } from '../api/positions'
 import { alertPath } from '../auth/paths'
 import { useContracts } from '../contracts/ContractContext'
@@ -489,6 +489,7 @@ export function Pulse() {
               emptyNotice={allHidden ? noneSelectedNotice : undefined}
               load={load}
               peek={peekPulse}
+              peekAt={peekPulseAt}
               onCached={applyCachedSnapshot}
               filter={filter}
               period={period}
