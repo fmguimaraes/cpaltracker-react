@@ -273,7 +273,10 @@ function Fitter({
   emptyFit?: Array<[number, number]>
 }) {
   const map = useMap()
-  const key = fitKey === undefined ? list.map((d) => d.id).join(',') : `${fitKey}|${list.length > 0}`
+  // `emptyFit` arriving counts too: the map can mount before the positions load (Pulse).
+  const hasEmptyFit = Boolean(emptyFit?.length)
+  const key =
+    fitKey === undefined ? `${list.map((d) => d.id).join(',')}|${hasEmptyFit}` : `${fitKey}|${list.length > 0}|${hasEmptyFit}`
   // With `fitKey`: frame once per key (as soon as there is something to frame), plus on every fit request.
   const fitted = useRef<{ key: string | undefined | typeof EMPTY_FIT; trigger: number } | null>(null)
   useEffect(() => {

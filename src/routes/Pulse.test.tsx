@@ -215,6 +215,33 @@ describe('Pulse (KAN-272)', () => {
     expect(screen.getByTestId('pulse-split')).toHaveClass('isolate')
   })
 
+  it('shows the map, the timeline and the loader while the pallets load, then the markers', async () => {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const realFetch = globalThis.fetch
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes('/contracts/pulse.php/')) await gate
+        return realFetch(input, init)
+      }),
+    )
+    renderPulse()
+    const badge = await screen.findByTestId('positions-loading', {}, { timeout: 5000 })
+    expect(badge).toHaveTextContent('Chargement des positions…')
+    expect(screen.getByTestId('positions-map')).toBeInTheDocument()
+    expect(screen.getByTestId('pulse-timeline')).toBeInTheDocument()
+    expect(screen.queryByTestId('marker-CHIP-A')).not.toBeInTheDocument()
+    // No "no pallet in this period" notice while loading.
+    expect(screen.queryByTestId('positions-period-empty')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('positions-empty')).not.toBeInTheDocument()
+    release()
+    expect(await screen.findByTestId('marker-CHIP-A', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByTestId('positions-loading')).not.toBeInTheDocument()
+  })
+
   it('loads the contract from the Pulse endpoint and maps the devices reporting in the last 30 days by default, without the fleet panel', async () => {
     renderPulse()
     expect(await screen.findByTestId('marker-CHIP-A', {}, { timeout: 5000 })).toBeInTheDocument()
@@ -480,7 +507,7 @@ describe('Pulse (KAN-272)', () => {
     expect(screen.getByTestId('pallet-panel')).toHaveAttribute('data-days', '7')
     expect(screen.getByTestId('pulse-period-7d')).toHaveAttribute('data-state', 'on')
     expect(screen.getByTestId('marker-CHIP-A')).toHaveAttribute('data-selected', 'true')
-    expect(screen.getByTestId('map-reveal')).toHaveTextContent('CHIP-A@')
+    expect(await screen.findByTestId('map-reveal')).toHaveTextContent('CHIP-A@')
     // The period choice writes back to the URL in place (no history entry).
     await userEvent.click(screen.getByTestId('pulse-period-24h'))
     await waitFor(() => expect(searchOf().get('periode')).toBe('1j'))

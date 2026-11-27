@@ -200,7 +200,7 @@ describe('Pulse map frame and top-bar controls', () => {
     // Live: "● En direct · HH:MM" with the refresh icon inside; the date and time of the update in the tooltip.
     const chip = within(controls).getByTestId('pulse-freshness')
     expect(chip).toHaveAttribute('data-mode', 'live')
-    expect(chip).toHaveTextContent(/^En direct · \d{2}:\d{2}$/)
+    await waitFor(() => expect(chip).toHaveTextContent(/^En direct · \d{2}:\d{2}$/))
     expect(chip).toHaveAttribute('title', expect.stringMatching(/^Dernière mise à jour \d{1,2}\s\S+\s\d{2}:\d{2}$/))
     expect(within(chip).getByRole('button', { name: 'Rafraîchir' })).toBeEnabled()
     expect(within(controls).queryByTestId('pulse-period')).not.toBeInTheDocument()

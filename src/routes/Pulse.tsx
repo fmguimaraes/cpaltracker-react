@@ -101,7 +101,6 @@ export function Pulse() {
     }
   })
   const [loaded, setLoaded] = useState<Position[]>([])
-  const [snapshotReady, setSnapshotReady] = useState(false)
   // "Charge pleine" of the weight ramp: the heaviest pallet of the latest snapshot.
   const loadMax = useMemo(() => maxMass(loaded), [loaded])
   const [loadedAt, setLoadedAt] = useState(() => new Date())
@@ -130,7 +129,7 @@ export function Pulse() {
       setHoveredChipId(null)
       setReveal(null)
       setHidden(new Set())
-      setSnapshotReady(false)
+      setLoaded([])
     }
   }
   // …and the URL drops the previous contract's selection (in place: no history entry).
@@ -146,14 +145,12 @@ export function Pulse() {
     const positions = await fetchPulse(contractId)
     setLoaded(positions)
     setLoadedAt(new Date())
-    setSnapshotReady(true)
     return positions
   }, [])
 
   // FR24: the cached snapshot also feeds Pulse's own mirror (lot list, timeline bar) at once.
   const applyCachedSnapshot = useCallback((positions: Position[]) => {
     setLoaded(positions)
-    setSnapshotReady(true)
   }, [])
 
   const loadAnomalies = useCallback(
@@ -513,7 +510,7 @@ export function Pulse() {
               // A selected pallet: a click on the map background unselects it (back to the anomalies).
               onMapClick={pallet || cardChipId ? backToContract : undefined}
             />
-            {snapshotReady && <PulseTimelineBar timeline={timeline} ticks={ticks} onTick={openTick} />}
+            <PulseTimelineBar timeline={timeline} ticks={ticks} onTick={openTick} />
           </div>
 
           <aside
