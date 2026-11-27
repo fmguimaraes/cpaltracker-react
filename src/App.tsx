@@ -1,9 +1,10 @@
-import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { AppShellLayout } from './chrome/AppShellLayout'
 import {
   ALERTS_PATH,
-  CHANGE_PASSWORD_PATH,
+  ACCOUNT_PATH,
+  LEGACY_ACCOUNT_PATH,
   DEVICE_PILOTAGE_PATH,
   FORGOT_PASSWORD_PATH,
   HISTORY_DASHBOARD_PATH,
@@ -33,6 +34,12 @@ import { NotFound } from './routes/NotFound'
 import { RequireAuth } from './routes/RequireAuth'
 import { ResetPassword } from './routes/ResetPassword'
 import { Trends } from './routes/Trends'
+
+/** Old `/change-password` links (bookmarks, mails) land on `/account`, keeping `?premiere`. */
+function LegacyAccountRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: ACCOUNT_PATH, search }} replace />
+}
 
 export function App() {
   return (
@@ -74,7 +81,7 @@ export function App() {
               <Route path={FORGOT_PASSWORD_PATH} element={<ForgotPassword />} />
               <Route path={RESET_PASSWORD_PATH} element={<ResetPassword />} />
               <Route
-                path={CHANGE_PASSWORD_PATH}
+                path={ACCOUNT_PATH}
                 element={
                   <RequireAuth allowMustChangePassword>
                     <AccountLayout />
@@ -83,6 +90,7 @@ export function App() {
               >
                 <Route index element={<Account />} />
               </Route>
+              <Route path={LEGACY_ACCOUNT_PATH} element={<LegacyAccountRedirect />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

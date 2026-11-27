@@ -37,14 +37,23 @@ const SUCCESS_MESSAGE = "Adresse enregistrée. Elle n'est pas encore vérifiée.
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function EmailForm({ account }: { account: Account }) {
+export function EmailForm({
+  account,
+  embedded = false,
+  onCancel,
+}: {
+  account: Account;
+  /** Inside an account-page row: no section heading (the row names it), plus a Cancel button. */
+  embedded?: boolean;
+  onCancel?: () => void;
+}) {
   const { updateAccount } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const form = useForm<EmailFormValues>({
     mode: "onSubmit",
-    defaultValues: { currentPassword: "", email: account.mail },
+    defaultValues: { currentPassword: "", email: "" },
   });
   const {
     handleSubmit,
@@ -60,14 +69,14 @@ export function EmailForm({ account }: { account: Account }) {
       await updateAccount({ currentPassword, email: normalized });
       setSuccess(true);
       toast.success(SUCCESS_MESSAGE);
-      reset({ currentPassword: "", email: normalized });
+      reset({ currentPassword: "", email: "" });
     } catch (err) {
       setFormError(mapAccountActionOutcome(err).message);
     }
   });
 
   return (
-    <AccountSection title="Adresse de connexion" testId="account-email-section">
+    <AccountSection bare={embedded} title="Adresse de connexion" testId="account-email-section">
       {success && (
         <Alert
           variant="success"
@@ -118,6 +127,7 @@ export function EmailForm({ account }: { account: Account }) {
                   <Input
                     {...field}
                     type="email"
+                    autoComplete="email"
                     data-testid="account-email-address"
                   />
                 </FormControl>
@@ -151,14 +161,28 @@ export function EmailForm({ account }: { account: Account }) {
             )}
           />
 
-          <Button
-            type="submit"
-            className="self-start"
-            loading={isSubmitting}
-            data-testid="account-email-submit"
-          >
-            Enregistrer l'adresse
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+
+            <Button
+              type="submit"
+              className="self-start"
+              loading={isSubmitting}
+              data-testid="account-email-submit"
+            >
+              Enregistrer l'adresse
+            </Button>
+
+            {onCancel && (
+
+              <Button type="button" variant="ghost" onClick={onCancel} data-testid="account-email-cancel">
+
+                Annuler
+
+              </Button>
+
+            )}
+
+          </div>
         </form>
       </Form>
     </AccountSection>

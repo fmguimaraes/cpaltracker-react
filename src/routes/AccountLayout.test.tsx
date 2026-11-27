@@ -40,11 +40,11 @@ function renderAt(search: string, mustChangePassword: boolean) {
   return render(
     <ThemeProvider>
       <TooltipProvider>
-        <MemoryRouter initialEntries={[`/change-password${search}`]}>
+        <MemoryRouter initialEntries={[`/account${search}`]}>
           <AuthProvider>
             <Routes>
               <Route
-                path="/change-password"
+                path="/account"
                 element={
                   <RequireAuth allowMustChangePassword>
                     <AccountLayout />

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
   ALERTS_PATH,
-  CHANGE_PASSWORD_PATH,
+  ACCOUNT_PATH,
   DEVICE_PILOTAGE_PATH,
   PULSE_PATH,
   TRENDS_PATH,
@@ -43,7 +43,7 @@ function initialsOf(prenom: string, nom: string, mail: string) {
 
 /**
  * The one shell of every authenticated route (layout route, renders `<Outlet/>` through the
- * kit `AppShell`): sidebar + mobile drawer, c-PAL mark, client logo, theme toggle, user menu.
+ * kit `AppShell`): sidebar + mobile drawer, c-PAL mark, client logo, user menu.
  */
 export function AppShellLayout() {
   const { account, isAdmin, logout } = useAuth()
@@ -107,7 +107,7 @@ export function AppShellLayout() {
           caption: account?.role === 'admin' ? 'Administrateur' : 'Client',
           triggerLabel: 'Menu utilisateur',
           account: {
-            to: CHANGE_PASSWORD_PATH,
+            to: ACCOUNT_PATH,
             label: 'Mon compte',
             testId: 'user-menu-account',
           },
@@ -122,7 +122,6 @@ export function AppShellLayout() {
         onNavOpenChange={setNavOpen}
         skipToContentLabel="Aller au contenu"
         navigationLabel="Navigation principale"
-        themeLabels={{ group: 'Thème', light: 'Clair', dark: 'Sombre', system: 'Système' }}
       />
       {/* FBK-TOAST: one toaster for every page's action outcome, centred at the top. */}
       <Toaster position="top-center" />

@@ -42,8 +42,8 @@ function renderGuarded({
           />
           <Route path="/login" element={<div data-testid="login-screen" />} />
           <Route
-            path="/change-password"
-            element={<div data-testid="change-password-screen" />}
+            path="/account"
+            element={<div data-testid="account-screen" />}
           />
         </Routes>
       </AuthProvider>
@@ -110,7 +110,7 @@ describe('RequireAuth', () => {
     renderGuarded()
 
     await waitFor(() =>
-      expect(screen.getByTestId('change-password-screen')).toBeInTheDocument(),
+      expect(screen.getByTestId('account-screen')).toBeInTheDocument(),
     )
     expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument()
   })

@@ -93,7 +93,7 @@ test('redirects a mustChangePassword account away from the protected home route,
 
   await page.goto('/')
 
-  await expect(page).toHaveURL(/\/change-password$/)
+  await expect(page).toHaveURL(/\/account$/)
   await expect(page.getByTestId('account-first-connection-notice')).toBeVisible()
   await expect(page.getByTestId('account-password-form')).toBeVisible()
   await expect(page.getByTestId('account-phone-section')).toHaveCount(0)

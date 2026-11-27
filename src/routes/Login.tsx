@@ -19,7 +19,7 @@ import { useAuth } from "../auth/AuthContext";
 import { getAuthOutcomeMessage } from "../auth/authOutcome";
 import { LOGIN_NOTICE_MESSAGES, parseLoginNotice } from "../auth/loginNotice";
 import {
-  CHANGE_PASSWORD_PATH,
+  ACCOUNT_PATH,
   FORGOT_PASSWORD_PATH,
   HOME_PATH,
 } from "../auth/paths";
@@ -39,7 +39,7 @@ import { sanitizeSuite } from "../auth/suite";
  * just succeeded — skips this form and redirects to the validated `suite`
  * target, else home) and the FR3/FR14 redirect-targeting it depends on
  * (`sanitizeSuite`, the `MustChangePassword` redirect to
- * `CHANGE_PASSWORD_PATH`). Single effect below, reacting to `status`/
+ * `ACCOUNT_PATH`). Single effect below, reacting to `status`/
  * `account`, so there is exactly one place that decides "where does an
  * authenticated visitor on this screen go" — no separate manual navigate on
  * submit success racing it.
@@ -86,7 +86,7 @@ export function Login() {
   useEffect(() => {
     if (status !== "authenticated") return;
     if (account?.mustChangePassword) {
-      navigate(CHANGE_PASSWORD_PATH, { replace: true });
+      navigate(ACCOUNT_PATH, { replace: true });
       return;
     }
     const suite = sanitizeSuite(searchParams.get("suite"));

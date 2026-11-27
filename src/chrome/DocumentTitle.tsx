@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
   ALERTS_PATH,
-  CHANGE_PASSWORD_PATH,
+  ACCOUNT_PATH,
   DEVICE_PILOTAGE_PATH,
   FORGOT_PASSWORD_PATH,
   HISTORY_DASHBOARD_PATH,
@@ -21,7 +21,7 @@ const ROUTE_TITLES: Record<string, string> = {
   [LOGIN_PATH]: 'Sign in',
   [FORGOT_PASSWORD_PATH]: 'Mot de passe oublié',
   [RESET_PASSWORD_PATH]: 'Nouveau mot de passe',
-  [CHANGE_PASSWORD_PATH]: 'Mon compte',
+  [ACCOUNT_PATH]: 'Mon compte',
   [PULSE_PATH]: 'Pulse',
   [LIVE_TRACKING_PATH]: 'Suivi en direct',
   [HISTORY_DASHBOARD_PATH]: 'Historique',

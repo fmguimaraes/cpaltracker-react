@@ -3,7 +3,7 @@ import { chooseTheme } from './theme-helpers'
 
 /**
  * KAN-224 (epic KAN-217) - one AppShell for every authenticated route (FR6, FR7 shell part).
- * Sign out (logout-button) lives only in the shell user menu; /change-password sits in the shell in
+ * Sign out (logout-button) lives only in the shell user menu; /account sits in the shell in
  * normal mode and stays shell-less in first-connection mode (FR12, F-41).
  */
 
@@ -84,7 +84,7 @@ test.describe('KAN-224 app shell', () => {
     await expect(page.getByTestId('cpal-brand-mark')).toHaveCount(1)
   })
 
-  test('AC4 @SI-224-4 the user menu sets the theme: Clair, Sombre, Système (follows the OS); the choice persists', async ({
+  test('AC4 @SI-224-4 the account page sets the theme: Clair, Sombre, Système (follows the OS); the choice persists', async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: 'light' })
@@ -93,7 +93,7 @@ test.describe('KAN-224 app shell', () => {
     const html = page.locator('html')
     // The default is Système (D7, 2026-11-25): the OS says light
     await expect(html).toHaveAttribute('data-theme', 'light')
-    // The top bar has no theme control any more: it lives in the user menu
+    // The top bar has no theme control: it lives on the account page
     await expect(page.getByTestId('theme-toggle')).toHaveCount(0)
     await chooseTheme(page, 'dark')
     await expect(html).toHaveAttribute('data-theme', 'dark')
@@ -122,20 +122,20 @@ test.describe('KAN-224 app shell', () => {
     expect(logoutRequests).toEqual(['POST'])
   })
 
-  test('AC6 @SI-224-6 /change-password renders inside the shell in normal mode (FR12, F-41)', async ({ page }) => {
+  test('AC6 @SI-224-6 /account renders inside the shell in normal mode (FR12, F-41)', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/change-password')
-    await expect(page.getByTestId('account-password-form')).toBeVisible()
+    await page.goto('/account')
+    await expect(page.getByTestId('account-password-edit')).toBeVisible()
+    await expect(page.getByTestId('account-theme-section')).toBeVisible()
     await expect(page.getByTestId('app-sidebar')).toBeVisible()
     await expect(page.getByTestId('app-nav')).toBeVisible()
     await expect(page.getByTestId('shell-toolbar')).toBeVisible()
     await expect(page.getByTestId('user-menu')).toBeVisible()
     await expect(page.locator('main')).toHaveCount(1)
-    await expect(page.getByTestId('account-back-to-app')).toBeVisible()
     await expect(page.getByTestId('account-logout')).toBeVisible()
   })
 
-  test('AC7 @SI-224-7 /change-password stays shell-less in first-connection mode (mustChangePassword and ?premiere)', async ({
+  test('AC7 @SI-224-7 /account stays shell-less in first-connection mode (mustChangePassword and ?premiere)', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -146,16 +146,16 @@ test.describe('KAN-224 app shell', () => {
         body: JSON.stringify({ account: { ...account, mustChangePassword: true } }),
       }),
     )
-    await page.goto('/change-password')
+    await page.goto('/account')
     await expect(page.getByTestId('account-first-connection-notice')).toBeVisible()
     await expect(page.getByTestId('app-sidebar')).toHaveCount(0)
     await expect(page.getByTestId('shell-toolbar')).toHaveCount(0)
     await expect(page.getByTestId('user-menu')).toHaveCount(0)
-    await expect(page.getByTestId('account-back-to-app')).toHaveCount(0)
+    await expect(page.getByTestId('account-logout')).toHaveCount(0)
 
     await page.unroute('**/account.php')
     await mockApi(page)
-    await page.goto('/change-password?premiere')
+    await page.goto('/account?premiere')
     await expect(page.getByTestId('account-first-connection-notice')).toBeVisible()
     await expect(page.getByTestId('app-sidebar')).toHaveCount(0)
     await expect(page.getByTestId('shell-toolbar')).toHaveCount(0)

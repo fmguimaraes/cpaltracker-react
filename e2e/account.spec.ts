@@ -23,19 +23,33 @@ const account = {
   mustChangePassword: false,
 }
 
-test('renders all three sections, gated behind sign-in, for an authenticated visit (FR9)', async ({
+test('renders the account overview with its three editable rows, gated behind sign-in, for an authenticated visit (FR9)', async ({
   page,
 }) => {
   await page.route('**/account.php', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
   )
 
-  await page.goto('/change-password')
+  await page.goto('/account')
 
-  await expect(page.getByTestId('account-password-section')).toBeVisible()
-  await expect(page.getByTestId('account-phone-section')).toBeVisible()
-  await expect(page.getByTestId('account-email-section')).toBeVisible()
+  await expect(page.getByTestId('account-password-edit')).toBeVisible()
+  await expect(page.getByTestId('account-phone-edit')).toBeVisible()
+  await expect(page.getByTestId('account-email-edit')).toBeVisible()
   await expect(page.getByTestId('account-logout')).toBeVisible()
+})
+
+test('redirects the former /change-password URL to /account, keeping the query string', async ({ page }) => {
+  await page.route('**/account.php', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) }),
+  )
+
+  await page.goto('/change-password')
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByTestId('account-password-edit')).toBeVisible()
+
+  await page.goto('/change-password?premiere')
+  await expect(page).toHaveURL(/\/account\?premiere$/)
+  await expect(page.getByTestId('account-first-connection-notice')).toBeVisible()
 })
 
 test('redirects an unauthenticated visit to /login, preserving the return path (FR9)', async ({
@@ -49,9 +63,9 @@ test('redirects an unauthenticated visit to /login, preserving the return path (
     }),
   )
 
-  await page.goto('/change-password')
+  await page.goto('/account')
 
-  await expect(page).toHaveURL(/\/login\?suite=%2Fchange-password$/)
+  await expect(page).toHaveURL(/\/login\?suite=%2Faccount$/)
 })
 
 test('on a successful password change, shows the "other sessions closed" message and stays on the page (FR12)', async ({
@@ -77,7 +91,8 @@ test('on a successful password change, shows the "other sessions closed" message
     }),
   )
 
-  await page.goto('/change-password')
+  await page.goto('/account')
+  await page.getByTestId('account-password-edit').click()
   await page.getByTestId('account-password-current').fill('old-password-1')
   await page.getByTestId('account-password-new').fill('une-phrase-correcte-1')
   await page.getByTestId('account-password-confirmation').fill('une-phrase-correcte-1')
@@ -86,7 +101,7 @@ test('on a successful password change, shows the "other sessions closed" message
   await expect(page.getByTestId('account-password-success')).toContainText(
     'Toutes vos autres sessions ont été fermées',
   )
-  await expect(page).toHaveURL(/\/change-password$/)
+  await expect(page).toHaveURL(/\/account$/)
   expect(patchCalls).toBe(1)
 })
 
@@ -106,7 +121,8 @@ test('treats an empty phone submission as "clear the number" (FR13)', async ({ p
     })
   })
 
-  await page.goto('/change-password')
+  await page.goto('/account')
+  await page.getByTestId('account-phone-edit').click()
   await page.getByTestId('account-phone-number').fill('')
   await page.getByTestId('account-phone-current-password').fill('pw')
   await page.getByTestId('account-phone-submit').click()
@@ -125,7 +141,8 @@ test('rejects an obviously malformed phone number inline before any request is s
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) })
   })
 
-  await page.goto('/change-password')
+  await page.goto('/account')
+  await page.getByTestId('account-phone-edit').click()
   await page.getByTestId('account-phone-number').fill('not-a-phone')
   await page.getByTestId('account-phone-current-password').fill('pw')
   await page.getByTestId('account-phone-submit').click()
@@ -150,7 +167,8 @@ test('shows the "not yet verified" message on a successful e-mail change (FR14)'
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) })
   })
 
-  await page.goto('/change-password')
+  await page.goto('/account')
+  await page.getByTestId('account-email-edit').click()
   await page.getByTestId('account-email-address').fill('new@cpal.test')
   await page.getByTestId('account-email-current-password').fill('pw')
   await page.getByTestId('account-email-submit').click()
@@ -174,7 +192,8 @@ test('renders the API\'s duplicate-address rejection verbatim (FR14)', async ({ 
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) })
   })
 
-  await page.goto('/change-password')
+  await page.goto('/account')
+  await page.getByTestId('account-email-edit').click()
   await page.getByTestId('account-email-address').fill('taken@cpal.test')
   await page.getByTestId('account-email-current-password').fill('pw')
   await page.getByTestId('account-email-submit').click()
@@ -196,7 +215,8 @@ test('renders the shared ipThrottle message on a 429 (FR15, defensive — GAP1)'
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ account }) })
   })
 
-  await page.goto('/change-password')
+  await page.goto('/account')
+  await page.getByTestId('account-email-edit').click()
   await page.getByTestId('account-email-address').fill('new@cpal.test')
   await page.getByTestId('account-email-current-password').fill('pw')
   await page.getByTestId('account-email-submit').click()

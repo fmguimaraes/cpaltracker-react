@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { buildLoginRedirectPath } from '../auth/suite'
-import { CHANGE_PASSWORD_PATH } from '../auth/paths'
+import { ACCOUNT_PATH } from '../auth/paths'
 import { Spinner } from '@/ui/spinner'
 
 interface RequireAuthProps {
@@ -11,7 +11,7 @@ interface RequireAuthProps {
    * Mirrors the backend's own `allowMustChangePassword` gate (api/openapi.yaml
    * `bearerAuth` description, KAN-125): when `true`, an account with
    * `mustChangePassword` may still render this route instead of being
-   * redirected to `CHANGE_PASSWORD_PATH`. Only the password-change route
+   * redirected to `ACCOUNT_PATH`. Only the password-change route
    * itself should ever set this (FR14).
    */
   allowMustChangePassword?: boolean
@@ -58,7 +58,7 @@ export function RequireAuth({
   }
 
   if (account?.mustChangePassword && !allowMustChangePassword) {
-    return <Navigate to={CHANGE_PASSWORD_PATH} replace />
+    return <Navigate to={ACCOUNT_PATH} replace />
   }
 
   return <>{children}</>

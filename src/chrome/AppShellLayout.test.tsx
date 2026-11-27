@@ -135,27 +135,15 @@ describe('AppShellLayout (KAN-224 FR6)', () => {
     )
   })
 
-  it('the theme is a Clair | Sombre | Système choice in the user menu (default Système), not in the top bar', async () => {
+  it('the theme is neither in the top bar nor in the user menu (it lives on the account page)', async () => {
     const user = userEvent.setup()
     renderShell()
     expect(within(await screen.findByTestId('shell-toolbar')).queryByTestId('theme-toggle')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('theme-toggle')).not.toBeInTheDocument()
     await user.click(await screen.findByTestId('user-menu'))
     // Name, then the role.
     // The name arrives with the account, which can land after the menu opens: wait for the text, not the node.
     await waitFor(() => expect(screen.getByTestId('user-menu-identity')).toHaveTextContent(/Demo.*Client$/))
-    const choice = screen.getByTestId('theme-choice')
-    expect(within(choice).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Clair', 'Sombre', 'Système'])
-    expect(screen.getByTestId('theme-system')).toHaveAttribute('data-state', 'on')
-    // The selection reads as in every segmented control of the app: the primary fill.
-    expect(screen.getByTestId('theme-system')).toHaveClass('data-[state=on]:bg-primary', 'data-[state=on]:text-primary-foreground')
-    await user.click(screen.getByTestId('theme-dark'))
-    expect(document.documentElement.dataset.theme).toBe('dark')
-    expect(localStorage.getItem('cpaltracker:theme')).toBe('dark')
-    expect(screen.getByTestId('theme-dark')).toHaveAttribute('data-state', 'on')
-    await user.click(screen.getByTestId('theme-light'))
-    expect(document.documentElement.dataset.theme).toBe('light')
-    expect(localStorage.getItem('cpaltracker:theme')).toBe('light')
+    expect(screen.queryByTestId('theme-choice')).not.toBeInTheDocument()
   })
 
   it('exposes sign out (logout-button) in the user menu', async () => {

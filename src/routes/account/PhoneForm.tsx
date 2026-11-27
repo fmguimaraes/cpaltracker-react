@@ -39,7 +39,16 @@ function isAcceptablePhoneFormat(value: string): boolean {
   return /^\+[1-9][0-9]{7,14}$/.test(stripped);
 }
 
-export function PhoneForm({ account }: { account: Account }) {
+export function PhoneForm({
+  account,
+  embedded = false,
+  onCancel,
+}: {
+  account: Account;
+  /** Inside an account-page row: no section heading (the row names it), plus a Cancel button. */
+  embedded?: boolean;
+  onCancel?: () => void;
+}) {
   const { updateAccount } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -70,7 +79,7 @@ export function PhoneForm({ account }: { account: Account }) {
   });
 
   return (
-    <AccountSection title="Téléphone" testId="account-phone-section">
+    <AccountSection bare={embedded} title="Téléphone" testId="account-phone-section">
       {success && (
         <Alert
           variant="success"
@@ -114,6 +123,7 @@ export function PhoneForm({ account }: { account: Account }) {
                   <Input
                     {...field}
                     type="tel"
+                    autoComplete="tel"
                     placeholder="+33612345678"
                     data-testid="account-phone-number"
                   />
@@ -151,14 +161,28 @@ export function PhoneForm({ account }: { account: Account }) {
             )}
           />
 
-          <Button
-            type="submit"
-            className="self-start"
-            loading={isSubmitting}
-            data-testid="account-phone-submit"
-          >
-            Enregistrer le numéro
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+
+            <Button
+              type="submit"
+              className="self-start"
+              loading={isSubmitting}
+              data-testid="account-phone-submit"
+            >
+              Enregistrer le numéro
+            </Button>
+
+            {onCancel && (
+
+              <Button type="button" variant="ghost" onClick={onCancel} data-testid="account-phone-cancel">
+
+                Annuler
+
+              </Button>
+
+            )}
+
+          </div>
         </form>
       </Form>
     </AccountSection>

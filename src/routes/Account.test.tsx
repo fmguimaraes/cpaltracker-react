@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ThemeProvider } from "@/app/theme";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -63,16 +63,24 @@ function stubFetchWithAccount(
 function renderAccount(search = "") {
   return render(
     <ThemeProvider>
-      <MemoryRouter initialEntries={[`/change-password${search}`]}>
+      <MemoryRouter initialEntries={[`/account${search}`]}>
         <AuthProvider>
           <Routes>
-            <Route path="/change-password" element={<Account />} />
+            <Route path="/account" element={<Account />} />
             <Route path="/login" element={<div data-testid="login-screen" />} />
             <Route path="/" element={<div data-testid="home-screen" />} />
           </Routes>
         </AuthProvider>
       </MemoryRouter>
     </ThemeProvider>,
+  );
+}
+
+/** Normal mode shows an overview; each form opens from its row's "Modifier" button. */
+async function openEditor(name: "password" | "phone" | "email") {
+  fireEvent.click(await screen.findByTestId(`account-${name}-edit`));
+  await waitFor(() =>
+    expect(screen.getByTestId(`account-${name}-section`)).toBeVisible(),
   );
 }
 
@@ -115,31 +123,63 @@ describe("Account (KAN-152, FR9, FR10)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders all three sections, the back-to-app link, and logout when not in first-connection mode", async () => {
-    stubFetchWithAccount(baseAccount);
+  it("renders the account overview, the theme choice, and logout when not in first-connection mode", async () => {
+    stubFetchWithAccount({ ...baseAccount, telephone: "+33612345678" });
     renderAccount();
 
     await waitFor(() =>
-      expect(screen.getByTestId("account-password-section")).toBeVisible(),
+      expect(screen.getByTestId("account-email-value")).toHaveTextContent(
+        "demo@cpal.test",
+      ),
     );
     expect(
       screen.queryByTestId("account-first-connection-notice"),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("account-phone-section")).toBeVisible();
-    expect(screen.getByTestId("account-email-section")).toBeVisible();
+    expect(screen.getByTestId("account-name-value")).toHaveTextContent(
+      "User Demo",
+    );
+    expect(screen.getByTestId("account-role-value")).toHaveTextContent(
+      "Client",
+    );
+    expect(screen.getByTestId("account-phone-value")).toHaveTextContent(
+      "+33612345678",
+    );
+    // No form (and so no "Mot de passe actuel") until a row is opened.
+    expect(screen.queryByTestId("account-password-section")).toBeNull();
+    expect(screen.queryByTestId("account-phone-section")).toBeNull();
+    expect(screen.queryByTestId("account-email-section")).toBeNull();
+    expect(screen.queryByText("Mot de passe actuel")).toBeNull();
     expect(screen.getByTestId("account-logout")).toBeVisible();
-    expect(screen.getByTestId("account-back-to-app")).toBeVisible();
+    expect(screen.getByTestId("account-theme-section")).toBeVisible();
+    expect(screen.getByTestId("theme-system")).toHaveAttribute(
+      "data-state",
+      "on",
+    );
   });
 
-  it("blocks all three action submits until the current-password field is filled (FR11)", async () => {
+  it("opens one editor at a time; Annuler closes it", async () => {
     stubFetchWithAccount(baseAccount);
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-password-section")).toBeVisible(),
-    );
 
+    await openEditor("phone");
+    expect(screen.getAllByText("Mot de passe actuel")).toHaveLength(1);
+    await openEditor("email");
+    expect(screen.queryByTestId("account-phone-section")).toBeNull();
+    expect(screen.getAllByText("Mot de passe actuel")).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("account-email-cancel"));
+    expect(screen.queryByTestId("account-email-section")).toBeNull();
+    expect(screen.getByTestId("account-email-edit")).toBeVisible();
+  });
+
+  it("blocks each action's submit until the current-password field is filled (FR11)", async () => {
+    stubFetchWithAccount(baseAccount);
+    renderAccount();
+
+    await openEditor("password");
     expect(screen.getByTestId("account-password-submit")).toBeDisabled();
+    await openEditor("phone");
     expect(screen.getByTestId("account-phone-submit")).toBeEnabled(); // mode:onSubmit — blocked on submit, not disabled
+    await openEditor("email");
     expect(screen.getByTestId("account-email-submit")).toBeEnabled();
   });
 
@@ -164,9 +204,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
       return null;
     });
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-password-section")).toBeVisible(),
-    );
+    await openEditor("password");
 
     await user.type(screen.getByTestId("account-password-current"), "old-pw");
     await user.type(
@@ -192,9 +230,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
     const user = userEvent.setup();
     stubFetchWithAccount(baseAccount);
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-password-section")).toBeVisible(),
-    );
+    await openEditor("password");
 
     await user.type(
       screen.getByTestId("account-password-current"),
@@ -237,9 +273,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
       return null;
     });
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-phone-section")).toBeVisible(),
-    );
+    await openEditor("phone");
 
     // Bypass client-side validation (a server-only rejection, e.g. some
     // edge case the client regex doesn't catch) to exercise the wire path.
@@ -258,9 +292,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
     const user = userEvent.setup();
     stubFetchWithAccount(baseAccount);
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-phone-section")).toBeVisible(),
-    );
+    await openEditor("phone");
 
     await user.type(screen.getByTestId("account-phone-number"), "not-a-phone");
     await user.type(screen.getByTestId("account-phone-current-password"), "pw");
@@ -296,9 +328,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
       },
     );
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-phone-section")).toBeVisible(),
-    );
+    await openEditor("phone");
 
     await user.clear(screen.getByTestId("account-phone-number"));
     await user.type(screen.getByTestId("account-phone-current-password"), "pw");
@@ -315,9 +345,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
     const user = userEvent.setup();
     stubFetchWithAccount(baseAccount);
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-email-section")).toBeVisible(),
-    );
+    await openEditor("email");
 
     const emailField = screen.getByTestId("account-email-address");
     await user.clear(emailField);
@@ -350,9 +378,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
       return null;
     });
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-email-section")).toBeVisible(),
-    );
+    await openEditor("email");
 
     const emailField = screen.getByTestId("account-email-address");
     await user.clear(emailField);
@@ -381,9 +407,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
       return null;
     });
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-phone-section")).toBeVisible(),
-    );
+    await openEditor("phone");
 
     await user.type(screen.getByTestId("account-phone-number"), "+33612345678");
     await user.type(screen.getByTestId("account-phone-current-password"), "pw");
@@ -413,9 +437,7 @@ describe("Account (KAN-152, FR9, FR10)", () => {
       return null;
     });
     renderAccount();
-    await waitFor(() =>
-      expect(screen.getByTestId("account-phone-section")).toBeVisible(),
-    );
+    await openEditor("phone");
 
     await user.type(screen.getByTestId("account-phone-number"), "+33612345678");
     await user.type(

@@ -14,13 +14,16 @@ export const FORGOT_PASSWORD_PATH = '/forgot-password'
 export const RESET_PASSWORD_PATH = '/reset-password'
 
 /**
- * `RequireAuth`'s `MustChangePassword` gate (KAN-149 FR14) redirects here.
+ * The account page ("Mon compte"). `RequireAuth`'s `MustChangePassword` gate (KAN-149 FR14) redirects here.
  * KAN-152 (FR9-FR15) builds the real page at this path — the account
  * self-service screen (`Account.tsx`), which also serves as this redirect's
  * first-connection mode (the KAN-149-era `ChangePassword` placeholder, and
  * its stale "KAN-155" attribution, are gone).
  */
-export const CHANGE_PASSWORD_PATH = '/change-password'
+export const ACCOUNT_PATH = '/account'
+
+/** Former URL of the account page, kept as a redirect to `ACCOUNT_PATH` (query string preserved). */
+export const LEGACY_ACCOUNT_PATH = '/change-password'
 
 /** KAN-158 — the Live Tracking contract selector / last-known-position view. */
 export const LIVE_TRACKING_PATH = '/live-tracking'

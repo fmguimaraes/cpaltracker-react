@@ -28,7 +28,6 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/ui/sidebar'
-import { ThemeChoiceControl, type ThemeChoiceLabels } from '@/ui/patterns/theme-toggle'
 import { MOBILE_FRAME_WIDTH, useViewport } from '@/ui/patterns/viewport-toggle'
 import { ShellSlotsContext, type ShellSlots } from '@/ui/patterns/shell-title'
 
@@ -91,8 +90,6 @@ export interface AppShellProps {
   navTestId?: string
   /** aria-label of the sidebar collapse/open button. */
   sidebarTriggerLabel?: string
-  /** Copy of the user menu's theme choice (partial override of the defaults). */
-  themeLabels?: Partial<ThemeChoiceLabels>
   /**
    * Controlled nav state from 768 px: `true` = expanded (~256 px, labels), `false` = the icon rail (56 px,
    * tooltips). Absent = the kit's own state (expanded by default).
@@ -139,7 +136,7 @@ function SkipLink({ label }: { label: string }) {
   )
 }
 
-function UserMenu({ menu, themeLabels }: { menu: ShellUserMenu; themeLabels?: Partial<ThemeChoiceLabels> }) {
+function UserMenu({ menu }: { menu: ShellUserMenu }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const { withViewport } = useViewport()
   const navigate = useNavigate()
@@ -159,16 +156,11 @@ function UserMenu({ menu, themeLabels }: { menu: ShellUserMenu; themeLabels?: Pa
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={isMobile ? 'top' : 'right'} align="end" className="w-56">
-        {/* Pulse layout v2 §3: name + role, the theme (Clair | Sombre | Système), then the account and sign out. */}
+        {/* Name + role, then the account and sign out. The theme choice lives on the account page. */}
         <DropdownMenuLabel className="flex min-w-0 flex-col" data-testid="user-menu-identity">
           <span className="truncate">{menu.name}</span>
           <span className="truncate text-xs font-normal text-muted-foreground">{menu.caption}</span>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <div className="flex flex-col gap-1.5 px-2 py-1.5" data-testid="user-menu-theme">
-          <span className="text-xs font-medium text-muted-foreground">{themeLabels?.group ?? 'Thème'}</span>
-          <ThemeChoiceControl labels={themeLabels} />
-        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to={withViewport(menu.account.to)} data-testid={menu.account.testId} onClick={() => setOpenMobile(false)}>
@@ -194,7 +186,7 @@ function UserMenu({ menu, themeLabels }: { menu: ShellUserMenu; themeLabels?: Pa
 
 type AppSidebarProps = Pick<
   AppShellProps,
-  'sections' | 'userMenu' | 'logo' | 'clientLogo' | 'sidebarTop' | 'navigationLabel' | 'sidebarTestId' | 'navTestId' | 'themeLabels'
+  'sections' | 'userMenu' | 'logo' | 'clientLogo' | 'sidebarTop' | 'navigationLabel' | 'sidebarTestId' | 'navTestId'
 >
 
 function AppSidebar({
@@ -206,7 +198,6 @@ function AppSidebar({
   navigationLabel,
   sidebarTestId = 'app-sidebar',
   navTestId = 'app-nav',
-  themeLabels,
 }: AppSidebarProps) {
   const { pathname } = useLocation()
   const { withViewport } = useViewport()
@@ -253,7 +244,7 @@ function AppSidebar({
       {/* Rail: the avatar (initials) stays at the bottom, centred; a click opens the user menu. */}
       <SidebarFooter className="group-data-[collapsible=icon]:px-3">
         {clientLogo && <div className="flex justify-center px-1 pb-1 group-data-[collapsible=icon]:hidden">{clientLogo}</div>}
-        <UserMenu menu={userMenu} themeLabels={themeLabels} />
+        <UserMenu menu={userMenu} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
@@ -301,7 +292,7 @@ function MobileFrame() {
 }
 
 /**
- * The one app shell: collapsible sidebar (sheet on mobile), top bar with the theme toggle,
+ * The one app shell: collapsible sidebar (sheet on mobile), top bar,
  * and the routed page. Navigation, user menu and logo come from the app via props; the single
  * <main> is the skip-link target. `?view=mobile` frames the page in a 390 px iframe; `?frame=1` (inside it)
  * hides the toolbar's toggles and keeps only the menu trigger.
@@ -317,7 +308,6 @@ export function AppShell({
   sidebarTestId,
   navTestId,
   sidebarTriggerLabel = 'Réduire ou déplier le menu',
-  themeLabels,
   navOpen,
   onNavOpenChange,
 }: AppShellProps) {
@@ -343,7 +333,6 @@ export function AppShell({
         navigationLabel={navigationLabel}
         sidebarTestId={sidebarTestId}
         navTestId={navTestId}
-        themeLabels={themeLabels}
       />
       <SidebarInset
         id={MAIN_ID}
@@ -352,7 +341,7 @@ export function AppShell({
       >
         {/*
           The context bar, one row on every page: ☰, the page's breadcrumb (left, shrinks first), its global
-          controls, then last update + refresh (right). The theme lives in the user menu (Pulse layout v2 §3). Pages fill the three slots
+          controls, then last update + refresh (right). The theme lives on the account page. Pages fill the three slots
           through ShellPageTitle / ShellPageActions / ShellPageRefresh. z-20 + the pages' isolated map
           stacking context keep this bar's popovers and menus above the Leaflet panes (z 400–1000).
         */}

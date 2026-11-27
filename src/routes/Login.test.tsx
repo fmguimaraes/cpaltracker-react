@@ -39,8 +39,8 @@ function renderLogin({
               element={<div data-testid="suite-target-screen" />}
             />
             <Route
-              path="/change-password"
-              element={<div data-testid="change-password-screen" />}
+              path="/account"
+              element={<div data-testid="account-screen" />}
             />
           </Routes>
         </AuthProvider>
@@ -618,7 +618,7 @@ describe("Login redirect targeting (FR2, FR3, FR14)", () => {
     renderLogin({ initialEntry: "/login?suite=%2Fcontracts%2F42" });
 
     await waitFor(() =>
-      expect(screen.getByTestId("change-password-screen")).toBeInTheDocument(),
+      expect(screen.getByTestId("account-screen")).toBeInTheDocument(),
     );
   });
 });

@@ -27,7 +27,14 @@ const HIDE_LABEL = "Masquer les caractères";
 const SUCCESS_MESSAGE =
   "Mot de passe enregistré. Toutes vos autres sessions ont été fermées — vous restez connecté ici.";
 
-export function PasswordForm() {
+export function PasswordForm({
+  embedded = false,
+  onCancel,
+}: {
+  /** Inside an account-page row: no section heading (the row names it), plus a Cancel button. */
+  embedded?: boolean;
+  onCancel?: () => void;
+} = {}) {
   const { updateAccount } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -67,7 +74,7 @@ export function PasswordForm() {
   );
 
   return (
-    <AccountSection title="Mot de passe" testId="account-password-section">
+    <AccountSection bare={embedded} title="Mot de passe" testId="account-password-section">
       {success && (
         <Alert
           variant="success"
@@ -175,15 +182,29 @@ export function PasswordForm() {
             )}
           />
 
-          <Button
-            type="submit"
-            className="self-start"
-            disabled={!isValid}
-            loading={isSubmitting}
-            data-testid="account-password-submit"
-          >
-            Enregistrer le mot de passe
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+
+            <Button
+              type="submit"
+              className="self-start"
+              disabled={!isValid}
+              loading={isSubmitting}
+              data-testid="account-password-submit"
+            >
+              Enregistrer le mot de passe
+            </Button>
+
+            {onCancel && (
+
+              <Button type="button" variant="ghost" onClick={onCancel} data-testid="account-password-cancel">
+
+                Annuler
+
+              </Button>
+
+            )}
+
+          </div>
         </form>
       </Form>
     </AccountSection>
