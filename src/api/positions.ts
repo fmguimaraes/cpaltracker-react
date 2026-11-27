@@ -21,6 +21,12 @@ export interface Position {
   accelG: number | null
   /** KAN-272 — only on Pulse positions (`api/pulse.ts`); absent on Live Tracking's. */
   lot?: PositionLot | null
+  /** Pulse only: the pallet's initial weight (kg), first reading above 0 of its current lot hook. */
+  initialWeight?: number | null
+  /** Pulse only: `mass` in % of `initialWeight`, one decimal; null without one of them. */
+  remainingPercent?: number | null
+  /** Pulse only: the state by `remainingPercent` (>= 50 ok, >= 20 warning, below alert; else offline). */
+  weightStatus?: 'ok' | 'warning' | 'alert' | 'offline'
 }
 
 /** KAN-272 — the lot hooked on a device at its latest reading (`null` when none or not the caller's). */

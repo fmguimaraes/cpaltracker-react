@@ -12,7 +12,7 @@ export const STATUS_RANK: Record<DeviceStatus, number> = { ok: 0, offline: 1, wa
 
 /* Full literal class strings so Tailwind's scanner emits them (colors only via token utilities). */
 /* The outline is --signal (spec 2026-11-25); the state is the dot, never the outline */
-const DOT: Record<DeviceStatus, string> = {
+export const STATUS_DOT: Record<DeviceStatus, string> = {
   ok: 'bg-success',
   warning: 'bg-warning',
   alert: 'bg-danger-mark',
@@ -93,11 +93,11 @@ export function deviceIcon(
   // edge, so the state (OK / Avertissement / Alerte / Hors ligne) stays visible without losing the load colour.
   const badge =
     d.load && compact
-      ? `<span class="${DOT[d.status]} absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card" data-status-badge="${d.status}" aria-hidden="true"></span>`
+      ? `<span class="${STATUS_DOT[d.status]} absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card" data-status-badge="${d.status}" aria-hidden="true"></span>`
       : ''
   const dot = d.load
     ? `<span class="${LOAD_DOT[d.load - 1]} relative size-4 shrink-0 rounded-full ring-1 ring-border" aria-hidden="true">${badge}</span>`
-    : `<span class="${DOT[d.status]} flex size-4 shrink-0 items-center justify-center rounded-full text-card" aria-hidden="true">${GLYPH[d.status]}</span>`
+    : `<span class="${STATUS_DOT[d.status]} flex size-4 shrink-0 items-center justify-center rounded-full text-card" aria-hidden="true">${GLYPH[d.status]}</span>`
   const frame =
     'absolute top-0 left-0 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-full text-xs font-semibold tabular-nums transition-transform group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring'
   const text = `${esc(d.id)}<span class="sr-only">, ${esc(statusText)}</span>`

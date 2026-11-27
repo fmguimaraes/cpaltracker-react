@@ -3,11 +3,10 @@ import type { Position } from '../api/positions'
 import { FleetMap, type FleetMapFitControl, type FleetMapTrack, type MapDevice, type MapLabels, type MapTrail, type MapViewport } from '@/ui/map'
 import { cn } from '@/lib/utils'
 import { STATE_LABEL } from './fleetModel'
-import { massStatus } from './markerStyle'
+import { positionStatus } from './markerStyle'
 import { Droplet, Thermometer, Weight, Zap, type LucideIcon } from 'lucide-react'
 import { formatPositionCard, type TooltipMetricKey } from './positionTooltip'
 import { LoadLegend } from './LoadLegend'
-import { loadLevel } from './loadScale'
 
 /**
  * KAN-160 (FR3/FR4) + FR8 — one kit `FleetMap` marker per positioned device
@@ -61,7 +60,7 @@ export function PositionsMap({
   onViewportChange,
   fitKey,
   anchorTooltip = false,
-  loadMax,
+  weightLegend = false,
   fitRequest,
   fitControl,
   markerStyle,
@@ -90,11 +89,8 @@ export function PositionsMap({
   fitKey?: string
   /** Pulse: show the detail card next to its marker instead of in the map's corner (Live Tracking's default). */
   anchorTooltip?: boolean
-  /**
-   * Pulse: colour markers by remaining load relative to this weight ("charge pleine") and show the
-   * legend; absent = the state colours (Live Tracking).
-   */
-  loadMax?: number | null
+  /** Pulse: show the weight legend (marker state colours by remaining weight) over the map, bottom-left. */
+  weightLegend?: boolean
   /** Pulse: bump to frame every device (kit `fitRequest`). */
   fitRequest?: number
   /** Pulse: fit control overrides (kit `fitControl`); absent = the default fit button (Live Tracking). */
@@ -114,12 +110,11 @@ export function PositionsMap({
       positioned.map((p) => ({
         id: p.chipId,
         name: p.chipId,
-        status: massStatus(p.mass),
-        ...(loadMax === undefined ? {} : { load: loadLevel(p.mass, loadMax) ?? undefined }),
+        status: positionStatus(p),
         lat: p.latitude,
         lng: p.longitude,
       })),
-    [positioned, loadMax],
+    [positioned],
   )
   const [ownSelectedId, setOwnSelectedId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -259,8 +254,8 @@ export function PositionsMap({
       onMouseOut={(e: MouseEvent) => setActiveId(markerIdOf(e.relatedTarget))}
     >
       {map}
-      {/* Pulse (load-coloured markers): the colour ramp stays visible over the map, bottom-left. */}
-      {loadMax !== undefined && <LoadLegend className="pointer-events-none absolute bottom-3 left-3 z-1000" />}
+      {/* Pulse: what the marker state colours mean stays visible over the map, bottom-left. */}
+      {weightLegend && <LoadLegend className="pointer-events-none absolute bottom-3 left-3 z-1000" />}
       {shown && (
         <div
           ref={cardRef}

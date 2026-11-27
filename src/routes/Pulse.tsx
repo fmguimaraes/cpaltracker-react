@@ -23,7 +23,6 @@ import { alertPath } from '../auth/paths'
 import { useContracts } from '../contracts/ContractContext'
 import { ContractPositions, type PositionsRefreshState } from '../live-tracking/ContractPositions'
 import { filterByLastReport } from '../live-tracking/lastReportFilter'
-import { maxMass } from '../live-tracking/loadScale'
 import { PalletPanel } from '../pulse/PalletPanel'
 import { PalletRail } from '../pulse/PalletRail'
 import { ALL_LOTS, PalletSelector } from '../pulse/PalletSelector'
@@ -101,8 +100,6 @@ export function Pulse() {
     }
   })
   const [loaded, setLoaded] = useState<Position[]>([])
-  // "Charge pleine" of the weight ramp: the heaviest pallet of the latest snapshot.
-  const loadMax = useMemo(() => maxMass(loaded), [loaded])
   const [loadedAt, setLoadedAt] = useState(() => new Date())
   const [lotChoice, setLotChoice] = useState(ALL_LOTS)
   // Pallets unchecked in the selector: not drawn, and their anomalies not listed.
@@ -503,7 +500,7 @@ export function Pulse() {
               keepMapWhenEmpty
               onViewportChange={timeline.setViewport}
               fitKey={fitKey}
-              loadMax={loadMax}
+              weightLegend
               fitRequest={fitRequest}
               fitControl={overview}
               markerStyle="compact"

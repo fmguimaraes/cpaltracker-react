@@ -56,6 +56,13 @@ describe('positionsAt', () => {
     expect(a).toMatchObject({ chipId: 'A', latitude: 45, longitude: 4, mass: 250, timestamp: new Date(100).toISOString() })
     expect(b).toMatchObject({ chipId: 'B', latitude: 43, longitude: 5 })
   })
+  it('sets the weight state at that instant against the snapshot’s initial weight (Pulse)', () => {
+    const snapshot = { ...position('A'), initialWeight: 1000, remainingPercent: 30, weightStatus: 'warning' as const }
+    expect(positionsAt([snapshot], byDevice, 260)[0]).toMatchObject({ mass: 250, remainingPercent: 25, weightStatus: 'warning' })
+    expect(positionsAt([snapshot], byDevice, 300)[0]).toMatchObject({ mass: 600, remainingPercent: 60, weightStatus: 'ok' })
+    // Live Tracking shape (no initial weight): no weight state added.
+    expect(positionsAt([position('A')], byDevice, 260)[0]).not.toHaveProperty('weightStatus')
+  })
   it('leaves out pallets without a position yet', () => {
     expect(positionsAt([position('A'), position('B')], byDevice, 150).map((p) => p.chipId)).toEqual(['A'])
     expect(positionsAt([position('A')], byDevice, 50)).toEqual([])

@@ -7,7 +7,7 @@ import { useDeviceVisibilityStore } from './deviceVisibilityStore'
 import { PositionsMap } from './PositionsMap'
 import type { FleetMapFitControl, MapTrail, MapViewport } from '@/ui/map'
 import { FleetPanel } from './FleetPanel'
-import { massStatus } from './markerStyle'
+import { positionStatus } from './markerStyle'
 import { Alert } from '@/ui/alert'
 import { Button } from '@/ui/button'
 import { Empty, EmptyDescription, EmptyHeader } from '@/ui/empty'
@@ -85,7 +85,7 @@ export function ContractPositions({
   mapPositions,
   onViewportChange,
   fitKey,
-  loadMax,
+  weightLegend,
   fitRequest,
   fitControl,
   markerStyle,
@@ -153,8 +153,8 @@ export function ContractPositions({
   onViewportChange?: (viewport: MapViewport) => void
   /** Pulse: the map auto-frames only when this key changes (passed to `PositionsMap`). */
   fitKey?: string
-  /** Pulse: colour markers by remaining load against this weight and show the load legend (see `PositionsMap`). */
-  loadMax?: number | null
+  /** Pulse: show the weight legend over the map (see `PositionsMap`). */
+  weightLegend?: boolean
   /** Pulse: bump to frame every pallet on the map ("Tout afficher"), passed to `PositionsMap`. */
   fitRequest?: number
   /** Pulse: the map's fit control overrides ("Vue d'ensemble"), passed to `PositionsMap`. */
@@ -285,9 +285,9 @@ export function ContractPositions({
     const inPeriod = period ? filterByLastReport(allPositions, period) : allPositions
     return filter ? inPeriod.filter(filter) : inPeriod
   }, [allPositions, period, filter])
-  const fleetStatuses = useMemo(() => positions.map((p) => massStatus(p.mass)), [positions])
+  const fleetStatuses = useMemo(() => positions.map(positionStatus), [positions])
   const statusByChip = useMemo(
-    () => Object.fromEntries(positions.map((p) => [p.chipId, massStatus(p.mass)])),
+    () => Object.fromEntries(positions.map((p) => [p.chipId, positionStatus(p)])),
     [positions],
   )
   // Pulse's empty map opens on every last known position of the contract (period and filter ignored).
@@ -389,7 +389,7 @@ export function ContractPositions({
               fitKey={fitKey}
               // Without the fleet panel (Pulse) the corner is free of context: show the card by its marker.
               anchorTooltip={!showFleetPanel}
-              loadMax={loadMax}
+              weightLegend={weightLegend}
               fitRequest={fitRequest}
               fitControl={fitControl}
               markerStyle={markerStyle}

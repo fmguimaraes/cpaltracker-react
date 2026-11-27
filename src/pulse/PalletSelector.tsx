@@ -3,7 +3,7 @@ import { ChevronDown, LocateFixed } from 'lucide-react'
 import type { Position } from '../api/positions'
 import { formatAbsolute, formatLocalIso, formatRelative } from '../anomalies/anomalyCard'
 import { STATE_LABEL, STATES } from '../live-tracking/fleetModel'
-import { massStatus } from '../live-tracking/markerStyle'
+import { positionStatus } from '../live-tracking/markerStyle'
 import { Button } from '@/ui/button'
 import { Checkbox } from '@/ui/checkbox'
 import { Label } from '@/ui/label'
@@ -17,7 +17,7 @@ export const ALL_LOTS = 'all'
 
 /** "6 palettes · 5 OK · 1 Alerte" — the fleet summary ported from Suivi en direct (zero counts left out). */
 export function fleetSummary(positions: Position[]): string {
-  const counts = countByStatus(positions.map((p) => ({ status: massStatus(p.mass) })))
+  const counts = countByStatus(positions.map((p) => ({ status: positionStatus(p) })))
   const total = `${positions.length} ${positions.length > 1 ? 'palettes' : 'palette'}`
   return [total, ...STATES.filter((state) => counts[state] > 0).map((state) => `${counts[state]} ${STATE_LABEL[state]}`)].join(' · ')
 }
@@ -169,7 +169,7 @@ export function PalletSelector({
             {rows.map((position) => {
               const { chipId } = position
               const shown = !hidden.has(chipId)
-              const status = massStatus(position.mass)
+              const status = positionStatus(position)
               const last = lastReading(position, reference)
               const checkboxId = `${listId}-${chipId}`
               return (

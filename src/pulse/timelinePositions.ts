@@ -5,6 +5,7 @@ import { validateDateRangeInputs } from '../history/dateRange'
 import { findLastIndexAtOrBefore, trailPositions, type DeviceSeries } from '../history/timelineData'
 import type { MapTrail, MapViewport } from '@/ui/map'
 import type { PeriodPreset } from '@/ui/patterns/period-control'
+import { weightState } from '../live-tracking/markerStyle'
 
 /**
  * Pulse timeline — pure helpers: the page's one period (a preset or typed du/au dates), the pallets'
@@ -148,6 +149,8 @@ export function positionsAt(positions: Position[], byDevice: Map<string, DeviceS
       mass: row.m,
       mpuTemperature: row.tm,
       accelG: row.g,
+      // The weight state at that instant, against the snapshot's initial weight (Pulse snapshots only).
+      ...(position.initialWeight === undefined ? {} : weightState(row.m, position.initialWeight)),
     })
   }
   return out

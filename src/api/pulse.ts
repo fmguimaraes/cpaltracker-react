@@ -4,8 +4,8 @@ import type { Position } from './positions'
 
 /**
  * KAN-272 — `GET /api/v1/contracts/pulse.php/{contractId}`: Live Tracking's position shape plus the lot
- * hooked on each device (`lot`, null unless the caller owns it). `remainingWeight` equals `mass` (same
- * `V_PULSE` reading), so the existing mass thresholds colour the markers unchanged.
+ * hooked on each device (`lot`, null unless the caller owns it), and the weight state computed by the
+ * backend against the pallet's initial weight (`initialWeight`, `remainingPercent`, `weightStatus`).
  */
 interface PulseResponse {
   positions: Position[]

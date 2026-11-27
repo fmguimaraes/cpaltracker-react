@@ -18,3 +18,30 @@ export function massStatus(mass: number | null): DeviceStatus {
   if (mass < 500) return 'warning'
   return 'ok'
 }
+
+/**
+ * Pulse (owner 2026-11-27): the state by remaining weight in % of the pallet's initial weight — ok >= 50 %,
+ * warning >= 20 %, alert below; offline with no reading or no usable initial weight. The backend computes it
+ * (`weightStatus`, api/v1/contracts/pulse.php, cpal_pulse_statut_poids); this mirror only serves playback,
+ * where a past reading is set against the snapshot's initial weight. Keep both in step.
+ */
+export const WEIGHT_OK_PERCENT = 50
+export const WEIGHT_WARNING_PERCENT = 20
+
+export function weightState(
+  mass: number | null,
+  initialWeight: number | null,
+): { remainingPercent: number | null; weightStatus: DeviceStatus } {
+  if (mass === null || Number.isNaN(mass) || initialWeight === null || initialWeight <= 0) {
+    return { remainingPercent: null, weightStatus: 'offline' }
+  }
+  const remainingPercent = Math.round((mass / initialWeight) * 1000) / 10
+  const weightStatus =
+    remainingPercent >= WEIGHT_OK_PERCENT ? 'ok' : remainingPercent >= WEIGHT_WARNING_PERCENT ? 'warning' : 'alert'
+  return { remainingPercent, weightStatus }
+}
+
+/** A position's state: the backend's weight state when given (Pulse), else the kg thresholds (Live Tracking). */
+export function positionStatus(p: { mass: number | null; weightStatus?: DeviceStatus }): DeviceStatus {
+  return p.weightStatus ?? massStatus(p.mass)
+}
