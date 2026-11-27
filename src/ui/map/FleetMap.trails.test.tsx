@@ -50,9 +50,9 @@ describe('FleetMap trails', () => {
     expect(lines.map((l) => JSON.parse(l.dataset.positions!))).toEqual([trails[0].points, trails[1].points])
     for (const line of lines) {
       expect(line).toHaveAttribute('data-interactive', 'false')
-      // Chart theme primary, thin and dashed (2.5 px light, 2 px dark; owner 2026-11-26).
-      expect(['2', '2.5']).toContain(line.dataset.weight)
-      expect(line).toHaveAttribute('data-dash', '6 6')
+      // Chart theme primary, thin and dashed (1.5 px light, 1.25 px dark; owner 2026-11-27).
+      expect(['1.25', '1.5']).toContain(line.dataset.weight)
+      expect(line).toHaveAttribute('data-dash', '4 4')
       expect(line).toHaveAttribute('data-color')
     }
 

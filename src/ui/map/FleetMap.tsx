@@ -487,8 +487,8 @@ function TrailLayer({ trails }: { trails: MapTrail[] }) {
             // Thin dashed line (owner 2026-11-26), so it doesn't compete with the markers.
             pathOptions={{
               color: chartTheme.primary,
-              weight: chartTheme.theme === 'light' ? 2.5 : 2,
-              dashArray: '6 6',
+              weight: chartTheme.theme === 'light' ? 1.5 : 1.25,
+              dashArray: '4 4',
               opacity: 1,
             }}
           />
